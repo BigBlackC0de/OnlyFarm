@@ -1,5 +1,5 @@
 --[[---------------------------------------------------------------------------
-	OptiFarm — Core/Database.lua
+	OnlyFarm — Core/Database.lua
 
 	Persistance. Remplit le rôle d'AceDB-3.0 sans la dépendance :
 	  ns.db.global   — partagé par tout le compte (verrous, routes, exclusions)
@@ -81,7 +81,7 @@ local function Migrate(sv)
 		sv.schema = from
 	end
 	if sv.schema and sv.schema > CURRENT_SCHEMA then
-		ns:Print("base écrite par une version plus récente d'OptiFarm (schéma %d > %d).",
+		ns:Print("base écrite par une version plus récente d'OnlyFarm (schéma %d > %d).",
 			sv.schema, CURRENT_SCHEMA)
 	end
 end
@@ -91,8 +91,8 @@ end
 --------------------------------------------------------------------------------
 
 function Database:OnInitialize()
-	if type(OptiFarmDB) ~= "table" then OptiFarmDB = {} end
-	local sv = OptiFarmDB
+	if type(OnlyFarmDB) ~= "table" then OnlyFarmDB = {} end
+	local sv = OnlyFarmDB
 
 	Migrate(sv)
 
@@ -172,8 +172,8 @@ end
 --  planteraient au premier accès. Un /reload reste conseillé pour repartir
 --  d'un état propre côté modules.
 function Database:Wipe()
-	OptiFarmDB = nil
-	OptiFarmScanDB = nil
+	OnlyFarmDB = nil
+	OnlyFarmScanDB = nil
 	self:OnInitialize()
 	self:OnEnable()
 end

@@ -1,5 +1,5 @@
 --[[---------------------------------------------------------------------------
-	OptiFarm — Core/Init.lua
+	OnlyFarm — Core/Init.lua
 
 	Espace de noms, bus d'événements/messages, système de modules.
 
@@ -23,14 +23,14 @@ ns.Data = ns.Data or {}
 -- Journalisation
 --------------------------------------------------------------------------------
 
-local CHAT_PREFIX = "|cff7ac1ffOptiFarm|r: "
+local CHAT_PREFIX = "|cff7ac1ffOnlyFarm|r: "
 
 function ns:Print(fmt, ...)
 	local msg = select("#", ...) > 0 and fmt:format(...) or fmt
 	DEFAULT_CHAT_FRAME:AddMessage(CHAT_PREFIX .. msg)
 end
 
---- Trace de debug. Silencieuse tant que `/optifarm debug` n'a pas été activé.
+--- Trace de debug. Silencieuse tant que `/onlyfarm debug` n'a pas été activé.
 function ns:Debug(fmt, ...)
 	if not ns.debugEnabled then return end
 	local msg = select("#", ...) > 0 and fmt:format(...) or fmt
@@ -243,4 +243,10 @@ ns:RegisterEvent("PLAYER_LOGIN", bootstrap, "PLAYER_LOGIN")
 ns:RegisterEvent("PLAYER_ENTERING_WORLD", bootstrap, "PLAYER_ENTERING_WORLD")
 
 -- Exposé pour le débogage en jeu et pour les tests headless.
-_G.OptiFarm = ns
+-- Textures de l'addon. Chemins sans extension : le client choisit entre .tga
+-- et .blp tout seul. Un chemin invalide s'affiche en carré vert, pas en erreur,
+-- donc c'est un point à vérifier à l'œil et pas en test.
+ns.LOGO_TEXTURE = "Interface\\AddOns\\OnlyFarm\\Media\\logo"
+ns.MINIMAP_TEXTURE = "Interface\\AddOns\\OnlyFarm\\Media\\minimap"
+
+_G.OnlyFarm = ns

@@ -1,10 +1,10 @@
-# OptiFarm — Spécification technique
+# OnlyFarm — Spécification technique
 
 **Addon World of Warcraft (Retail) — planificateur de farm de montures**
 Version 1.0 · Cible : Retail (The War Within / Midnight, API 11.x+)
 
 > Document d'origine, rédigé sous le nom de travail « MountRoute ». Le projet
-> s'appelle **OptiFarm**. Le texte est conservé tel quel ; les corrections
+> s'appelle **OnlyFarm**. Le texte est conservé tel quel ; les corrections
 > apportées après vérification contre le client réel sont dans
 > [`API-NOTES.md`](API-NOTES.md), et l'état d'avancement dans
 > [`../CONTRIBUTING.md`](../CONTRIBUTING.md).
@@ -73,8 +73,8 @@ Trois fonctions :
 ## 3. Architecture
 
 ```
-OptiFarm/
-├─ OptiFarm.toc
+OnlyFarm/
+├─ OnlyFarm.toc
 ├─ libs/                    Ace3, LibDeflate, LibSerialize, HereBeDragons, LibDBIcon
 ├─ Core/
 │  ├─ Init.lua              bootstrap AceAddon, namespace, event bus
@@ -240,7 +240,7 @@ for i = 1, GetNumSavedInstances() do
 end
 ```
 
-Écrit dans `OptiFarmDB.global.chars[realm-name]`, avec `lastSeen`. Un raid absent du store et non expiré = **disponible**.
+Écrit dans `OnlyFarmDB.global.chars[realm-name]`, avec `lastSeen`. Un raid absent du store et non expiré = **disponible**.
 
 Les donjons legacy n'apparaissent quasiment jamais dans les saved instances (reset quotidien, verrou court) : pour eux, l'addon suit ses propres entrées via `PLAYER_ENTERING_WORLD` + `IsInInstance()` et compare à la frontière de reset quotidien du royaume.
 
@@ -428,7 +428,7 @@ Le point sur lequel la plupart des addons de ce type déçoivent. Le cahier des 
 Schéma de stockage :
 
 ```lua
-OptiFarmDB.global.routes["Legacy mardi"] = {
+OnlyFarmDB.global.routes["Legacy mardi"] = {
     version = 2,
     steps = {
         { sourceID="srcICC_LK", pinned=true,  condition="missing" },
@@ -443,7 +443,7 @@ OptiFarmDB.global.routes["Legacy mardi"] = {
 ## 9. Persistance
 
 ```
-OptiFarmDB
+OnlyFarmDB
 ├─ global
 │  ├─ chars["Krayne-Hyjal"] = { lockouts={}, quests={}, teleports={}, lastSeen=… }
 │  ├─ routes[name]          = { steps={}, version=… }
@@ -508,4 +508,4 @@ La phase 1 seule est déjà utilisable au quotidien — c'est le bon point d'arr
 - **Estimation de fin** : « à ce rythme, Invincible tombe statistiquement autour de la semaine 47 ». Purement indicatif, mais motivant.
 - **Intégration Rarity** : si l'addon Rarity est présent, lire ses compteurs de tentatives plutôt que de dupliquer le suivi.
 - **Alerte de reset** : notification le jour du reset avec le nombre de tentatives disponibles.
-- **Détection de groupe** : si des membres du groupe ont aussi OptiFarm, afficher les cibles communes pour organiser un tour de farm collectif.
+- **Détection de groupe** : si des membres du groupe ont aussi OnlyFarm, afficher les cibles communes pour organiser un tour de farm collectif.

@@ -1,49 +1,64 @@
 # Media
 
-Textures de l'addon. **Ce dossier attend le logo OptiFarm.**
+Identité visuelle d'OnlyFarm.
+
+| Fichier | Rôle |
+|---|---|
+| `mark.svg` | symbole seul — **source vectorielle**, c'est le fichier à éditer |
+| `logo.svg` | logo complet (symbole + wordmark + accroche) |
+| `mark.png` | rendu 512 × 512 du symbole |
+| `logo.png` | rendu 1280 × 440 du logo complet, pour le README |
+| `logo.tga` | 128 × 128 — portrait de la fenêtre et icône du `.toc` |
+| `minimap.tga` | 64 × 64 — bouton minimap (phase 4) |
+
+Les deux `.tga` sont déjà en place et référencés par `OnlyFarm.toc` et
+`Core/Init.lua`. Rien à faire pour les utiliser.
+
+## L'idée
+
+Un cadenas dont l'anse est un fer à cheval, posé sur un disque radar traversé
+par une route.
+
+Le fer à cheval dit « monture », le cadenas dit « contenu verrouillé » — et ça
+tombe bien, parce que **les verrous d'instance sont littéralement le sujet de
+l'addon**. Le clin d'œil au nom passe par là plutôt que par un pastiche de la
+charte de qui que ce soit : le dessin est original, aucune marque existante
+n'est reprise. Utile si tu publies un jour sur CurseForge, où une imitation
+trop littérale d'un logo connu se fait retirer.
 
 ## Contrainte : WoW ne lit pas les PNG
 
-Le client n'accepte que `.tga` et `.blp` pour les textures d'addon. Un `.png`
-posé ici ne s'affichera pas — c'est l'erreur classique.
+Le client n'accepte que `.tga` et `.blp`. Un `.png` posé ici ne s'affichera
+pas — c'est l'erreur classique. Et un chemin de texture invalide ne produit pas
+d'erreur Lua : ça s'affiche en **carré vert**. À vérifier à l'œil.
 
-## Fichiers attendus
-
-| Fichier | Dimensions | Usage |
-|---|---|---|
-| `logo.tga` | 128 × 128 | portrait de la fenêtre principale, icône du `.toc` |
-| `minimap.tga` | 64 × 64 | bouton minimap (phase 4, LibDBIcon) |
-
-## Export
-
-Depuis le PNG du logo, avec ImageMagick :
+## Régénérer après une modification du SVG
 
 ```bash
-magick logo.png -resize 128x128 -background none -gravity center -extent 128x128 \
-       -define tga:image-origin=TopLeft logo.tga
-magick logo.png -resize 64x64 -background none -gravity center -extent 64x64 \
-       -define tga:image-origin=TopLeft minimap.tga
+# Rendus PNG
+rsvg-convert -w 512  -h 512 Media/mark.svg -o Media/mark.png
+rsvg-convert -w 1280 -h 440 -b '#071624' Media/logo.svg -o Media/logo.png
+
+# Textures du jeu
+for size in 128 64; do rsvg-convert -w $size -h $size Media/mark.svg -o /tmp/mark$size.png; done
+convert /tmp/mark128.png -background none -alpha on -type TrueColorAlpha -depth 8 \
+        -compress none -define tga:image-origin=TopLeft Media/logo.tga
+convert /tmp/mark64.png  -background none -alpha on -type TrueColorAlpha -depth 8 \
+        -compress none -define tga:image-origin=TopLeft Media/minimap.tga
 ```
 
-Points de vigilance :
+Trois règles à ne pas casser :
 
 * **dimensions en puissance de deux** (32, 64, 128, 256…), sinon la texture est
   ignorée ou déformée ;
-* **32 bits avec canal alpha** pour garder la transparence autour du logo ;
-* le logo étant plus large que haut, le carré 128 × 128 laissera des marges —
-  d'où le `-extent` centré plutôt qu'un étirement.
+* **32 bits avec canal alpha** (`-type TrueColorAlpha`), sinon plus de
+  transparence autour du badge ;
+* **non compressé** (`-compress none`) : le client gère mal la compression RLE
+  de certains encodeurs TGA.
 
-## Une fois les fichiers en place
+## Polices
 
-Décommenter dans `OptiFarm.toc` :
-
-```
-## IconTexture: Interface\AddOns\OptiFarm\Media\logo
-```
-
-(sans extension), et dans `UI/MainFrame.lua`, remplacer l'icône Blizzard par
-`Interface\\AddOns\\OptiFarm\\Media\\logo` dans l'appel à `SetPortraitToAsset`.
-
-Tant que les fichiers sont absents, l'addon utilise une icône du jeu : un
-chemin de texture invalide s'affiche en carré vert, ce qui est pire que pas de
-logo.
+Les rendus ci-dessus utilisent DejaVu Sans, qui est ce que la machine de build
+avait sous la main. Une police plus ronde (Nunito, Quicksand, Baloo…) collerait
+mieux au ton. Si tu en installes une, remplace `font-family` dans `logo.svg` et
+régénère — ou convertis le texte en tracés pour que le fichier soit autonome.

@@ -1,5 +1,5 @@
 --[[---------------------------------------------------------------------------
-	OptiFarm — Core/Commands.lua
+	OnlyFarm — Core/Commands.lua
 
 	Commandes slash. Chargé en dernier : tous les modules existent.
 -----------------------------------------------------------------------------]]
@@ -11,9 +11,9 @@ local Commands = ns:NewModule("Commands", 90)
 local handlers = {}
 
 function Commands:OnEnable()
-	SLASH_OPTIFARM1 = "/optifarm"
-	SLASH_OPTIFARM2 = "/of"
-	SlashCmdList["OPTIFARM"] = function(input)
+	SLASH_ONLYFARM1 = "/onlyfarm"
+	SLASH_ONLYFARM2 = "/of"
+	SlashCmdList["ONLYFARM"] = function(input)
 		Commands:Dispatch(input or "")
 	end
 end

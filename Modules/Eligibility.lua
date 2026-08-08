@@ -1,5 +1,5 @@
 --[[---------------------------------------------------------------------------
-	OptiFarm — Modules/Eligibility.lua
+	OnlyFarm — Modules/Eligibility.lua
 
 	Répond à « cette monture, je peux tenter de l'avoir maintenant, et sur quel
 	personnage ? »

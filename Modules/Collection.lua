@@ -1,5 +1,5 @@
 --[[---------------------------------------------------------------------------
-	OptiFarm — Modules/Collection.lua
+	OnlyFarm — Modules/Collection.lua
 
 	Diff de collection : croise le Journal des montures avec ce que le
 	personnage courant peut réellement obtenir, et produit la liste des

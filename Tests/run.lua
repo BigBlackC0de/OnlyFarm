@@ -1,6 +1,6 @@
 #!/usr/bin/env lua5.1
 --[[---------------------------------------------------------------------------
-	OptiFarm — Tests/run.lua
+	OnlyFarm — Tests/run.lua
 
 	Lancement :  lua5.1 Tests/run.lua      (depuis la racine du dépôt)
 -----------------------------------------------------------------------------]]
@@ -125,7 +125,7 @@ end)
 test("Database — création et estampille de schéma", function()
 	stub.Reset()
 	local ns = harness.Load(stub)
-	eq(_G.OptiFarmDB.schema, 1, "schéma estampillé")
+	eq(_G.OnlyFarmDB.schema, 1, "schéma estampillé")
 	eq(ns.db.charKey, "Krayne-Hyjal", "clé de personnage")
 	eq(type(ns.db.global.chars["Krayne-Hyjal"]), "table", "entrée de personnage créée")
 	eq(ns.db.char.faction, "Alliance", "instantané écrit à PLAYER_LOGIN")
@@ -134,7 +134,7 @@ end)
 
 test("Database — base existante préservée", function()
 	stub.Reset()
-	_G.OptiFarmDB = {
+	_G.OnlyFarmDB = {
 		schema = 1,
 		global = { chars = { ["Zaltus-Hyjal"] = { name = "Zaltus", lastSeen = 1 } },
 			excluded = { [777] = true } },

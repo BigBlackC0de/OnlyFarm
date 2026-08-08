@@ -1,5 +1,5 @@
 --[[---------------------------------------------------------------------------
-	OptiFarm — Data/Sources.lua
+	OnlyFarm — Data/Sources.lua
 
 	Schéma de la base des sources + table statique.
 
@@ -10,7 +10,7 @@
 	main ici : un mountID ou un instanceID inventé produit un addon qui ment
 	silencieusement, ce qui est pire que pas de données du tout.
 
-	En attendant, OptiFarm fonctionne sans cette table :
+	En attendant, OnlyFarm fonctionne sans cette table :
 	  * la liste des montures manquantes vient entièrement du client
 	    (C_MountJournal), donc elle est exacte et se met à jour toute seule ;
 	  * la catégorie de source vient de `sourceType` + du texte de source du
@@ -52,7 +52,7 @@ Data.LOCKOUT = {
 }
 
 --------------------------------------------------------------------------------
--- Correspondance sourceType (client) -> nature de source (OptiFarm)
+-- Correspondance sourceType (client) -> nature de source (OnlyFarm)
 --
 -- `sourceType` est le 6e retour de C_MountJournal.GetMountInfoByID. Le libellé
 -- localisé correspondant est toujours _G["BATTLE_PET_SOURCE_"..sourceType] :

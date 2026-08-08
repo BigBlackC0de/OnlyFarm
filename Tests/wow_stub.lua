@@ -1,5 +1,5 @@
 --[[---------------------------------------------------------------------------
-	OptiFarm — Tests/wow_stub.lua
+	OnlyFarm — Tests/wow_stub.lua
 
 	Environnement WoW minimal pour Lua 5.1 standard.
 
@@ -338,8 +338,8 @@ function stub.Reset()
 	stub.weeklyResetAt = stub.now + 3 * 86400
 	stub.dailyResetPeriod = 86400
 	stub.weeklyResetPeriod = 7 * 86400
-	_G.OptiFarmDB = nil
-	_G.OptiFarmScanDB = nil
+	_G.OnlyFarmDB = nil
+	_G.OnlyFarmScanDB = nil
 end
 
 return stub

@@ -1,5 +1,5 @@
 --[[---------------------------------------------------------------------------
-	OptiFarm — Modules/Lockouts.lua
+	OnlyFarm — Modules/Lockouts.lua
 
 	Verrous d'instance, agrégés sur tout le compte.
 

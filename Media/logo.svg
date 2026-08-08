@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 440" width="1280" height="440">
+  <!--
+    OnlyFarm — logo complet (README, page de projet).
+    Le symbole seul est dans mark.svg ; il est repris ici à l'identique.
+  -->
+  <defs>
+    <radialGradient id="disc" cx="50%" cy="36%" r="72%">
+      <stop offset="0%" stop-color="#123c5c"/>
+      <stop offset="58%" stop-color="#0a2036"/>
+      <stop offset="100%" stop-color="#040e1a"/>
+    </radialGradient>
+    <linearGradient id="ring" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5eead4"/>
+      <stop offset="45%" stop-color="#22d3ee"/>
+      <stop offset="100%" stop-color="#2563eb"/>
+    </linearGradient>
+    <linearGradient id="metal" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#bae6fd"/>
+      <stop offset="50%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#0284c7"/>
+    </linearGradient>
+    <linearGradient id="body" x1="0%" y1="0%" x2="20%" y2="100%">
+      <stop offset="0%" stop-color="#5cc9f5"/>
+      <stop offset="55%" stop-color="#2b8fe0"/>
+      <stop offset="100%" stop-color="#1a45b8"/>
+    </linearGradient>
+    <linearGradient id="route" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#4ade80"/>
+      <stop offset="100%" stop-color="#bef264"/>
+    </linearGradient>
+    <linearGradient id="word" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#7dd3fc"/>
+      <stop offset="100%" stop-color="#38bdf8"/>
+    </linearGradient>
+  </defs>
+
+  <g transform="translate(24, 24) scale(0.766)">
+    <circle cx="256" cy="256" r="248" fill="none" stroke="url(#ring)" stroke-width="4" opacity="0.28"/>
+    <circle cx="256" cy="256" r="234" fill="url(#disc)"/>
+    <circle cx="256" cy="256" r="234" fill="none" stroke="url(#ring)" stroke-width="15"/>
+
+    <g stroke="#67e8f9" fill="none" opacity="0.16">
+      <circle cx="256" cy="256" r="182" stroke-width="2"/>
+      <circle cx="256" cy="256" r="118" stroke-width="2"/>
+      <path d="M256 30 L256 482 M30 256 L482 256" stroke-width="2"/>
+    </g>
+    <path d="M256 256 L256 30 A226 226 0 0 1 416 96 Z" fill="#22d3ee" opacity="0.09"/>
+
+    <g opacity="0.92">
+      <path d="M112 404 C 168 372, 214 440, 268 410 S 358 380, 404 404"
+            fill="none" stroke="url(#route)" stroke-width="12"
+            stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="112" cy="404" r="13" fill="#4ade80" stroke="#04121f" stroke-width="4"/>
+      <path d="M404 404 L404 356 L444 368 L404 380" fill="#bef264" stroke="#04121f"
+            stroke-width="4" stroke-linejoin="round"/>
+    </g>
+
+    <path d="M190 244 L190 214 A66 66 0 1 1 322 214 L322 244"
+          fill="none" stroke="url(#metal)" stroke-width="31" stroke-linecap="round"/>
+    <g fill="#062033" opacity="0.75">
+      <circle cx="256" cy="148" r="7"/>
+      <circle cx="214" cy="163" r="7"/>
+      <circle cx="298" cy="163" r="7"/>
+      <circle cx="192" cy="200" r="7"/>
+      <circle cx="320" cy="200" r="7"/>
+    </g>
+
+    <rect x="164" y="230" width="184" height="152" rx="28"
+          fill="url(#body)" stroke="#04121f" stroke-width="7"/>
+    <rect x="180" y="244" width="152" height="124" rx="20"
+          fill="none" stroke="#bae6fd" stroke-width="3" opacity="0.35"/>
+
+    <circle cx="256" cy="296" r="22" fill="#06253c"/>
+    <path d="M245 310 L235 350 L277 350 L267 310 Z" fill="#06253c"/>
+  </g>
+
+  <g font-family="DejaVu Sans, Liberation Sans, Helvetica, sans-serif">
+    <text x="452" y="238" font-size="132" letter-spacing="-2">
+      <tspan fill="url(#word)" font-weight="400">Only</tspan><tspan fill="#f1f9ff" font-weight="700">Farm</tspan>
+    </text>
+    <rect x="456" y="266" width="200" height="7" rx="3.5" fill="url(#route)"/>
+    <text x="456" y="330" font-size="36" fill="#8ecae6" font-weight="400">
+      Le farm de montures, sans le grind inutile
+    </text>
+    <text x="456" y="378" font-size="27" fill="#4d7f9e" font-weight="400">
+      World of Warcraft · collection · verrous · routes
+    </text>
+  </g>
+</svg>

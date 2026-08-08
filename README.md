@@ -1,4 +1,6 @@
-# OptiFarm
+# OnlyFarm
+
+![OnlyFarm](Media/logo.png)
 
 Addon World of Warcraft (Retail) qui répond à une question : **qu'est-ce que je
 fais cette semaine pour choper des montures, et dans quel ordre ?**
@@ -21,13 +23,13 @@ multi-personnage fonctionnent. Les routes arrivent en phase 3.
 
 ## Installation
 
-Cloner (ou copier) le dépôt dans le dossier des addons, sous le nom `OptiFarm` :
+Cloner (ou copier) le dépôt dans le dossier des addons, sous le nom `OnlyFarm` :
 
 ```
-World of Warcraft/_retail_/Interface/AddOns/OptiFarm/
+World of Warcraft/_retail_/Interface/AddOns/OnlyFarm/
 ```
 
-Le nom du dossier doit correspondre à `OptiFarm.toc`, sinon le client ignore
+Le nom du dossier doit correspondre à `OnlyFarm.toc`, sinon le client ignore
 l'addon.
 
 ## Commandes
@@ -49,7 +51,7 @@ construit cette correspondance depuis **ton** client, donc pour le patch
 courant. Quelques secondes, à relancer après chaque patch majeur.
 
 C'est aussi ce scan qui alimentera le générateur de données de la phase 2 : il
-écrit son résultat brut dans `OptiFarmScanDB` (SavedVariables).
+écrit son résultat brut dans `OnlyFarmScanDB` (SavedVariables).
 
 ## Développement
 

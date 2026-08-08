@@ -1,4 +1,4 @@
-# OptiFarm — consignes de développement
+# OnlyFarm — consignes de développement
 
 Addon World of Warcraft Retail (Lua 5.1, API 12.x). Planificateur de farm de
 montures : diff de collection, état des verrous, puis routes.
@@ -53,7 +53,7 @@ les frames sécurisées, et le comportement réel des API.
 
 Rien ici ne remplace un chargement en jeu :
 
-1. lien symbolique du dépôt vers `_retail_/Interface/AddOns/OptiFarm` ;
+1. lien symbolique du dépôt vers `_retail_/Interface/AddOns/OnlyFarm` ;
 2. installer **BugSack + BugGrabber**, sans quoi les erreurs sont invisibles ;
 3. `/reload`, puis `/of` ;
 4. recoller les erreurs de BugSack ici.
@@ -69,7 +69,7 @@ Un module « écrit et syntaxiquement valide » n'est pas un module qui marche.
 * **Un module = un fichier** dans `Modules/`, déclaré par
   `ns:NewModule(nom, priorité)`. Priorité croissante = initialisé plus tôt
   (Database 10, Collection 20, Lockouts 30, Eligibility 40, UI 80, Commands 90).
-* **Pas de variable globale** hors `_G.OptiFarm`, `OptiFarmDB`, `OptiFarmScanDB`
+* **Pas de variable globale** hors `_G.OnlyFarm`, `OnlyFarmDB`, `OnlyFarmScanDB`
   et les frames nommées.
 * **Messages internes** préfixés `OF_` (`OF_COLLECTION_UPDATED`, …), via
   `self:SendMessage` / `self:RegisterMessage`.
@@ -119,7 +119,7 @@ montures manquantes vient entièrement du client, donc elle est exacte.
 
 **Le scan doit précéder le pipeline Python.** `Data/Mounts.lua` ne peut pas être
 produit hors du jeu : il faut d'abord `/of ejscan` en jeu, sur un client à jour,
-puis `Build/generate_data.py` lit `OptiFarmScanDB` dans les SavedVariables.
+puis `Build/generate_data.py` lit `OnlyFarmScanDB` dans les SavedVariables.
 Ordre non négociable.
 
 ## État par phase

@@ -1,11 +1,11 @@
 ## Interface: 120007
-## Title: OptiFarm
+## Title: OnlyFarm
 ## Notes: Planificateur de farm de montures : diff de collection, verrous, disponibilite multi-perso.
 ## Notes-frFR: Planificateur de farm de montures : diff de collection, verrous, disponibilité multi-personnage.
 ## Author: BigBlackC0de
 ## Version: 0.1.0
-## IconTexture: Interface\ICONS\Ability_Mount_Drake_Proto
-## SavedVariables: OptiFarmDB, OptiFarmScanDB
+## IconTexture: Interface\AddOns\OnlyFarm\Media\logo
+## SavedVariables: OnlyFarmDB, OnlyFarmScanDB
 ## X-Phase: 1 (socle)
 ## X-Website: https://github.com/BigBlackC0de/Optifarm
 

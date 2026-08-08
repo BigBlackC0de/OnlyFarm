@@ -1,5 +1,5 @@
 --[[---------------------------------------------------------------------------
-	OptiFarm — UI/MainFrame.lua
+	OnlyFarm — UI/MainFrame.lua
 
 	Fenêtre principale. Trois onglets prévus par la spécification ; seul
 	« Collection » a du contenu en phase 1, les deux autres annoncent
@@ -43,7 +43,7 @@ function UI:CreateFrame()
 	if self.frame then return self.frame end
 	local L = ns.L
 
-	local frame = CreateFrame("Frame", "OptiFarmFrame", UIParent, "ButtonFrameTemplate")
+	local frame = CreateFrame("Frame", "OnlyFarmFrame", UIParent, "ButtonFrameTemplate")
 	frame:SetSize(FRAME_WIDTH, FRAME_HEIGHT)
 	frame:SetMovable(true)
 	frame:EnableMouse(true)
@@ -61,11 +61,11 @@ function UI:CreateFrame()
 		pcall(ButtonFrameTemplate_HideButtonBar, frame)
 	end
 	if frame.SetPortraitToAsset then
-		pcall(frame.SetPortraitToAsset, frame, "Interface\\ICONS\\Ability_Mount_Drake_Proto")
+		pcall(frame.SetPortraitToAsset, frame, ns.LOGO_TEXTURE)
 	end
 
 	-- Fermeture par Échap.
-	tinsert(UISpecialFrames, "OptiFarmFrame")
+	tinsert(UISpecialFrames, "OnlyFarmFrame")
 
 	self.frame = frame
 	self:CreateHeader(frame)
@@ -84,7 +84,7 @@ function UI:CreateHeader(frame)
 	summary:SetJustifyH("LEFT")
 	frame.Summary = summary
 
-	local search = CreateFrame("EditBox", "OptiFarmSearchBox", parent, "SearchBoxTemplate")
+	local search = CreateFrame("EditBox", "OnlyFarmSearchBox", parent, "SearchBoxTemplate")
 	search:SetSize(200, 20)
 	search:SetPoint("TOPRIGHT", -12, -8)
 	search:SetScript("OnTextChanged", function(box, userInput)
@@ -97,7 +97,7 @@ function UI:CreateHeader(frame)
 	end)
 	frame.SearchBox = search
 
-	local availableOnly = CreateFrame("CheckButton", "OptiFarmAvailableOnly", parent, "UICheckButtonTemplate")
+	local availableOnly = CreateFrame("CheckButton", "OnlyFarmAvailableOnly", parent, "UICheckButtonTemplate")
 	availableOnly:SetSize(22, 22)
 	availableOnly:SetPoint("TOPLEFT", 10, -32)
 	availableOnly.text = availableOnly.text or availableOnly.Text
@@ -108,7 +108,7 @@ function UI:CreateHeader(frame)
 	end)
 	frame.AvailableOnly = availableOnly
 
-	local hideUnmapped = CreateFrame("CheckButton", "OptiFarmHideUnmapped", parent, "UICheckButtonTemplate")
+	local hideUnmapped = CreateFrame("CheckButton", "OnlyFarmHideUnmapped", parent, "UICheckButtonTemplate")
 	hideUnmapped:SetSize(22, 22)
 	hideUnmapped:SetPoint("LEFT", availableOnly, "LEFT", 250, 0)
 	hideUnmapped.text = hideUnmapped.text or hideUnmapped.Text
@@ -126,7 +126,7 @@ function UI:CreateTabs(frame)
 	frame.Tabs = {}
 
 	for i, label in ipairs(labels) do
-		local tab = CreateFrame("Button", "OptiFarmTab" .. i, frame, "PanelTabButtonTemplate")
+		local tab = CreateFrame("Button", "OnlyFarmTab" .. i, frame, "PanelTabButtonTemplate")
 		tab:SetText(label)
 		tab:SetID(i)
 		if i == 1 then

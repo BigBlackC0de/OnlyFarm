@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!--
+    OnlyFarm — symbole seul (portrait de fenêtre, bouton minimap, favicon).
+
+    Le gag : un cadenas dont l'anse est un fer à cheval. Contenu verrouillé +
+    monture, soit exactement le sujet de l'addon (les verrous d'instance).
+    Dessin original — voir Media/README.md pour ce qui a été évité côté marque.
+  -->
+  <defs>
+    <radialGradient id="disc" cx="50%" cy="36%" r="72%">
+      <stop offset="0%" stop-color="#123c5c"/>
+      <stop offset="58%" stop-color="#0a2036"/>
+      <stop offset="100%" stop-color="#040e1a"/>
+    </radialGradient>
+    <linearGradient id="ring" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5eead4"/>
+      <stop offset="45%" stop-color="#22d3ee"/>
+      <stop offset="100%" stop-color="#2563eb"/>
+    </linearGradient>
+    <linearGradient id="metal" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#bae6fd"/>
+      <stop offset="50%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#0284c7"/>
+    </linearGradient>
+    <linearGradient id="body" x1="0%" y1="0%" x2="20%" y2="100%">
+      <stop offset="0%" stop-color="#5cc9f5"/>
+      <stop offset="55%" stop-color="#2b8fe0"/>
+      <stop offset="100%" stop-color="#1a45b8"/>
+    </linearGradient>
+    <linearGradient id="route" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#4ade80"/>
+      <stop offset="100%" stop-color="#bef264"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Halo -->
+  <circle cx="256" cy="256" r="248" fill="none" stroke="url(#ring)" stroke-width="4" opacity="0.28"/>
+
+  <!-- Disque -->
+  <circle cx="256" cy="256" r="234" fill="url(#disc)"/>
+  <circle cx="256" cy="256" r="234" fill="none" stroke="url(#ring)" stroke-width="15"/>
+
+  <!-- Grille radar : rappel de la fonction « planificateur » -->
+  <g stroke="#67e8f9" fill="none" opacity="0.16">
+    <circle cx="256" cy="256" r="182" stroke-width="2"/>
+    <circle cx="256" cy="256" r="118" stroke-width="2"/>
+    <path d="M256 30 L256 482 M30 256 L482 256" stroke-width="2"/>
+  </g>
+  <path d="M256 256 L256 30 A226 226 0 0 1 416 96 Z" fill="#22d3ee" opacity="0.09"/>
+
+  <!-- Route : sous le cadenas, elle ressort de chaque côté -->
+  <g opacity="0.92">
+    <path d="M112 404 C 168 372, 214 440, 268 410 S 358 380, 404 404"
+          fill="none" stroke="url(#route)" stroke-width="12"
+          stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="112" cy="404" r="13" fill="#4ade80" stroke="#04121f" stroke-width="4"/>
+    <path d="M404 404 L404 356 L444 368 L404 380" fill="#bef264" stroke="#04121f"
+          stroke-width="4" stroke-linejoin="round"/>
+  </g>
+
+  <!-- Anse en fer à cheval -->
+  <path d="M190 244 L190 214 A66 66 0 1 1 322 214 L322 244"
+        fill="none" stroke="url(#metal)" stroke-width="31" stroke-linecap="round"/>
+  <g fill="#062033" opacity="0.75">
+    <circle cx="256" cy="148" r="7"/>
+    <circle cx="214" cy="163" r="7"/>
+    <circle cx="298" cy="163" r="7"/>
+    <circle cx="192" cy="200" r="7"/>
+    <circle cx="320" cy="200" r="7"/>
+  </g>
+
+  <!-- Corps du cadenas -->
+  <rect x="164" y="230" width="184" height="152" rx="28"
+        fill="url(#body)" stroke="#04121f" stroke-width="7"/>
+  <rect x="180" y="244" width="152" height="124" rx="20"
+        fill="none" stroke="#bae6fd" stroke-width="3" opacity="0.35"/>
+
+  <!-- Serrure -->
+  <circle cx="256" cy="296" r="22" fill="#06253c"/>
+  <path d="M245 310 L235 350 L277 350 L267 310 Z" fill="#06253c"/>
+</svg>

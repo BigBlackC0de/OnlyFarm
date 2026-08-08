@@ -1,9 +1,9 @@
 --[[---------------------------------------------------------------------------
-	OptiFarm — Modules/DevScan.lua
+	OnlyFarm — Modules/DevScan.lua
 
 	Moissonneuse du Journal des rencontres : parcourt palier -> instance ->
 	boss -> butin, garde ce qui est une monture, et écrit le résultat dans
-	`OptiFarmScanDB` (dump pour Build/generate_data.py) et dans
+	`OnlyFarmScanDB` (dump pour Build/generate_data.py) et dans
 	`db.global.sourceCache` (utilisable immédiatement par Eligibility).
 
 	C'est la brique qui débloque la phase 2 : Data/Mounts.lua ne peut pas être
@@ -205,19 +205,19 @@ end
 function DevScan:Finish(results, instanceCount, mountCount)
 	if type(results) ~= "table" then return end
 
-	if type(OptiFarmScanDB) ~= "table" then OptiFarmScanDB = {} end
-	OptiFarmScanDB.sources = results
-	OptiFarmScanDB.scannedAt = time()
-	OptiFarmScanDB.build = select(2, GetBuildInfo())
-	OptiFarmScanDB.version = select(1, GetBuildInfo())
-	OptiFarmScanDB.locale = GetLocale()
-	OptiFarmScanDB.addonVersion = ns.VERSION
+	if type(OnlyFarmScanDB) ~= "table" then OnlyFarmScanDB = {} end
+	OnlyFarmScanDB.sources = results
+	OnlyFarmScanDB.scannedAt = time()
+	OnlyFarmScanDB.build = select(2, GetBuildInfo())
+	OnlyFarmScanDB.version = select(1, GetBuildInfo())
+	OnlyFarmScanDB.locale = GetLocale()
+	OnlyFarmScanDB.addonVersion = ns.VERSION
 
 	if ns.db then
 		ns.db.global.sourceCache = results
 		ns.db.global.scanMeta = {
-			at = OptiFarmScanDB.scannedAt,
-			build = OptiFarmScanDB.build,
+			at = OnlyFarmScanDB.scannedAt,
+			build = OnlyFarmScanDB.build,
 			mounts = mountCount,
 			instances = instanceCount,
 		}

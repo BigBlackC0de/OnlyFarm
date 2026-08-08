@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Vérification locale d'OptiFarm : syntaxe Lua 5.1 (la version du client WoW)
+# Vérification locale d'OnlyFarm : syntaxe Lua 5.1 (la version du client WoW)
 # puis suite de tests headless.
 #
 # Prérequis : lua5.1 (paquet « lua5.1 » sur Debian/Ubuntu).
@@ -26,7 +26,7 @@ while IFS= read -r declared; do
 		echo "  MANQUANT : $path"
 		missing=1
 	fi
-done < <(grep -E '\.lua$' OptiFarm.toc || true)
+done < <(grep -E '\.lua$' OnlyFarm.toc || true)
 [ "$missing" -eq 0 ] && echo "  ok"
 
 echo

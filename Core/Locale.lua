@@ -1,5 +1,5 @@
 --[[---------------------------------------------------------------------------
-	OptiFarm — Core/Locale.lua
+	OnlyFarm — Core/Locale.lua
 
 	Table de chaînes. Base enUS, surcharge par locale.
 	Toute chaîne affichée passe par `ns.L`.
@@ -15,7 +15,7 @@ local L = {
 	UNIT_SEC = "s",
 
 	-- Fenêtre principale
-	TITLE = "OptiFarm",
+	TITLE = "OnlyFarm",
 	TAB_COLLECTION = "Collection",
 	TAB_ROUTE = "Route",
 	TAB_EDITOR = "Editor",
@@ -51,7 +51,7 @@ local L = {
 	LOCK_STALE = "not seen for %s",
 
 	-- Commandes
-	CMD_HELP_HEADER = "OptiFarm commands:",
+	CMD_HELP_HEADER = "OnlyFarm commands:",
 	CMD_HELP_SHOW = "  /of           — open the window",
 	CMD_HELP_SCAN = "  /of scan      — rescan collection and lockouts",
 	CMD_HELP_CHARS = "  /of chars     — list known characters",
@@ -66,7 +66,7 @@ local L = {
 	SCAN_NEEDS_EJ = "Encounter Journal unavailable — open it once, then retry.",
 
 	-- Divers
-	RESET_CONFIRM = "Type |cffff5555/of reset confirm|r to wipe OptiFarm's database.",
+	RESET_CONFIRM = "Type |cffff5555/of reset confirm|r to wipe OnlyFarm's database.",
 	RESET_DONE = "Database wiped. Reload the interface (/reload).",
 }
 
@@ -103,7 +103,7 @@ if GetLocale and GetLocale() == "frFR" then
 	L.LOCK_CHARS = "%d perso(s) disponible(s)"
 	L.LOCK_STALE = "vu il y a %s"
 
-	L.CMD_HELP_HEADER = "Commandes OptiFarm :"
+	L.CMD_HELP_HEADER = "Commandes OnlyFarm :"
 	L.CMD_HELP_SHOW = "  /of           — ouvrir la fenêtre"
 	L.CMD_HELP_SCAN = "  /of scan      — rescanner collection et verrous"
 	L.CMD_HELP_CHARS = "  /of chars     — lister les personnages connus"
@@ -116,7 +116,7 @@ if GetLocale and GetLocale() == "frFR" then
 	L.SCAN_BUSY = "Un scan est déjà en cours."
 	L.SCAN_NEEDS_EJ = "Journal des rencontres indisponible — ouvre-le une fois, puis réessaie."
 
-	L.RESET_CONFIRM = "Tape |cffff5555/of reset confirm|r pour effacer la base d'OptiFarm."
+	L.RESET_CONFIRM = "Tape |cffff5555/of reset confirm|r pour effacer la base d'OnlyFarm."
 	L.RESET_DONE = "Base effacée. Recharge l'interface (/reload)."
 end
 

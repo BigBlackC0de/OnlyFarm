@@ -1,8 +1,8 @@
 --[[---------------------------------------------------------------------------
-	OptiFarm — Core/Util.lua
+	OnlyFarm — Core/Util.lua
 
 	Helpers sans état : temps, formatage, tables, anti-rebond.
-	Rien ici ne doit dépendre d'un module d'OptiFarm.
+	Rien ici ne doit dépendre d'un module d'OnlyFarm.
 -----------------------------------------------------------------------------]]
 
 local _, ns = ...

@@ -1,5 +1,5 @@
 --[[---------------------------------------------------------------------------
-	OptiFarm — Tests/harness.lua
+	OnlyFarm — Tests/harness.lua
 
 	Charge l'addon dans l'environnement simulé et rejoue la séquence de
 	démarrage du client (ADDON_LOADED -> PLAYER_LOGIN -> PLAYER_ENTERING_WORLD).
@@ -11,7 +11,7 @@
 
 local harness = {}
 
--- Ordre de chargement identique à OptiFarm.toc, sans UI/.
+-- Ordre de chargement identique à OnlyFarm.toc, sans UI/.
 harness.FILES = {
 	"Core/Init.lua",
 	"Core/Util.lua",
@@ -35,17 +35,17 @@ function harness.Load(stub, options)
 
 	-- Nouvel espace de noms à chaque chargement : pas d'état résiduel entre tests.
 	local ns = {}
-	_G.OptiFarm = nil
+	_G.OnlyFarm = nil
 
 	for _, path in ipairs(harness.FILES) do
 		local chunk, err = loadfile(root .. path)
 		if not chunk then
 			error("échec de chargement de " .. path .. " : " .. tostring(err))
 		end
-		chunk("OptiFarm", ns)
+		chunk("OnlyFarm", ns)
 	end
 
-	stub.Fire("ADDON_LOADED", "OptiFarm")
+	stub.Fire("ADDON_LOADED", "OnlyFarm")
 	if options.skipLogin then return ns end
 
 	stub.Fire("PLAYER_LOGIN")
