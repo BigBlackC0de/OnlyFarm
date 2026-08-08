@@ -25,7 +25,7 @@ Modules\Teleports.lua
 Modules\Attempts.lua
 Modules\Eligibility.lua
 Modules\Stats.lua
-Modules\DevScan.lua
+Modules\Mapping.lua
 
 UI\Theme.lua
 UI\Dashboard.lua

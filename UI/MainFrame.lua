@@ -33,6 +33,7 @@ function UI:OnEnable()
 	self:RegisterMessage("OF_COLLECTION_UPDATED", "Refresh")
 	self:RegisterMessage("OF_LOCKOUTS_UPDATED", "Refresh")
 	self:RegisterMessage("OF_SCAN_COMPLETE", "Refresh")
+	self:RegisterMessage("OF_SCAN_STARTED", "Refresh")
 	self:RegisterMessage("OF_ATTEMPTS_UPDATED", "Refresh")
 end
 
@@ -448,7 +449,7 @@ function UI:CreateExpansionDropdown(parent, anchor)
 		-- est justement en train de tourner, on le dit aussi : « lance une
 		-- commande » serait un mauvais conseil pendant qu'elle s'exécute.
 		if #expansions <= 1 then
-			rootDescription:CreateTitle(ns.DevScan.running
+			rootDescription:CreateTitle(ns.Mapping.running
 				and L.EXPANSION_SCANNING or L.EXPANSION_NEEDS_SCAN)
 		end
 	end)

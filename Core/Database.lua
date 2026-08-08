@@ -22,11 +22,11 @@ local GLOBAL_DEFAULTS = {
 	attempts = {},           -- [mountID] = { count, lastAt, byChar = {} }
 	routes = {},             -- phase 5
 	travelTimings = {},      -- phase 3 : auto-apprentissage des durées de vol
-	sourceCache = {},        -- [mountID] = source résolue par DevScan
-	nodeCache = {},          -- [nodeID] = entrée d'instance moissonnée par DevScan
+	sourceCache = {},        -- [mountID] = source résolue par Mapping
+	nodeCache = {},          -- [nodeID] = entrée d'instance moissonnée par Mapping
 	customNodes = {},        -- [nodeID] = point posé par le joueur (éditeur de route)
 	instanceIDsByName = {},  -- [nom normalisé] = instanceID moteur (pont EJ <-> verrous)
-	scanMeta = {},           -- horodatage et build du dernier DevScan
+	scanMeta = {},           -- horodatage et build du dernier scan
 }
 
 local PROFILE_DEFAULTS = {

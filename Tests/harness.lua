@@ -27,7 +27,7 @@ harness.FILES = {
 	"Modules/Attempts.lua",
 	"Modules/Eligibility.lua",
 	"Modules/Stats.lua",
-	"Modules/DevScan.lua",
+	"Modules/Mapping.lua",
 	"Core/Commands.lua",
 }
 

@@ -46,31 +46,39 @@ l'addon.
 | Commande | Effet |
 |---|---|
 | `/of` | ouvrir la fenêtre |
-| `/of scan` | forcer un rescan collection + verrous |
+| `/of scan` | forcer un rescan : collection, verrous et cartographie |
 | `/of chars` | lister les personnages connus et leurs verrous |
-| `/of ejscan` | moissonner les sources de montures dans le Journal des rencontres |
+| `/of deepscan` | passe approfondie : butin boss par boss (lent, facultatif) |
 | `/of debug` | activer les traces |
 | `/of reset` | effacer la base sauvegardée (confirmation requise) |
 
-### Le scan du Journal des rencontres
+### La cartographie des montures
 
-L'addon connaît les montures qui te manquent dès l'installation, mais pas
-encore quel boss les lâche, ni à quelle extension elles appartiennent, ni où se
-trouve l'entrée de l'instance. Ces trois choses viennent du Journal des
-rencontres.
+L'addon connaît les montures qui te manquent dès l'installation. Savoir à
+quelle extension elles appartiennent et dans quelle instance elles tombent
+demande une passe supplémentaire : c'est la **cartographie**.
 
-**Tu n'as rien à lancer** : le scan part tout seul une dizaine de secondes
-après la première connexion, et se relance de lui-même après chaque patch
-(l'addon compare le build du client à celui du dernier scan). Il tourne en
-coroutine avec un budget de 6 ms par frame — pas de gel. `/of ejscan` reste là
-pour le forcer.
+**Tu n'as rien à lancer.** Elle part toute seule quelques secondes après la
+première connexion, puis **elle est gardée sur le disque** (SavedVariables).
+Elle ne se refait que dans deux cas : le build du client a changé (un patch), ou
+le client expose plus de montures qu'au dernier passage. Le bouton
+« Rescanner » du tableau de bord la force à la main.
 
-Le scan attend si tu es en combat ou si le Journal des rencontres est ouvert :
-il déplace la sélection de cette fenêtre, et le faire sous ton nez passerait
-pour un bug.
+Elle se fait en deux temps :
 
-Il écrit aussi son résultat brut dans `OnlyFarmScanDB` (SavedVariables), qui
-alimente le générateur de données de la phase 2.
+1. **l'index des instances** — les paliers du Journal des rencontres donnent la
+   liste des instances et leur extension ;
+2. **le texte de source** — chaque monture expose déjà
+   `Butin : Le roi-liche|nCitadelle de la Couronne de glace`. On le découpe, et
+   on rapproche le lieu de l'index.
+
+Une troisième passe, **`/of deepscan`** (bouton « Scan approfondi »), parcourt
+le butin boss par boss pour affiner les cas que le texte de source décrit mal.
+Elle est lente et facultative : la version 0.1.0 en dépendait entièrement, et
+c'est ce qui laissait l'addon muet quand l'API de butin ne répondait pas.
+
+Le résultat brut part aussi dans `OnlyFarmScanDB`, qui alimentera le générateur
+de données de la phase 2.
 
 ## Développement
 

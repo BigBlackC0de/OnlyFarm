@@ -170,6 +170,27 @@ function Dashboard:CreateExpansions(page)
 	card.Empty:SetPoint("CENTER", 0, -10)
 	card.Empty:SetText(L.DASH_NEEDS_SCAN)
 	card.Empty:Hide()
+
+	-- Pied de carte : état de la cartographie et relance manuelle. C'est ici
+	-- que le manque se voit, donc c'est ici que doit se trouver le remède.
+	local rule = Theme.Separator(card)
+	rule:SetPoint("BOTTOMLEFT", 1, 30)
+	rule:SetPoint("BOTTOMRIGHT", -1, 30)
+
+	local deep = Theme.Button(card, L.SCAN_BUTTON_DEEP, 120, 20)
+	deep:SetPoint("BOTTOMRIGHT", -10, 6)
+	deep:SetScript("OnClick", function() ns.Mapping:Run(true) end)
+	card.DeepButton = deep
+
+	local rescan = Theme.Button(card, L.SCAN_BUTTON, 96, 20)
+	rescan:SetPoint("BOTTOMRIGHT", deep, "BOTTOMLEFT", -6, 0)
+	rescan:SetScript("OnClick", function() ns.Mapping:Run(false) end)
+	card.RescanButton = rescan
+
+	card.ScanInfo = Theme.Text(card, "GameFontHighlightSmall", Theme.colors.faint)
+	card.ScanInfo:SetPoint("BOTTOMLEFT", 10, 10)
+	card.ScanInfo:SetPoint("BOTTOMRIGHT", rescan, "BOTTOMLEFT", -10, 10)
+	card.ScanInfo:SetWordWrap(false)
 end
 
 --- Colonne de droite, en deux cartes : ce qui est ouvert, puis ce qui est déjà
@@ -361,6 +382,15 @@ function Dashboard:Refresh()
 	end
 	expansionCard.Empty:SetShown(not hasExpansions)
 	expansionCard.Hint:SetShown(hasExpansions)
+
+	-- État de la cartographie, et boutons coupés pendant qu'elle tourne.
+	if ns.Mapping.running then
+		expansionCard.ScanInfo:SetText(L.SCAN_RUNNING)
+	else
+		expansionCard.ScanInfo:SetText(ns.Mapping:GetSummary() or L.SCAN_NEVER)
+	end
+	expansionCard.RescanButton:SetEnabled(not ns.Mapping.running)
+	expansionCard.DeepButton:SetEnabled(not ns.Mapping.running)
 
 	-- 4. Cibles du moment.
 	local targetCard = page.TargetCard

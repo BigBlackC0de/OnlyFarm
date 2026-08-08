@@ -644,6 +644,127 @@ test("Database — une base neuve n'affiche pas les exclues masquées", function
 end)
 
 --------------------------------------------------------------------------------
+-- Mapping
+--------------------------------------------------------------------------------
+
+test("Mapping — découpage du texte de source", function()
+	stub.Reset()
+	local ns = harness.Load(stub)
+	local Parse = ns.Mapping.ParseSourceText
+
+	local boss, place = Parse("Butin : Le roi-liche|nCitadelle de la Couronne de glace")
+	eq(boss, "Le roi-liche", "boss extrait")
+	eq(place, "Citadelle de la Couronne de glace", "lieu extrait")
+
+	-- Codes couleur et espaces insécables : les deux traînent dans les
+	-- libellés du client.
+	boss, place = Parse("|cffffd200Butin|r :\194\160Sartharion|nL'Œil de l'éternité")
+	eq(boss, "Sartharion", "codes couleur et espace insécable absorbés")
+	eq(place, "L'Œil de l'éternité", "lieu extrait")
+
+	-- Un nom de boss peut contenir un deux-points : on ne coupe qu'au premier.
+	boss = Parse("Butin : Mimiron : phase 4|nUlduar")
+	eq(boss, "Mimiron : phase 4", "seul le premier deux-points sépare")
+
+	-- Une seule ligne : pas de lieu, et on ne l'invente pas.
+	boss, place = Parse("Haut fait : Cavalier accompli")
+	eq(boss, "Cavalier accompli", "sujet seul")
+	eq(place, nil, "aucun lieu deviné")
+
+	eq(Parse(nil), nil, "entrée nil")
+	eq(Parse(""), nil, "entrée vide")
+end)
+
+test("Mapping — extension et instance déduites du texte de source", function()
+	stub.Reset()
+	stub.tiers = {
+		{ name = "Wrath of the Lich King", instances = {
+			{ id = 187, name = "Ulduar", isRaid = true },
+			{ id = 186, name = "Citadelle de la Couronne de glace", isRaid = true },
+		} },
+		{ name = "Legion", instances = {
+			{ id = 786, name = "Karazhan supérieur", isRaid = false },
+		} },
+	}
+	stub.mounts = {
+		{ mountID = 201, name = "Invincible", sourceType = 1,
+		  source = "Butin : Le roi-liche|nCitadelle de la Couronne de glace" },
+		{ mountID = 202, name = "Fumeronde", sourceType = 1,
+		  source = "Butin : Yogg-Saron|nUlduar" },
+		-- Lieu qui n'est pas une instance : on garde le texte sans prétendre
+		-- que c'est un raid.
+		{ mountID = 203, name = "Aeonaxx", sourceType = 1,
+		  source = "Butin : Aeonaxx|nDéserts de Vashj'ir" },
+	}
+	local ns = harness.Load(stub)
+
+	ns.Mapping:Run(false)
+	stub.RunFrames(60)
+	eq(ns.Mapping.running, false, "le scan se termine")
+
+	local cache = ns.db.global.sourceCache
+	eq(cache[201].instanceName, "Citadelle de la Couronne de glace", "instance rattachée")
+	eq(cache[201].tierName, "Wrath of the Lich King", "extension déduite du palier")
+	eq(cache[201].encounterName, "Le roi-liche", "boss retenu")
+	eq(cache[201].isRaid, true, "raid reconnu")
+
+	eq(cache[202].tierName, "Wrath of the Lich King", "seconde monture du même palier")
+
+	eq(cache[203].instanceName, nil, "une zone n'est pas une instance")
+	eq(cache[203].placeName, "Déserts de Vashj'ir", "le lieu est conservé tel quel")
+	eq(cache[203].encounterName, "Aeonaxx", "le rare est retenu comme rencontre")
+
+	-- Et c'est bien ça qui alimente le filtre par extension.
+	local expansions = ns.Eligibility:GetKnownExpansions()
+	eq(expansions[1].name, "Wrath of the Lich King", "l'extension apparaît dans le filtre")
+end)
+
+test("Mapping — la cartographie survit et ne se refait pas pour rien", function()
+	stub.Reset()
+	stub.tiers = {
+		{ name = "Wrath", instances = { { id = 187, name = "Ulduar", isRaid = true } } },
+	}
+	stub.mounts = {
+		{ mountID = 202, name = "Fumeronde", sourceType = 1,
+		  source = "Butin : Yogg-Saron|nUlduar" },
+	}
+	local ns = harness.Load(stub)
+
+	ns.Mapping:Run(false)
+	stub.RunFrames(60)
+	eq(ns.Mapping:IsStale(), false, "à jour juste après un scan")
+
+	-- Un patch : le build change, il faut refaire.
+	ns.db.global.scanMeta.build = "00000"
+	eq(ns.Mapping:IsStale(), true, "build différent -> à refaire")
+
+	-- Nouveau build mais surtout de nouvelles montures dans le client.
+	ns.db.global.scanMeta.build = select(2, GetBuildInfo())
+	eq(ns.Mapping:IsStale(), false, "rien de neuf")
+	stub.mounts[#stub.mounts + 1] = { mountID = 999, name = "Nouvelle", sourceType = 1 }
+	eq(ns.Mapping:IsStale(), true, "plus de montures qu'au dernier scan -> à refaire")
+end)
+
+test("Mapping — sans palier lisible, le scan n'invente rien", function()
+	stub.Reset()
+	stub.tiers = {}
+	stub.mounts = {
+		{ mountID = 201, name = "Invincible", sourceType = 1,
+		  source = "Butin : Le roi-liche|nCitadelle de la Couronne de glace" },
+	}
+	local ns = harness.Load(stub)
+
+	ns.Mapping:Run(false)
+	stub.RunFrames(60)
+
+	local entry = ns.db.global.sourceCache[201]
+	eq(entry.encounterName, "Le roi-liche", "le boss reste lisible")
+	eq(entry.tierName, nil, "aucune extension inventée")
+	eq(ns.Eligibility:GetExpansion(201), ns.Eligibility.UNKNOWN_EXPANSION,
+		"la monture tombe dans le panier « inconnue »")
+end)
+
+--------------------------------------------------------------------------------
 -- Stats
 --------------------------------------------------------------------------------
 

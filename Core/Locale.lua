@@ -106,15 +106,21 @@ local L = {
 	CMD_HELP_SHOW = "  /of           — open the window",
 	CMD_HELP_SCAN = "  /of scan      — rescan collection and lockouts",
 	CMD_HELP_CHARS = "  /of chars     — list known characters",
-	CMD_HELP_EJSCAN = "  /of ejscan    — dev: harvest mount sources from the Encounter Journal",
+	CMD_HELP_DEEPSCAN = "  /of deepscan  — deep pass: walk every boss's loot table (slow, optional)",
 	CMD_HELP_DEBUG = "  /of debug     — toggle debug traces",
 	CMD_HELP_RESET = "  /of reset     — wipe the saved database (asks twice)",
 
-	-- DevScan
-	SCAN_START = "Encounter Journal scan started (a few seconds, the UI may stutter).",
-	SCAN_AUTO_START = "First-run scan of the Encounter Journal — mapping mounts and instance entrances.",
-	SCAN_DONE = "Scan finished: %d mounts across %d instances, %d entrances located.",
-	SCAN_AUTO_DONE = "Expansion filter and geography are ready. Runs again by itself after each patch.",
+	-- Cartographie
+	SCAN_START = "Mapping mounts…",
+	SCAN_AUTO_START = "First-run mapping of your mounts — expansions, instances and bosses.",
+	SCAN_DEEP_START = "Deep pass started: walking every boss's loot table. Slower, the UI may stutter.",
+	SCAN_DONE = "Mapping done: %d of %d mounts tied to an instance, across %d instances.",
+	SCAN_AUTO_DONE = "Kept on disc — it only runs again after a patch or when new mounts appear.",
+	SCAN_SUMMARY = "%d/%d mapped · %s ago",
+	SCAN_RUNNING = "mapping…",
+	SCAN_BUTTON = "Rescan",
+	SCAN_BUTTON_DEEP = "Deep scan",
+	SCAN_NEVER = "never mapped",
 	SCAN_BUSY = "A scan is already running.",
 	SCAN_NEEDS_EJ = "Encounter Journal unavailable — open it once, then retry.",
 
@@ -211,14 +217,20 @@ if GetLocale and GetLocale() == "frFR" then
 	L.CMD_HELP_SHOW = "  /of           — ouvrir la fenêtre"
 	L.CMD_HELP_SCAN = "  /of scan      — rescanner collection et verrous"
 	L.CMD_HELP_CHARS = "  /of chars     — lister les personnages connus"
-	L.CMD_HELP_EJSCAN = "  /of ejscan    — dev : moissonner les sources via le Journal des rencontres"
+	L.CMD_HELP_DEEPSCAN = "  /of deepscan  — passe approfondie : butin boss par boss (lent, facultatif)"
 	L.CMD_HELP_DEBUG = "  /of debug     — activer/couper les traces"
 	L.CMD_HELP_RESET = "  /of reset     — effacer la base sauvegardée (demande confirmation)"
 
-	L.SCAN_START = "Scan du Journal des rencontres lancé (quelques secondes, l'interface peut saccader)."
-	L.SCAN_AUTO_START = "Premier scan du Journal des rencontres — cartographie des montures et des entrées d'instance."
-	L.SCAN_DONE = "Scan terminé : %d montures sur %d instances, %d entrées repérées."
-	L.SCAN_AUTO_DONE = "Filtre par extension et géographie prêts. Le scan se relancera seul après chaque patch."
+	L.SCAN_START = "Cartographie des montures en cours…"
+	L.SCAN_AUTO_START = "Première cartographie de tes montures — extensions, instances et boss."
+	L.SCAN_DEEP_START = "Passe approfondie lancée : butin boss par boss. Plus lent, l'interface peut saccader."
+	L.SCAN_DONE = "Cartographie terminée : %d montures sur %d rattachées à une instance, sur %d instances."
+	L.SCAN_AUTO_DONE = "C'est gardé sur le disque — ça ne se refait qu'après un patch ou à l'arrivée de nouvelles montures."
+	L.SCAN_SUMMARY = "%d/%d cartographiées · il y a %s"
+	L.SCAN_RUNNING = "cartographie…"
+	L.SCAN_BUTTON = "Rescanner"
+	L.SCAN_BUTTON_DEEP = "Scan approfondi"
+	L.SCAN_NEVER = "jamais cartographié"
 	L.SCAN_BUSY = "Un scan est déjà en cours."
 	L.SCAN_NEEDS_EJ = "Journal des rencontres indisponible — ouvre-le une fois, puis réessaie."
 

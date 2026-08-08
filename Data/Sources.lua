@@ -6,7 +6,7 @@
 	>>> ÉTAT PHASE 1 : la table `Sources` est VOLONTAIREMENT VIDE. <<<
 
 	Elle sera générée en phase 2 par Build/generate_data.py à partir du dump
-	produit en jeu par Modules/DevScan.lua. Aucun identifiant n'est écrit à la
+	produit en jeu par Modules/Mapping.lua. Aucun identifiant n'est écrit à la
 	main ici : un mountID ou un instanceID inventé produit un addon qui ment
 	silencieusement, ce qui est pire que pas de données du tout.
 

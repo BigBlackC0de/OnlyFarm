@@ -36,7 +36,7 @@ function handlers.help()
 	ns:Print(L.CMD_HELP_HEADER)
 	for _, line in ipairs({
 		L.CMD_HELP_SHOW, L.CMD_HELP_SCAN, L.CMD_HELP_CHARS,
-		L.CMD_HELP_EJSCAN, L.CMD_HELP_DEBUG, L.CMD_HELP_RESET,
+		L.CMD_HELP_DEEPSCAN, L.CMD_HELP_DEBUG, L.CMD_HELP_RESET,
 	}) do
 		DEFAULT_CHAT_FRAME:AddMessage(line)
 	end
@@ -54,12 +54,18 @@ function handlers.scan()
 	ns.Lockouts:PurgeExpired()
 	ns.Lockouts.lastRequest = 0   -- on force, la commande est explicite
 	ns.Lockouts:RequestScan()
-	ns:Print("scan lancé.")
+	ns.Mapping:Run(false)
 end
 
-function handlers.ejscan()
-	ns.DevScan:Start()
+--- Passe approfondie : le parcours boss par boss du Journal des rencontres.
+--  Lente et facultative — elle ne fait qu'affiner ce que le texte de source a
+--  déjà donné.
+function handlers.deepscan()
+	ns.Mapping:Run(true)
 end
+
+-- Ancien nom de la commande, gardé pour les habitudes.
+handlers["ejscan"] = handlers.deepscan
 
 function handlers.chars()
 	local keys = ns.Database:GetCharKeys()

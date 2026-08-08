@@ -33,7 +33,19 @@ end
 
 _G.time = function() return stub.now end
 _G.GetTime = function() return stub.gameTime end
-_G.debugprofilestop = function() return stub.gameTime * 1000 end
+
+-- debugprofilestop AVANCE à chaque appel, d'une milliseconde.
+--
+-- Ce n'est pas une coquetterie : les coroutines à budget de frame tournent
+-- dans un « repeat … until debugprofilestop() >= deadline ». Avec une horloge
+-- figée sur gameTime, la condition n'est jamais atteinte et le test part en
+-- boucle infinie au lieu d'échouer. Une horloge qui avance donne quelques
+-- itérations par frame simulée, exactement comme en jeu.
+stub.profileClock = 0
+_G.debugprofilestop = function()
+	stub.profileClock = stub.profileClock + 1
+	return stub.profileClock
+end
 
 --------------------------------------------------------------------------------
 -- Timers différés
@@ -97,6 +109,21 @@ function frameProto:GetScript(name) return self.scripts[name] end
 function frameProto:Show() self.shown = true end
 function frameProto:Hide() self.shown = false end
 function frameProto:IsShown() return self.shown == true end
+
+--- Fait tourner les scripts OnUpdate, ce qui fait avancer les coroutines
+--  pilotées par frame (cartographie, futur solveur de route).
+function stub.RunFrames(count)
+	for _ = 1, (count or 1) do
+		-- Copie : un pilote peut retirer son OnUpdate en cours de route, et une
+		-- frame peut en créer une autre.
+		local snapshot = {}
+		for index, frame in ipairs(stub.frames) do snapshot[index] = frame end
+		for _, frame in ipairs(snapshot) do
+			local onUpdate = frame.scripts.OnUpdate
+			if onUpdate then onUpdate(frame, 0.016) end
+		end
+	end
+end
 
 --- Envoie un événement à toutes les frames abonnées.
 function stub.Fire(event, ...)
@@ -225,6 +252,41 @@ _G.BATTLE_PET_SOURCE_3 = "Vendor"
 _G.BATTLE_PET_SOURCE_4 = "Profession"
 _G.BATTLE_PET_SOURCE_6 = "Achievement"
 _G.BATTLE_PET_SOURCE_7 = "World Event"
+
+--------------------------------------------------------------------------------
+-- Journal des rencontres — paliers et instances
+--
+-- Fixture : stub.tiers = { { name = "Wrath",
+--                            instances = { { id = 187, name = "Ulduar", isRaid = true } } } }
+--------------------------------------------------------------------------------
+
+stub.tiers = {}
+stub.selectedTier = 1
+
+_G.EJ_GetNumTiers = function() return #stub.tiers end
+_G.EJ_SelectTier = function(tier) stub.selectedTier = tier end
+_G.EJ_GetTierInfo = function(tier)
+	local entry = stub.tiers[tier]
+	return entry and entry.name or nil
+end
+
+_G.EJ_GetInstanceByIndex = function(index, isRaid)
+	local tier = stub.tiers[stub.selectedTier]
+	if not tier then return nil end
+	local matching = {}
+	for _, instance in ipairs(tier.instances or {}) do
+		if (instance.isRaid and true or false) == (isRaid and true or false) then
+			matching[#matching + 1] = instance
+		end
+	end
+	local instance = matching[index]
+	if not instance then return nil end
+	return instance.id, instance.name
+end
+
+_G.EJ_SelectInstance = function(id) stub.selectedInstance = id end
+_G.EJ_SelectEncounter = function(id) stub.selectedEncounter = id end
+_G.EJ_GetEncounterInfoByIndex = function() return nil end
 
 --------------------------------------------------------------------------------
 -- Verrous d'instance
@@ -475,6 +537,11 @@ function stub.Reset()
 	stub.waypoint = nil
 	stub.superTracked = nil
 	stub.inCombat = false
+	stub.tiers = {}
+	stub.selectedTier = 1
+	stub.selectedInstance = nil
+	stub.selectedEncounter = nil
+	stub.profileClock = 0
 	stub.dailyResetAt = stub.now + 3600
 	stub.weeklyResetAt = stub.now + 3 * 86400
 	stub.dailyResetPeriod = 86400

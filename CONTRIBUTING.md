@@ -69,7 +69,7 @@ Un module « écrit et syntaxiquement valide » n'est pas un module qui marche.
 * **Un module = un fichier** dans `Modules/`, déclaré par
   `ns:NewModule(nom, priorité)`. Priorité croissante = initialisé plus tôt
   (Database 10, Collection 20, Lockouts 30, Nodes 32, Teleports 33,
-  TravelGraph 34, Attempts 35, Eligibility 40, Stats 45, DevScan 60, UI 80,
+  TravelGraph 34, Attempts 35, Eligibility 40, Stats 45, Mapping 60, UI 80,
   Dashboard 82, Preview 82, MinimapButton 85, Commands 90).
 * **Rien ne se dessine hors de `UI/Theme.lua`.** Couleurs, cartes, barres et
   pastilles viennent toutes de là. Un `|cffxxxxxx` écrit en dur dans un module
@@ -122,20 +122,29 @@ mécanique le jour où AceConfig et AceGUI deviennent utiles (phase 3+).
 
 **`Data/Sources.lua` est vide, et c'est voulu.** Un `mountID` ou un `instanceID`
 écrit de mémoire produit un addon qui ment sans le dire. La table sera générée
-en phase 2 à partir du dump de `/of ejscan`. En attendant, la liste des
+en phase 2 à partir du dump de la cartographie. En attendant, la liste des
 montures manquantes vient entièrement du client, donc elle est exacte.
 
+**La cartographie ne repose PAS sur l'API de butin.** La version 0.1.0 en
+dépendait entièrement (`EJ_SelectEncounter` + `GetLootInfoByIndex`) et remontait
+zéro monture en jeu : le butin n'est pas prêt à la frame suivante, il dépend de
+la difficulté sélectionnée, et une liste vide est indiscernable d'une fin de
+liste. `Modules/Mapping.lua` part maintenant du texte de source déjà exposé par
+`C_MountJournal.GetMountInfoExtraByID`, rapproché d'un index des instances
+construit sans toucher au butin. La passe de butin subsiste en `/of deepscan`,
+hors du chemin critique.
+
 **Le scan doit précéder le pipeline Python.** `Data/Mounts.lua` ne peut pas être
-produit hors du jeu : il faut d'abord `/of ejscan` en jeu, sur un client à jour,
-puis `Build/generate_data.py` lit `OnlyFarmScanDB` dans les SavedVariables.
-Ordre non négociable.
+produit hors du jeu : il faut d'abord une cartographie en jeu sur un client à
+jour, puis `Build/generate_data.py` lit `OnlyFarmScanDB` dans les
+SavedVariables. Ordre non négociable.
 
 ## État par phase
 
 | Phase | Contenu | État |
 |---|---|---|
-| 1 — Socle | collection, verrous, éligibilité, fenêtre Collection | **fait** |
-| 2 — Données | `Build/generate_data.py`, taux de drop, coordonnées | scan en jeu prêt (`/of ejscan`), pipeline à écrire |
+| 1 — Socle | collection, verrous, éligibilité, tableau de bord, tentatives | **fait** |
+| 2 — Données | `Build/generate_data.py`, taux de drop, coordonnées | cartographie en jeu prête et persistée, pipeline à écrire |
 | 3 — Route auto | NodeDB, TravelDB, Dijkstra, TSP | à faire |
 | 4 — En jeu | HUD, auto-avance, waypoints, bouton de téléport | à faire |
 | 5 — Routes maison | éditeur, épinglage, import/export | à faire |

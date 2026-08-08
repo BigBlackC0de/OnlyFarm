@@ -50,7 +50,7 @@ Deux options :
 * **ou** appeler directement `C_MountJournal.GetMountFromItem(itemID)` — plus
   court, plus fiable, et c'est le test qui compte vraiment.
 
-`Modules/DevScan.lua` retient la seconde.
+`Modules/Mapping.lua` retient la seconde, en passe approfondie.
 
 ### 2. `C_Spell.GetSpellCooldown` renvoie une table, pas 4 valeurs
 
