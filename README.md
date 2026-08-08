@@ -49,6 +49,7 @@ l'addon.
 | `/of scan` | forcer un rescan : collection, verrous et cartographie |
 | `/of chars` | lister les personnages connus et leurs verrous |
 | `/of deepscan` | passe approfondie : butin boss par boss (lent, facultatif) |
+| `/of diag` | dire pourquoi la cartographie est revenue vide |
 | `/of debug` | activer les traces |
 | `/of reset` | effacer la base sauvegardée (confirmation requise) |
 
@@ -66,11 +67,18 @@ le client expose plus de montures qu'au dernier passage. Le bouton
 
 Elle se fait en deux temps :
 
-1. **l'index des instances** — les paliers du Journal des rencontres donnent la
-   liste des instances et leur extension ;
+1. **l'index des instances** — construit à partir de *deux* sources : la liste
+   des donjons du Recherche de groupe (des globales toujours présentes, qui
+   portent le niveau d'extension) et, quand il répond, le parcours par paliers
+   du Journal des rencontres (qui apporte en plus l'identifiant reliant une
+   instance à son entrée sur la carte). Si l'une est muette, l'autre suffit ;
 2. **le texte de source** — chaque monture expose déjà
    `Butin : Le roi-liche|nCitadelle de la Couronne de glace`. On le découpe, et
    on rapproche le lieu de l'index.
+
+Si la cartographie revient vide, **`/of diag`** dit lequel des quatre maillons
+a cédé : les paliers, la liste du Recherche de groupe, le découpage du texte,
+ou le rapprochement des noms.
 
 Une troisième passe, **`/of deepscan`** (bouton « Scan approfondi »), parcourt
 le butin boss par boss pour affiner les cas que le texte de source décrit mal.

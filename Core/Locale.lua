@@ -45,7 +45,8 @@ local L = {
 	DASH_NO_TARGET = "Nothing available right now — everything is locked or unmapped.",
 	DASH_LOCKOUTS = "Done this week",
 	DASH_NO_LOCKOUT = "No lockout on this character — the week is untouched.",
-	DASH_NEEDS_SCAN = "Expansions appear once the Encounter Journal scan has run.",
+	DASH_NEEDS_SCAN = "Expansions appear once the mapping has run.",
+	DASH_SCAN_EMPTY = "The mapping ran but tied no mount to an instance. |cff7ac1ff/of diag|r says where it broke.",
 
 	-- Statuts
 	STATUS_AVAILABLE = "available",
@@ -107,6 +108,7 @@ local L = {
 	CMD_HELP_SCAN = "  /of scan      — rescan collection and lockouts",
 	CMD_HELP_CHARS = "  /of chars     — list known characters",
 	CMD_HELP_DEEPSCAN = "  /of deepscan  — deep pass: walk every boss's loot table (slow, optional)",
+	CMD_HELP_DIAG = "  /of diag      — why the mapping came back empty",
 	CMD_HELP_DEBUG = "  /of debug     — toggle debug traces",
 	CMD_HELP_RESET = "  /of reset     — wipe the saved database (asks twice)",
 
@@ -163,7 +165,8 @@ if GetLocale and GetLocale() == "frFR" then
 	L.DASH_NO_TARGET = "Rien de disponible maintenant — tout est verrouillé ou non cartographié."
 	L.DASH_LOCKOUTS = "Déjà fait cette semaine"
 	L.DASH_NO_LOCKOUT = "Aucun verrou sur ce personnage — la semaine est intacte."
-	L.DASH_NEEDS_SCAN = "Les extensions apparaissent une fois le scan du Journal des rencontres passé."
+	L.DASH_NEEDS_SCAN = "Les extensions apparaissent une fois la cartographie passée."
+	L.DASH_SCAN_EMPTY = "La cartographie a tourné mais n'a rattaché aucune monture à une instance. |cff7ac1ff/of diag|r dit où ça coince."
 
 	L.STATUS_AVAILABLE = "disponible"
 	L.STATUS_LOCKED = "verrouillé"
@@ -218,6 +221,7 @@ if GetLocale and GetLocale() == "frFR" then
 	L.CMD_HELP_SCAN = "  /of scan      — rescanner collection et verrous"
 	L.CMD_HELP_CHARS = "  /of chars     — lister les personnages connus"
 	L.CMD_HELP_DEEPSCAN = "  /of deepscan  — passe approfondie : butin boss par boss (lent, facultatif)"
+	L.CMD_HELP_DIAG = "  /of diag      — pourquoi la cartographie est revenue vide"
 	L.CMD_HELP_DEBUG = "  /of debug     — activer/couper les traces"
 	L.CMD_HELP_RESET = "  /of reset     — effacer la base sauvegardée (demande confirmation)"
 

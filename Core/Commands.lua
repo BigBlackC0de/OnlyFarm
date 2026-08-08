@@ -36,7 +36,7 @@ function handlers.help()
 	ns:Print(L.CMD_HELP_HEADER)
 	for _, line in ipairs({
 		L.CMD_HELP_SHOW, L.CMD_HELP_SCAN, L.CMD_HELP_CHARS,
-		L.CMD_HELP_DEEPSCAN, L.CMD_HELP_DEBUG, L.CMD_HELP_RESET,
+		L.CMD_HELP_DEEPSCAN, L.CMD_HELP_DIAG, L.CMD_HELP_DEBUG, L.CMD_HELP_RESET,
 	}) do
 		DEFAULT_CHAT_FRAME:AddMessage(line)
 	end
@@ -66,6 +66,10 @@ end
 
 -- Ancien nom de la commande, gardé pour les habitudes.
 handlers["ejscan"] = handlers.deepscan
+
+function handlers.diag()
+	ns.Mapping:Diagnose()
+end
 
 function handlers.chars()
 	local keys = ns.Database:GetCharKeys()

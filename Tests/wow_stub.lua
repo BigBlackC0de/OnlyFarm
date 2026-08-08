@@ -284,6 +284,30 @@ _G.EJ_GetInstanceByIndex = function(index, isRaid)
 	return instance.id, instance.name
 end
 
+--------------------------------------------------------------------------------
+-- Recherche de groupe : la seconde source d'extension
+--
+-- Fixture : stub.lfgDungeons[dungeonID] = { name, subtypeID, expansionLevel }
+--------------------------------------------------------------------------------
+
+stub.lfgDungeons = {}
+
+_G.GetLFGDungeonInfo = function(dungeonID)
+	local entry = stub.lfgDungeons[dungeonID]
+	if not entry then return nil end
+	-- name, typeID, subtypeID, minLevel, maxLevel, recLevel, minRecLevel,
+	-- maxRecLevel, expansionLevel, …
+	return entry.name, entry.typeID or 1, entry.subtypeID or 1,
+		0, 0, 0, 0, 0, entry.expansionLevel or 0
+end
+
+-- Libellés d'extension du client, tels que les expose _G["EXPANSION_NAME"..n].
+_G.EXPANSION_NAME0 = "Classic"
+_G.EXPANSION_NAME1 = "The Burning Crusade"
+_G.EXPANSION_NAME2 = "Wrath of the Lich King"
+_G.EXPANSION_NAME3 = "Cataclysm"
+_G.EXPANSION_NAME6 = "Legion"
+
 _G.EJ_SelectInstance = function(id) stub.selectedInstance = id end
 _G.EJ_SelectEncounter = function(id) stub.selectedEncounter = id end
 _G.EJ_GetEncounterInfoByIndex = function() return nil end
@@ -541,6 +565,7 @@ function stub.Reset()
 	stub.selectedTier = 1
 	stub.selectedInstance = nil
 	stub.selectedEncounter = nil
+	stub.lfgDungeons = {}
 	stub.profileClock = 0
 	stub.dailyResetAt = stub.now + 3600
 	stub.weeklyResetAt = stub.now + 3 * 86400

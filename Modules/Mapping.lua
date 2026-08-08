@@ -147,11 +147,83 @@ end
 
 --------------------------------------------------------------------------------
 -- Passe A — index des instances
+--
+-- DEUX sources, et c'est délibéré.
+--
+-- Le parcours par paliers du Journal des rencontres donne le journalInstanceID
+-- (dont la géographie a besoin) mais il s'est révélé muet en jeu : selon l'état
+-- du client, EJ_GetNumTiers peut renvoyer 0 tant que la fenêtre du Journal n'a
+-- jamais été ouverte. Résultat, index vide et cartographie à zéro, sans la
+-- moindre erreur pour le signaler.
+--
+-- La liste des donjons du Recherche de groupe, elle, est faite de globales
+-- toujours présentes, sans addon à charger ni fenêtre à ouvrir, et elle porte
+-- directement le niveau d'extension de chaque instance. Elle ne donne pas
+-- d'identifiant de Journal, mais elle donne le nom et l'extension — c'est-à-dire
+-- ce dont l'affichage a besoin.
+--
+-- On construit donc les deux et on les fusionne. Si l'une est vide, l'autre
+-- suffit.
 --------------------------------------------------------------------------------
 
---- Parcourt les paliers et enregistre chaque instance.
+-- Les identifiants du Recherche de groupe sont épars ; on balaie large et on
+-- ignore les trous. Le coût est négligeable, la boucle respire régulièrement.
+local MAX_LFG_ID = 3000
+local LFG_IDS_PER_SLICE = 400
+
+-- subtypeID du Recherche de groupe : 3 = raid, 5 = raid flexible.
+local LFG_RAID_SUBTYPES = { [3] = true, [5] = true }
+
+--- Nom localisé d'une extension à partir de son niveau.
+--  EXPANSION_NAME0 = « Classic », EXPANSION_NAME1 = « The Burning Crusade »…
+--  Ce sont les libellés du client, donc ceux que le joueur connaît.
+local function ExpansionName(level)
+	if type(level) ~= "number" then return nil end
+	local name = _G["EXPANSION_NAME" .. level]
+	if type(name) == "string" and name ~= "" then return name end
+	return nil
+end
+
+--- Index tiré de la liste des donjons du Recherche de groupe.
+local function BuildLFGIndex()
+	local index = {}
+	if type(GetLFGDungeonInfo) ~= "function" then return index end
+
+	local since = 0
+	for dungeonID = 1, MAX_LFG_ID do
+		local ok, name, _, subtypeID, _, _, _, _, _, expansionLevel =
+			pcall(GetLFGDungeonInfo, dungeonID)
+
+		if ok and type(name) == "string" and name ~= "" then
+			local key = ns.Util.NormalizeName(name)
+			local tierName = ExpansionName(expansionLevel)
+			-- On ne retient que si on a effectivement une extension à en tirer,
+			-- et on garde la première vue : un même nom apparaît en normal, en
+			-- héroïque et en Recherche de raid, avec la même extension.
+			if key and tierName and not index[key] then
+				index[key] = {
+					name = name,
+					tier = expansionLevel,
+					tierName = tierName,
+					isRaid = LFG_RAID_SUBTYPES[subtypeID] or false,
+					origin = "lfg",
+				}
+			end
+		end
+
+		since = since + 1
+		if since >= LFG_IDS_PER_SLICE then
+			since = 0
+			coroutine.yield()
+		end
+	end
+
+	return index
+end
+
+--- Parcourt les paliers du Journal et enregistre chaque instance.
 --  @return [nom normalisé] = { name, journalInstanceID, tier, tierName, isRaid }
-local function BuildInstanceIndex()
+local function BuildJournalIndex()
 	local index = {}
 	if not TiersReady() then return index end
 
@@ -185,6 +257,7 @@ local function BuildInstanceIndex()
 						tier = tier,
 						tierName = tierName,
 						isRaid = isRaid,
+						origin = "journal",
 					}
 				end
 				position = position + 1
@@ -193,6 +266,30 @@ local function BuildInstanceIndex()
 	end
 
 	return index
+end
+
+--- Fusion des deux index. Le Journal gagne quand il répond : il apporte le
+--  journalInstanceID, qui relie une instance à son entrée sur la carte. La
+--  liste du Recherche de groupe comble le reste, et sauve le cas où le Journal
+--  ne répond pas du tout.
+local function BuildInstanceIndex()
+	local lfg = BuildLFGIndex()
+	local journal = BuildJournalIndex()
+
+	local index = {}
+	for key, entry in pairs(lfg) do index[key] = entry end
+	for key, entry in pairs(journal) do
+		local existing = index[key]
+		if existing then
+			-- Le Journal n'a pas toujours de nom de palier exploitable ; on
+			-- garde alors celui du Recherche de groupe plutôt que de le perdre.
+			entry.tierName = entry.tierName or existing.tierName
+			entry.tier = entry.tier or existing.tier
+		end
+		index[key] = entry
+	end
+
+	return index, ns.Util.Count(lfg), ns.Util.Count(journal)
 end
 
 --------------------------------------------------------------------------------
@@ -464,7 +561,7 @@ end
 --------------------------------------------------------------------------------
 
 local function ScanRoutine(self, deep)
-	local index = BuildInstanceIndex()
+	local index, lfgCount, journalCount = BuildInstanceIndex()
 	self.instanceIndex = index
 
 	local results, mapped = MapFromSourceText(index)
@@ -482,6 +579,8 @@ local function ScanRoutine(self, deep)
 	return {
 		sources = results,
 		instances = ns.Util.Count(index),
+		lfgInstances = lfgCount,
+		journalInstances = journalCount,
 		mounts = total,
 		mapped = mapped,
 		refined = refined,
@@ -569,6 +668,10 @@ function Mapping:Finish(payload)
 			mounts = payload.mounts,
 			mapped = payload.mapped,
 			instances = payload.instances,
+			-- Détail par source : c'est ce qui permet de dire « le Journal n'a
+			-- rien renvoyé » au lieu de « ça ne marche pas ».
+			lfgInstances = payload.lfgInstances,
+			journalInstances = payload.journalInstances,
 			nodes = payload.nodeCount,
 			deep = payload.deep or false,
 			mountsSeen = type(mountIDs) == "table" and #mountIDs or 0,
@@ -578,6 +681,70 @@ function Mapping:Finish(payload)
 	ns:Print(ns.L.SCAN_DONE, payload.mapped or 0, payload.mounts or 0, payload.instances or 0)
 	if silent then ns:Print(ns.L.SCAN_AUTO_DONE) end
 	self:SendMessage("OF_SCAN_COMPLETE")
+end
+
+--------------------------------------------------------------------------------
+-- Diagnostic
+--
+-- Quand la cartographie rend zéro, il y a exactement quatre endroits où ça peut
+-- coincer : les paliers du Journal, la liste du Recherche de groupe, le
+-- découpage du texte de source, ou le rapprochement des noms. Cette commande
+-- dit lequel, au lieu de laisser deviner.
+--------------------------------------------------------------------------------
+
+function Mapping:Diagnose()
+	local function Line(fmt, ...)
+		DEFAULT_CHAT_FRAME:AddMessage("  " .. string.format(fmt, ...))
+	end
+
+	ns:Print("diagnostic de cartographie")
+
+	-- 1. Journal des rencontres.
+	Line("Journal chargé : %s", tostring(TiersReady()))
+	if type(EJ_GetNumTiers) == "function" then
+		local ok, tiers = pcall(EJ_GetNumTiers)
+		Line("EJ_GetNumTiers() = %s", ok and tostring(tiers) or "erreur")
+	else
+		Line("EJ_GetNumTiers absente")
+	end
+
+	-- 2. Recherche de groupe.
+	if type(GetLFGDungeonInfo) == "function" then
+		local sampled, named = 0, 0
+		for dungeonID = 1, 500 do
+			local ok, name = pcall(GetLFGDungeonInfo, dungeonID)
+			sampled = sampled + 1
+			if ok and type(name) == "string" and name ~= "" then named = named + 1 end
+		end
+		Line("GetLFGDungeonInfo : %d noms sur %d identifiants testés", named, sampled)
+		Line("EXPANSION_NAME0 = %s", tostring(_G.EXPANSION_NAME0))
+	else
+		Line("GetLFGDungeonInfo absente")
+	end
+
+	-- 3. Découpage du texte de source, sur les premières montures manquantes.
+	local shown = 0
+	for _, entry in ipairs(ns.Collection:GetMissing()) do
+		if shown >= 3 then break end
+		local _, _, sourceText = C_MountJournal.GetMountInfoExtraByID(entry.mountID)
+		local boss, place = ParseSourceText(sourceText)
+		Line("« %s » -> boss=%s | lieu=%s", entry.name, tostring(boss), tostring(place))
+		if place and self.instanceIndex then
+			local match = self.instanceIndex[ns.Util.NormalizeName(place)]
+			Line("    rapprochement : %s", match and (match.tierName or "sans extension") or "AUCUN")
+		end
+		shown = shown + 1
+	end
+
+	-- 4. Bilan du dernier passage.
+	local meta = ns.db and ns.db.global.scanMeta
+	if type(meta) == "table" and meta.at then
+		Line("dernier scan : %d/%d rattachées, %d instances (%s via RdG, %s via Journal)",
+			meta.mapped or 0, meta.mounts or 0, meta.instances or 0,
+			tostring(meta.lfgInstances), tostring(meta.journalInstances))
+	else
+		Line("aucun scan enregistré")
+	end
 end
 
 --- Résumé du dernier scan, pour l'interface.

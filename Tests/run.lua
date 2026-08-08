@@ -745,6 +745,62 @@ test("Mapping — la cartographie survit et ne se refait pas pour rien", functio
 	eq(ns.Mapping:IsStale(), true, "plus de montures qu'au dernier scan -> à refaire")
 end)
 
+-- Régression : en jeu, EJ_GetNumTiers renvoyait 0 et l'index restait vide, ce
+-- qui donnait « 0/1619 cartographiées » sans la moindre erreur. La liste du
+-- Recherche de groupe doit suffire à elle seule.
+test("Mapping — le Journal muet, la liste du Recherche de groupe suffit", function()
+	stub.Reset()
+	stub.tiers = {}   -- EJ_GetNumTiers() = 0, exactement le cas observé
+	stub.lfgDungeons = {
+		[100] = { name = "Citadelle de la Couronne de glace", subtypeID = 3, expansionLevel = 2 },
+		[101] = { name = "Karazhan supérieur", subtypeID = 1, expansionLevel = 6 },
+	}
+	stub.mounts = {
+		{ mountID = 201, name = "Invincible", sourceType = 1,
+		  source = "Butin : Le roi-liche|nCitadelle de la Couronne de glace" },
+		{ mountID = 202, name = "Fauve", sourceType = 1,
+		  source = "Butin : Attumen|nKarazhan supérieur" },
+	}
+	local ns = harness.Load(stub)
+
+	ns.Mapping:Run(false)
+	stub.RunFrames(80)
+	eq(ns.Mapping.running, false, "le scan se termine")
+
+	local cache = ns.db.global.sourceCache
+	eq(cache[201].tierName, "Wrath of the Lich King", "extension via le Recherche de groupe")
+	eq(cache[201].isRaid, true, "raid reconnu par le subtypeID")
+	eq(cache[202].tierName, "Legion", "donjon d'une autre extension")
+	eq(cache[202].isRaid, false, "donjon, pas raid")
+	eq(ns.db.global.scanMeta.mapped, 2, "les deux montures rattachées")
+	eq(ns.db.global.scanMeta.journalInstances, 0, "le Journal n'a rien donné, et on le dit")
+end)
+
+test("Mapping — le Journal prime quand les deux répondent", function()
+	stub.Reset()
+	stub.tiers = {
+		{ name = "Wrath of the Lich King", instances = {
+			{ id = 186, name = "Citadelle de la Couronne de glace", isRaid = true },
+		} },
+	}
+	stub.lfgDungeons = {
+		[100] = { name = "Citadelle de la Couronne de glace", subtypeID = 3, expansionLevel = 2 },
+	}
+	stub.mounts = {
+		{ mountID = 201, name = "Invincible", sourceType = 1,
+		  source = "Butin : Le roi-liche|nCitadelle de la Couronne de glace" },
+	}
+	local ns = harness.Load(stub)
+
+	ns.Mapping:Run(false)
+	stub.RunFrames(80)
+
+	-- Le journalInstanceID ne vient que du Journal : c'est lui qui relie une
+	-- instance à son entrée sur la carte, donc il doit gagner.
+	eq(ns.db.global.sourceCache[201].journalInstanceID, 186, "identifiant du Journal retenu")
+	eq(ns.db.global.sourceCache[201].tierName, "Wrath of the Lich King", "extension cohérente")
+end)
+
 test("Mapping — sans palier lisible, le scan n'invente rien", function()
 	stub.Reset()
 	stub.tiers = {}

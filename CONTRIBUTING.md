@@ -125,6 +125,15 @@ mécanique le jour où AceConfig et AceGUI deviennent utiles (phase 3+).
 en phase 2 à partir du dump de la cartographie. En attendant, la liste des
 montures manquantes vient entièrement du client, donc elle est exacte.
 
+**La cartographie a deux sources d'extension, et c'est voulu.** Le parcours par
+paliers du Journal (`EJ_GetNumTiers` / `EJ_SelectTier`) s'est révélé muet en
+jeu : selon l'état du client, `EJ_GetNumTiers` renvoie 0 tant que la fenêtre du
+Journal n'a jamais été ouverte, et l'index sort vide sans la moindre erreur.
+`GetLFGDungeonInfo` est une globale toujours présente qui porte directement le
+niveau d'extension (`_G["EXPANSION_NAME"..n]` pour le libellé). Les deux sont
+construits et fusionnés ; le Journal gagne quand il répond, parce qu'il apporte
+le `journalInstanceID`. Ne jamais revenir à une source unique ici.
+
 **La cartographie ne repose PAS sur l'API de butin.** La version 0.1.0 en
 dépendait entièrement (`EJ_SelectEncounter` + `GetLootInfoByIndex`) et remontait
 zéro monture en jeu : le butin n'est pas prêt à la frame suivante, il dépend de

@@ -168,6 +168,10 @@ function Dashboard:CreateExpansions(page)
 
 	card.Empty = Theme.Text(card, "GameFontHighlightSmall", Theme.colors.faint, "CENTER")
 	card.Empty:SetPoint("CENTER", 0, -10)
+	-- Bornée à gauche et à droite : le message d'échec est une phrase, pas une
+	-- étiquette, et il doit passer à la ligne au lieu de déborder de la carte.
+	card.Empty:SetPoint("LEFT", 24, 0)
+	card.Empty:SetPoint("RIGHT", -24, 0)
 	card.Empty:SetText(L.DASH_NEEDS_SCAN)
 	card.Empty:Hide()
 
@@ -380,6 +384,12 @@ function Dashboard:Refresh()
 			row:Hide()
 		end
 	end
+	-- Deux messages distincts pour deux situations distinctes : « pas encore
+	-- scanné » et « scanné, mais rien n'est ressorti ». Le second est un
+	-- problème, et il doit se lire comme tel plutôt que comme une attente.
+	local meta = ns.db and ns.db.global.scanMeta
+	local hasScanned = type(meta) == "table" and meta.at ~= nil
+	expansionCard.Empty:SetText(hasScanned and L.DASH_SCAN_EMPTY or L.DASH_NEEDS_SCAN)
 	expansionCard.Empty:SetShown(not hasExpansions)
 	expansionCard.Hint:SetShown(hasExpansions)
 
