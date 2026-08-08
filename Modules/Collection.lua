@@ -81,8 +81,10 @@ function Collection:Scan()
 		if name then
 			if shouldHideOnChar then
 				-- Monture d'une autre faction ou d'une autre classe : elle ne
-				-- sera jamais obtenable sur CE personnage. On la compte à part
-				-- au lieu de polluer le total.
+				-- tombera JAMAIS sur ce personnage. Elle sort du total, et le
+				-- compteur n'est gardé que pour le diagnostic — l'afficher
+				-- revenait à mettre en avant un chiffre sur lequel le joueur ne
+				-- peut rien.
 				counts.hidden = counts.hidden + 1
 			else
 				counts.total = counts.total + 1

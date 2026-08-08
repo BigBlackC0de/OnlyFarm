@@ -58,7 +58,6 @@ local L = {
 
 	-- Résumés
 	SUMMARY = "%d/%d collected — %d missing",
-	SUMMARY_HIDDEN = "%d unavailable to this character",
 	SUMMARY_FILTERED = "%d shown",
 	INSTANCE_COUNTER = "Instances: %d/%d this hour · %d/%d today",
 	JOURNAL_NOT_READY = "Mount Journal not populated yet, retrying…",
@@ -183,7 +182,6 @@ if GetLocale and GetLocale() == "frFR" then
 	L.STATUS_INELIGIBLE = "non éligible"
 
 	L.SUMMARY = "%d/%d possédées — %d manquantes"
-	L.SUMMARY_HIDDEN = "%d hors de portée sur ce perso"
 	L.INSTANCE_COUNTER = "Instances : %d/%d cette heure · %d/%d aujourd'hui"
 	L.SUMMARY_FILTERED = "%d affichées"
 	L.JOURNAL_NOT_READY = "Journal des montures pas encore peuplé, nouvelle tentative…"

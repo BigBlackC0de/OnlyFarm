@@ -337,8 +337,11 @@ function Dashboard:Refresh()
 	-- 1. Tuiles.
 	self.tiles.owned:Set(string.format("%d", stats.owned),
 		string.format("%d %%", math.floor(stats.ratio * 100 + 0.5)))
-	self.tiles.missing:Set(string.format("%d", stats.missing),
-		stats.hidden > 0 and L.SUMMARY_HIDDEN:format(stats.hidden) or "")
+	-- Pas de « N hors de portée sur ce perso » ici. Les montures de la faction
+	-- ou de la classe adverse ne tomberont jamais sur ce personnage : ce n'est
+	-- pas du travail restant, c'est du bruit. Elles sont déjà absentes de la
+	-- liste et du total ; ne pas les compter non plus en marge.
+	self.tiles.missing:Set(string.format("%d", stats.missing), "")
 	self.tiles.available:Set(string.format("%d", stats.availableCount or 0), "")
 	self.tiles.attempts:Set(string.format("%d", stats.attempts.total),
 		stats.attempts.mounts > 0 and L.KPI_ATTEMPTS_DETAIL:format(stats.attempts.mounts) or "")
