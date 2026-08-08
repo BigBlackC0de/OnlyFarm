@@ -18,17 +18,17 @@
 	Cette table est le seul moyen de passer le mur, et c'est ce que prévoit la
 	phase 2 de la spécification.
 
-	POURQUOI LA CLÉ EST LE spellID
+	POURQUOI LA CLÉ EST LE mountID
 
-	Surtout PAS le nom. Les noms de montures sont localisés : « Invincible » en
-	anglais, « Invincible » en français, mais « 冰龙 » ailleurs — et n'importe
-	quelle liste extérieure sera dans UNE langue. Un rapprochement par nom
-	marcherait sur un client anglais et échouerait partout ailleurs, ce qui est
-	la pire des situations : ça marche chez celui qui teste.
+	Surtout PAS le nom. Les noms de montures sont localisés, et n'importe quelle
+	liste extérieure est écrite dans UNE langue. Un rapprochement par nom
+	marcherait sur un client anglais et échouerait partout ailleurs — la pire
+	des situations, parce qu'elle passe les tests de celui qui l'écrit.
 
-	Le spellID est stable, unique, et le client le donne pour chaque monture
-	(2e retour de C_MountJournal.GetMountInfoByID). C'est la seule jointure
-	honnête entre une donnée extérieure et le client du joueur.
+	Le mountID est l'identifiant qu'utilisent À LA FOIS le client
+	(C_MountJournal) et l'API officielle de Blizzard (/data/wow/mount/{id}).
+	C'est donc la jointure naturelle. Le spellID est accepté en clé secondaire,
+	pour les sources qui ne connaissent que lui.
 
 	SOURCE DES DONNÉES
 
@@ -49,7 +49,8 @@ local Data = ns.Data
 --[[
 	Forme d'une entrée :
 
-	Data.Mounts[40192] = {
+	Data.Mounts[264] = {
+		spellID    = 40192,          -- facultatif, clé secondaire
 		expansion  = 1,              -- niveau d'extension (0 = Vanilla)
 		kind       = "boss",         -- cf. Data.SOURCE_KINDS
 		instance   = "Tempest Keep", -- nom NON localisé, indicatif seulement
@@ -61,10 +62,24 @@ local Data = ns.Data
 --]]
 Data.Mounts = {}
 
---- Entrée curée d'une monture, par son identifiant de sort.
-function Data.GetCuratedMount(spellID)
+--- Index secondaire spellID -> entrée, construit à la demande.
+local bySpell
+
+--- Entrée curée d'une monture.
+--  @param mountID identifiant du Journal des montures
+--  @param spellID identifiant de sort, utilisé en repli
+function Data.GetCuratedMount(mountID, spellID)
+	local entry = type(mountID) == "number" and Data.Mounts[mountID] or nil
+	if entry then return entry end
+
 	if type(spellID) ~= "number" then return nil end
-	return Data.Mounts[spellID]
+	if not bySpell then
+		bySpell = {}
+		for _, candidate in pairs(Data.Mounts) do
+			if candidate.spellID then bySpell[candidate.spellID] = candidate end
+		end
+	end
+	return bySpell[spellID]
 end
 
 --- Nombre d'entrées curées, pour le diagnostic.

@@ -14,20 +14,26 @@ peut — instances, hauts faits — et suit les patchs toute seule. Elle bute su
 les vendeurs, métiers, événements, PvP et butins de zone, dont le client
 n'expose pas l'extension. Ce script comble ce trou-là, et rien d'autre.
 
-LA CLÉ EST LE spellID
+LA CLÉ EST LE mountID
 ---------------------
 Surtout pas le nom : les noms de montures sont localisés, une liste extérieure
 est écrite dans une seule langue, et un rapprochement par nom marcherait chez
-celui qui teste puis échouerait chez tous les autres. Le spellID est stable et
-le client le donne pour chaque monture.
+celui qui teste puis échouerait chez tous les autres.
+
+Le mountID est l'identifiant qu'utilisent À LA FOIS le client (C_MountJournal)
+et l'API officielle de Blizzard (/data/wow/mount/{id}) : c'est la jointure
+naturelle. Le spellID est accepté en clé secondaire, pour les sources qui ne
+connaissent que lui.
 
 FORMAT D'ENTRÉE
 ---------------
-CSV avec en-tête. Une seule colonne est obligatoire : `spellID`.
+CSV avec en-tête. Une colonne de clé est obligatoire : `mountID` (celui de
+l'API officielle et du client) ; `spellID` peut l'accompagner comme clé
+secondaire.
 
-    spellID,expansion,kind,instance,dropRate
-    40192,1,boss,Tempest Keep,0.02
-    32458,1,boss,Tempest Keep,0.01
+    mountID,spellID,expansion,kind,instance,dropRate
+    264,40192,1,boss,Tempest Keep,0.02
+    183,32458,1,boss,Tempest Keep,0.01
 
   expansion  niveau d'extension du client, 0 = Vanilla … 11 = Midnight
   kind       boss | rare | vendor | profession | event | pvp | quest |
@@ -35,8 +41,9 @@ CSV avec en-tête. Une seule colonne est obligatoire : `spellID`.
   instance   nom indicatif, NON localisé, affichage seulement
   dropRate   estimation communautaire entre 0 et 1
 
-`/of export` en jeu produit un CSV de départ avec les spellID et ce que l'addon
-sait déjà. Les colonnes vides sont celles à remplir.
+`/of export` en jeu produit un CSV de départ avec les identifiants et ce que
+l'addon sait déjà. Les colonnes vides sont celles à remplir.
+`Build/fetch_blizzard.py` produit le même CSV depuis l'API officielle.
 
 Les lignes sans `expansion` exploitable sont ignorées avec un avertissement :
 une entrée vide dans la table serait pire qu'une absence, parce qu'elle
@@ -99,10 +106,24 @@ Data.Mounts = {{
 
 FOOTER = """}
 
---- Entrée curée d'une monture, par son identifiant de sort.
-function Data.GetCuratedMount(spellID)
+--- Index secondaire spellID -> entrée, construit à la demande.
+local bySpell
+
+--- Entrée curée d'une monture.
+--  @param mountID identifiant du Journal des montures
+--  @param spellID identifiant de sort, utilisé en repli
+function Data.GetCuratedMount(mountID, spellID)
+	local entry = type(mountID) == "number" and Data.Mounts[mountID] or nil
+	if entry then return entry end
+
 	if type(spellID) ~= "number" then return nil end
-	return Data.Mounts[spellID]
+	if not bySpell then
+		bySpell = {}
+		for _, candidate in pairs(Data.Mounts) do
+			if candidate.spellID then bySpell[candidate.spellID] = candidate end
+		end
+	end
+	return bySpell[spellID]
 end
 
 --- Nombre d'entrées curées, pour le diagnostic.
@@ -127,21 +148,29 @@ def parse_rows(path: Path) -> tuple[list[dict], list[str]]:
 
     with path.open(newline="", encoding="utf-8-sig") as handle:
         reader = csv.DictReader(handle)
-        if reader.fieldnames is None or "spellID" not in reader.fieldnames:
+        if reader.fieldnames is None or "mountID" not in reader.fieldnames:
             raise SystemExit(
-                f"{path}: colonne « spellID » absente. "
+                f"{path}: colonne « mountID » absente. "
                 "C'est la clé de jointure, elle est obligatoire."
             )
 
         for line_number, row in enumerate(reader, start=2):
-            raw_spell = (row.get("spellID") or "").strip()
-            if not raw_spell:
+            raw_mount = (row.get("mountID") or "").strip()
+            if not raw_mount:
                 continue
             try:
-                spell_id = int(raw_spell)
+                mount_id = int(raw_mount)
             except ValueError:
-                warnings.append(f"ligne {line_number} : spellID « {raw_spell} » illisible")
+                warnings.append(f"ligne {line_number} : mountID « {raw_mount} » illisible")
                 continue
+
+            spell_id = None
+            raw_spell = (row.get("spellID") or "").strip()
+            if raw_spell:
+                try:
+                    spell_id = int(raw_spell)
+                except ValueError:
+                    warnings.append(f"ligne {line_number} : spellID « {raw_spell} » illisible")
 
             expansion_raw = (row.get("expansion") or "").strip()
             expansion = None
@@ -185,11 +214,12 @@ def parse_rows(path: Path) -> tuple[list[dict], list[str]]:
             if expansion is None and kind is None and drop_rate is None:
                 continue
 
-            if spell_id in entries:
-                warnings.append(f"ligne {line_number} : spellID {spell_id} en double, ignoré")
+            if mount_id in entries:
+                warnings.append(f"ligne {line_number} : mountID {mount_id} en double, ignoré")
                 continue
 
-            entries[spell_id] = {
+            entries[mount_id] = {
+                "mountID": mount_id,
                 "spellID": spell_id,
                 "expansion": expansion,
                 "kind": kind,
@@ -213,6 +243,8 @@ def render(entries: list[dict], source: str, digest: str) -> str:
 
     for entry in entries:
         fields = []
+        if entry["spellID"] is not None:
+            fields.append(f'spellID = {entry["spellID"]}')
         if entry["expansion"] is not None:
             fields.append(f'expansion = {entry["expansion"]}')
         if entry["kind"]:
@@ -221,7 +253,7 @@ def render(entries: list[dict], source: str, digest: str) -> str:
             fields.append(f'instance = {lua_string(entry["instance"])}')
         if entry["dropRate"] is not None:
             fields.append(f'dropRate = {entry["dropRate"]:g}')
-        out.append(f'\t[{entry["spellID"]}] = {{ {", ".join(fields)} }},\n')
+        out.append(f'\t[{entry["mountID"]}] = {{ {", ".join(fields)} }},\n')
 
     out.append(FOOTER)
     return "".join(out)

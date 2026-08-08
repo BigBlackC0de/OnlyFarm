@@ -100,14 +100,29 @@ PNJ ou un lieu.
 Ce trou-là se comble par une table curée, compilée au build :
 
 ```bash
-/of export                                    # en jeu : produit le CSV de départ
+# depuis l'API officielle Blizzard (identifiants gratuits)
+export BLIZZARD_CLIENT_ID=... BLIZZARD_CLIENT_SECRET=...
+Build/fetch_blizzard.py --region eu --locale fr_FR
+
+# ou depuis le jeu, pour ne travailler que sur ce qui manque
+/of export
+
 Build/generate_data.py Build/overlay/mounts.csv
 ```
 
-La clé de jointure est le **spellID**, jamais le nom : les noms de montures
-sont localisés, une liste extérieure est écrite dans une seule langue, et un
-rapprochement par nom marcherait chez celui qui le teste puis échouerait chez
-tous les autres.
+La clé de jointure est le **mountID** — celui qu'utilisent à la fois
+`C_MountJournal` et `/data/wow/mount/{id}`. Jamais le nom : les noms de
+montures sont localisés, une liste extérieure est écrite dans une seule langue,
+et un rapprochement par nom marcherait chez celui qui le teste puis échouerait
+chez tous les autres.
+
+**Ce que l'API officielle donne, et ce qu'elle ne donne pas.** Elle donne la
+liste canonique des montures avec leur mountID, leur nom **dans toutes les
+locales**, la source déclarée par Blizzard et la faction. Elle ne donne **pas**
+l'extension : aucun champ, sur aucun endpoint des montures. Son apport réel est
+donc ailleurs — elle rend utilisable n'importe quelle liste communautaire
+écrite en anglais sur un client français, en passant par le mountID. La colonne
+`expansion` reste à remplir.
 
 La table curée ne prime jamais sur ce que le client sait : elle ne s'applique
 qu'aux montures pour lesquelles aucune source dérivée n'a répondu.

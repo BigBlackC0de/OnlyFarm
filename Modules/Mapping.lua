@@ -613,7 +613,7 @@ local function MapFromSourceText(index, achievements)
 			-- répondu — une donnée mesurée sur le client courant vaut toujours
 			-- mieux qu'une donnée figée au moment du build.
 			if not entry.tierName then
-				local curated = ns.Data.GetCuratedMount(spellID)
+				local curated = ns.Data.GetCuratedMount(mountID, spellID)
 				if curated then
 					entry.tier = curated.expansion
 					entry.tierName = ns.Data.ExpansionName(curated.expansion)

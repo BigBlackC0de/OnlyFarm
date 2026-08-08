@@ -1057,9 +1057,10 @@ test("Mapping — la table curée comble, mais ne prime pas", function()
 	}
 	local ns = harness.Load(stub)
 
+	-- Table curée keyée par mountID, comme l'API officielle et le client.
 	ns.Data.Mounts = {
-		[1001] = { expansion = 9, kind = "vendor" },   -- volontairement faux
-		[1002] = { expansion = 7, kind = "vendor", dropRate = 1 },
+		[201] = { expansion = 9, kind = "vendor" },   -- volontairement faux
+		[202] = { expansion = 7, kind = "vendor", dropRate = 1 },
 	}
 
 	ns.Mapping:Run(false)
@@ -1073,6 +1074,11 @@ test("Mapping — la table curée comble, mais ne prime pas", function()
 	eq(cache[202].tierName, "Battle for Azeroth", "la curation comble le trou")
 	eq(cache[202].matchedBy, "curated", "et le dit")
 	eq(cache[202].dropRate, 1, "taux de drop repris")
+
+	-- Une source qui ne connaît que le spellID doit rester exploitable.
+	ns.Data.Mounts = { [9999] = { spellID = 1002, expansion = 3 } }
+	eq(ns.Data.GetCuratedMount(202, 1002).expansion, 3, "repli par spellID")
+	eq(ns.Data.GetCuratedMount(202, nil), nil, "sans clé utilisable, rien")
 end)
 
 test("Mapping — sans palier lisible, le scan n'invente rien", function()
