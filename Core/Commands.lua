@@ -36,7 +36,8 @@ function handlers.help()
 	ns:Print(L.CMD_HELP_HEADER)
 	for _, line in ipairs({
 		L.CMD_HELP_SHOW, L.CMD_HELP_SCAN, L.CMD_HELP_CHARS,
-		L.CMD_HELP_DEEPSCAN, L.CMD_HELP_DIAG, L.CMD_HELP_DEBUG, L.CMD_HELP_RESET,
+		L.CMD_HELP_DEEPSCAN, L.CMD_HELP_DIAG, L.CMD_HELP_EXPORT,
+		L.CMD_HELP_DEBUG, L.CMD_HELP_RESET,
 	}) do
 		DEFAULT_CHAT_FRAME:AddMessage(line)
 	end
@@ -69,6 +70,12 @@ handlers["ejscan"] = handlers.deepscan
 
 function handlers.diag()
 	ns.Mapping:Diagnose()
+end
+
+--- Fichier de travail de la curation. Sans argument : uniquement ce qui reste
+--  sans extension, c'est-à-dire exactement ce qu'il y a à combler.
+function handlers.export(_, rest)
+	ns.Mapping:Export(rest ~= "all")
 end
 
 function handlers.chars()

@@ -30,6 +30,14 @@ done < <(grep -E '\.lua$' OnlyFarm.toc || true)
 [ "$missing" -eq 0 ] && echo "  ok"
 
 echo
+echo "== Générateur de données =="
+if [ -f Build/overlay/mounts.csv ]; then
+	python3 Build/generate_data.py Build/overlay/mounts.csv --check
+else
+	echo "  pas de Build/overlay/mounts.csv, rien à valider"
+fi
+
+echo
 echo "== Tests =="
 lua5.1 Tests/run.lua
 

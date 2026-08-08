@@ -129,6 +129,7 @@ local L = {
 	CMD_HELP_CHARS = "  /of chars     — list known characters",
 	CMD_HELP_DEEPSCAN = "  /of deepscan  — deep pass: walk every boss's loot table (slow, optional)",
 	CMD_HELP_DIAG = "  /of diag      — why the mapping came back empty (copyable report)",
+	CMD_HELP_EXPORT = "  /of export    — CSV of mounts still lacking an expansion (add 'all' for every mount)",
 	CMD_HELP_DEBUG = "  /of debug     — toggle debug traces",
 	CMD_HELP_RESET = "  /of reset     — wipe the saved database (asks twice)",
 
@@ -153,6 +154,8 @@ local L = {
 	DIAG_SUMMARY = "diagnostic opened: %d of %d mounts tied to an instance. Ctrl+C to copy.",
 	COPY_TITLE = "OnlyFarm",
 	COPY_HINT = "Ctrl+C to copy · Escape to close",
+	EXPORT_TITLE = "OnlyFarm — curation worksheet (CSV)",
+	EXPORT_DONE = "%d mounts exported. Ctrl+C to copy.",
 
 	-- Voyage
 	NODE_PLAYER = "Your position",
@@ -270,6 +273,7 @@ if GetLocale and GetLocale() == "frFR" then
 	L.CMD_HELP_CHARS = "  /of chars     — lister les personnages connus"
 	L.CMD_HELP_DEEPSCAN = "  /of deepscan  — passe approfondie : butin boss par boss (lent, facultatif)"
 	L.CMD_HELP_DIAG = "  /of diag      — pourquoi la cartographie est revenue vide (rapport copiable)"
+	L.CMD_HELP_EXPORT = "  /of export    — CSV des montures sans extension (« all » pour toutes)"
 	L.CMD_HELP_DEBUG = "  /of debug     — activer/couper les traces"
 	L.CMD_HELP_RESET = "  /of reset     — effacer la base sauvegardée (demande confirmation)"
 
@@ -292,6 +296,8 @@ if GetLocale and GetLocale() == "frFR" then
 	L.DIAG_SUMMARY = "diagnostic ouvert : %d montures sur %d rattachées à une instance. Ctrl+C pour copier."
 	L.COPY_TITLE = "OnlyFarm"
 	L.COPY_HINT = "Ctrl+C pour copier · Échap pour fermer"
+	L.EXPORT_TITLE = "OnlyFarm — fichier de curation (CSV)"
+	L.EXPORT_DONE = "%d montures exportées. Ctrl+C pour copier."
 
 	L.NODE_PLAYER = "Ta position"
 

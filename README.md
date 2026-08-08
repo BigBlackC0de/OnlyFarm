@@ -50,6 +50,7 @@ l'addon.
 | `/of chars` | lister les personnages connus et leurs verrous |
 | `/of deepscan` | passe approfondie : butin boss par boss (lent, facultatif) |
 | `/of diag` | dire pourquoi la cartographie est revenue vide |
+| `/of export` | CSV des montures sans extension, pour la curation |
 | `/of debug` | activer les traces |
 | `/of reset` | effacer la base sauvegardée (confirmation requise) |
 
@@ -87,6 +88,33 @@ c'est ce qui laissait l'addon muet quand l'API de butin ne répondait pas.
 
 Le résultat brut part aussi dans `OnlyFarmScanDB`, qui alimentera le générateur
 de données de la phase 2.
+
+### Ce que le client ne dira jamais
+
+La cartographie dérivée du client suit les patchs toute seule, mais elle bute
+sur un mur : **le client n'expose pas l'extension d'une zone**. Les montures de
+vendeur, de métier, d'événement saisonnier, de PvP ou de butin de zone n'ont
+donc aucun rattachement possible par API — leur texte de source ne cite qu'un
+PNJ ou un lieu.
+
+Ce trou-là se comble par une table curée, compilée au build :
+
+```bash
+/of export                                    # en jeu : produit le CSV de départ
+Build/generate_data.py Build/overlay/mounts.csv
+```
+
+La clé de jointure est le **spellID**, jamais le nom : les noms de montures
+sont localisés, une liste extérieure est écrite dans une seule langue, et un
+rapprochement par nom marcherait chez celui qui le teste puis échouerait chez
+tous les autres.
+
+La table curée ne prime jamais sur ce que le client sait : elle ne s'applique
+qu'aux montures pour lesquelles aucune source dérivée n'a répondu.
+
+Les valeurs communautaires (Wowhead, warcraftmounts.com et équivalents) sont
+des estimations maintenues par des joueurs. Si tu en importes, crédite-les dans
+ce README et présente les taux de drop comme des estimations.
 
 ## Développement
 

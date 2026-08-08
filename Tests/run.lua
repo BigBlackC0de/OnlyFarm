@@ -1039,6 +1039,42 @@ test("Mapping — le Journal prime quand les deux répondent", function()
 	eq(ns.db.global.sourceCache[201].tierName, "Wrath of the Lich King", "extension cohérente")
 end)
 
+-- La table curée est le seul moyen de rattacher les montures que le client ne
+-- sait pas situer : vendeurs, métiers, événements, PvP. Elle ne doit JAMAIS
+-- primer sur une donnée dérivée du client, qui suit les patchs.
+test("Mapping — la table curée comble, mais ne prime pas", function()
+	stub.Reset()
+	stub.lfgDungeons = {
+		[100] = { name = "Ulduar", subtypeID = 3, expansionLevel = 2 },
+	}
+	stub.mounts = {
+		-- Situable par le client : la table curée ne doit pas s'appliquer.
+		{ mountID = 201, spellID = 1001, name = "Fumeronde", sourceType = 1,
+		  source = "Butin : Yogg-Saron\nUlduar" },
+		-- Insituable : un vendeur, sans lieu exploitable.
+		{ mountID = 202, spellID = 1002, name = "Brutosaure", sourceType = 3,
+		  source = "Vendeur : Talutu" },
+	}
+	local ns = harness.Load(stub)
+
+	ns.Data.Mounts = {
+		[1001] = { expansion = 9, kind = "vendor" },   -- volontairement faux
+		[1002] = { expansion = 7, kind = "vendor", dropRate = 1 },
+	}
+
+	ns.Mapping:Run(false)
+	stub.RunFrames(80)
+
+	local cache = ns.db.global.sourceCache
+	eq(cache[201].tierName, "Wrath of the Lich King",
+		"le client garde la main sur la table curée")
+	eq(cache[201].matchedBy ~= "curated", true, "et ce n'est pas la curation qui a répondu")
+
+	eq(cache[202].tierName, "Battle for Azeroth", "la curation comble le trou")
+	eq(cache[202].matchedBy, "curated", "et le dit")
+	eq(cache[202].dropRate, 1, "taux de drop repris")
+end)
+
 test("Mapping — sans palier lisible, le scan n'invente rien", function()
 	stub.Reset()
 	stub.tiers = {}

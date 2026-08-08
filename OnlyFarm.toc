@@ -15,6 +15,7 @@ Core\Locale.lua
 Core\Database.lua
 
 Data\Expansions.lua
+Data\Mounts.lua
 Data\Sources.lua
 Data\Nodes.lua
 Data\Travel.lua

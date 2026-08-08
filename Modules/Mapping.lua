@@ -547,6 +547,7 @@ local function MapFromSourceText(index, achievements)
 		prefix = 0,
 		partial = 0,
 		byAchievement = 0,
+		byCurated = 0,
 	}
 
 	local mountIDs = C_MountJournal and C_MountJournal.GetMountIDs()
@@ -563,11 +564,14 @@ local function MapFromSourceText(index, achievements)
 		local subject, place = ParseSourceText(sourceText)
 		if place then stats.withPlace = stats.withPlace + 1 end
 
+		local spellID, sourceType = select(2, C_MountJournal.GetMountInfoByID(mountID)),
+			select(6, C_MountJournal.GetMountInfoByID(mountID))
+
 		if subject or place then
-			local sourceType = select(6, C_MountJournal.GetMountInfoByID(mountID))
 			local entry = {
 				kind = ns.Data.GetSourceKind(sourceType),
 				mountID = mountID,
+				spellID = spellID,
 				encounterName = subject,
 				origin = "sourceText",
 			}
@@ -601,6 +605,22 @@ local function MapFromSourceText(index, achievements)
 					entry.tierName = achievement.tierName
 					entry.matchedBy = "achievement"
 					stats.byAchievement = stats.byAchievement + 1
+				end
+			end
+
+			-- Dernier recours : la table curée, générée au build et indexée par
+			-- spellID. Elle ne s'applique QUE si rien de dérivé du client n'a
+			-- répondu — une donnée mesurée sur le client courant vaut toujours
+			-- mieux qu'une donnée figée au moment du build.
+			if not entry.tierName then
+				local curated = ns.Data.GetCuratedMount(spellID)
+				if curated then
+					entry.tier = curated.expansion
+					entry.tierName = ns.Data.ExpansionName(curated.expansion)
+					entry.dropRate = entry.dropRate or curated.dropRate
+					entry.kind = curated.kind or entry.kind
+					entry.matchedBy = "curated"
+					stats.byCurated = (stats.byCurated or 0) + 1
 				end
 			end
 
@@ -1149,6 +1169,61 @@ function Mapping:Diagnose()
 		for _, line in ipairs(lines) do
 			DEFAULT_CHAT_FRAME:AddMessage(line)
 		end
+	end
+	return lines
+end
+
+--------------------------------------------------------------------------------
+-- Export du fichier de curation
+--
+-- Aucune requête réseau n'est possible depuis un addon : la table curée doit
+-- être compilée au build. Cette commande produit le fichier de travail — un
+-- CSV de toutes les montures, avec leur spellID comme clé de jointure et ce
+-- que l'addon a déjà su déduire.
+--
+-- Le spellID, et pas le nom : une liste extérieure est écrite dans UNE langue,
+-- et un rapprochement par nom marcherait chez celui qui teste puis échouerait
+-- partout ailleurs.
+--------------------------------------------------------------------------------
+
+--- Échappement CSV minimal : guillemets doublés si le champ en contient ou
+--  contient un séparateur.
+local function CsvField(value)
+	local text = tostring(value == nil and "" or value)
+	if text:find('[",\n]') then
+		return '"' .. text:gsub('"', '""') .. '"'
+	end
+	return text
+end
+
+--- @param onlyMissing true pour n'exporter que ce qui reste sans extension
+function Mapping:BuildExport(onlyMissing)
+	local lines = { "spellID,mountID,name,sourceType,expansion,source,place" }
+
+	for _, entry in ipairs(ns.Collection:GetMissing()) do
+		local source = ns.db and ns.db.global.sourceCache[entry.mountID]
+		local tierName = source and source.tierName
+		if not onlyMissing or not tierName then
+			lines[#lines + 1] = table.concat({
+				CsvField(entry.spellID),
+				CsvField(entry.mountID),
+				CsvField(entry.name),
+				CsvField(entry.sourceTypeLabel or entry.kind),
+				CsvField(tierName),
+				CsvField(source and (source.instanceName or source.encounterName)),
+				CsvField(source and source.placeName),
+			}, ",")
+		end
+	end
+
+	return lines
+end
+
+function Mapping:Export(onlyMissing)
+	local lines = self:BuildExport(onlyMissing)
+	ns:Print(ns.L.EXPORT_DONE, #lines - 1)
+	if ns.Copy then
+		ns.Copy:ShowLines(ns.L.EXPORT_TITLE, lines)
 	end
 	return lines
 end
