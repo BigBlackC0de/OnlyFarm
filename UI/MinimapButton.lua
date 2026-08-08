@@ -13,7 +13,14 @@ local _, ns = ...
 
 local MinimapButton = ns:NewModule("MinimapButton", 85)
 
-local RING_RADIUS = 80   -- distance au centre de la minicarte, en pixels
+-- Marge entre le bord de la minicarte et le centre du bouton.
+--
+-- Ne PAS coder le rayon en dur : la minicarte de retail fait 198 px de côté
+-- (Blizzard_Minimap/Mainline/Minimap.xml), pas les 140 px de l'époque où le
+-- « rayon 80 » de LibDBIcon a été écrit. Avec 80, le bouton se retrouve à
+-- l'intérieur du cadre. On le calcule donc à partir de la taille réelle, ce
+-- qui suit aussi les addons qui redimensionnent la minicarte.
+local RING_MARGIN = 10
 
 function MinimapButton:OnEnable()
 	if not Minimap then
@@ -87,6 +94,13 @@ end
 -- Position sur l'anneau
 --------------------------------------------------------------------------------
 
+--- Rayon de l'anneau, recalculé à chaque positionnement.
+local function RingRadius()
+	local width = Minimap:GetWidth()
+	if not width or width <= 0 then width = 198 end   -- taille de retail 12.x
+	return (width / 2) + RING_MARGIN
+end
+
 function MinimapButton:UpdatePosition()
 	local button = self.button
 	if not button or not ns.db then return end
@@ -94,11 +108,12 @@ function MinimapButton:UpdatePosition()
 	local config = ns.db.profile.minimap
 	button:SetShown(not config.hide)
 
+	local radius = RingRadius()
 	local angle = math.rad(config.angle or 205)
 	button:ClearAllPoints()
 	button:SetPoint("CENTER", Minimap, "CENTER",
-		math.cos(angle) * RING_RADIUS,
-		math.sin(angle) * RING_RADIUS)
+		math.cos(angle) * radius,
+		math.sin(angle) * radius)
 end
 
 --- Recalcule l'angle depuis la position du curseur pendant un glisser.
