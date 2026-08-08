@@ -270,6 +270,11 @@ local function BuildJournalIndex()
 			or ns.Data.TierToExpansionLevel(tier)
 		local displayName = ns.Data.ExpansionName(level) or tierName
 
+		-- Le nom de palier est un libellé d'extension dans la langue du client.
+		-- On le déclare comme alias : les catégories de hauts faits, elles
+		-- aussi localisées, pourront s'y rattacher.
+		ns.Data.RegisterExpansionAlias(tierName, level)
+
 		for _, isRaid in ipairs({ true, false }) do
 			local position = 1
 			while true do
@@ -374,17 +379,20 @@ end
 --- Index « nom de haut fait normalisé » -> { tier, tierName }.
 local function BuildAchievementIndex()
 	local index = {}
-	if not AchievementsReady() then return index end
+	local stats = { categories = 0, resolved = 0, achievements = 0 }
+	if not AchievementsReady() then return index, stats end
 
 	local okList, categories = pcall(GetCategoryList)
-	if not okList or type(categories) ~= "table" then return index end
+	if not okList or type(categories) ~= "table" then return index, stats end
 
 	local categoryCache = {}
 	local since = 0
 
 	for _, categoryID in ipairs(categories) do
+		stats.categories = stats.categories + 1
 		local level = ResolveCategoryExpansion(categoryID, categoryCache)
 		if level then
+			stats.resolved = stats.resolved + 1
 			local tierName = ns.Data.ExpansionName(level)
 			local okCount, count = pcall(GetCategoryNumAchievements, categoryID, true)
 			if okCount and type(count) == "number" then
@@ -394,6 +402,7 @@ local function BuildAchievementIndex()
 						local key = ns.Util.NormalizeName(name)
 						if key and not index[key] then
 							index[key] = { tier = level, tierName = tierName }
+							stats.achievements = stats.achievements + 1
 						end
 					end
 
@@ -407,7 +416,7 @@ local function BuildAchievementIndex()
 		end
 	end
 
-	return index
+	return index, stats
 end
 
 --------------------------------------------------------------------------------
@@ -786,7 +795,7 @@ local function ScanRoutine(self, deep)
 	local index, lfgCount, journalCount = BuildInstanceIndex()
 	self.instanceIndex = index
 
-	local achievements = BuildAchievementIndex()
+	local achievements, achievementStats = BuildAchievementIndex()
 	self.achievementIndex = achievements
 
 	local results, stats = MapFromSourceText(index, achievements)
@@ -817,6 +826,7 @@ local function ScanRoutine(self, deep)
 		lfgInstances = lfgCount,
 		journalInstances = journalCount,
 		achievements = ns.Util.Count(achievements),
+		achievementStats = achievementStats,
 		mounts = total,
 		mapped = mapped,
 		textStats = stats,
@@ -917,6 +927,7 @@ function Mapping:Finish(payload)
 			lfgInstances = payload.lfgInstances,
 			journalInstances = payload.journalInstances,
 			achievements = payload.achievements,
+			achievementStats = payload.achievementStats,
 			textStats = payload.textStats,
 			refined = payload.refined,
 			nodes = payload.nodeCount,
@@ -926,6 +937,17 @@ function Mapping:Finish(payload)
 	end
 
 	ns:Print(ns.L.SCAN_DONE, payload.mapped or 0, payload.mounts or 0, payload.instances or 0)
+
+	-- Détail par source : c'est ce qui permet de voir d'un coup d'œil quelle
+	-- passe apporte quoi, au lieu d'un total qui ne bouge pas sans dire pourquoi.
+	local stats = payload.textStats or {}
+	local achievementStats = payload.achievementStats or {}
+	ns:Print(ns.L.SCAN_BREAKDOWN,
+		(stats.exact or 0) + (stats.labelled or 0) + (stats.prefix or 0) + (stats.partial or 0),
+		stats.byAchievement or 0,
+		payload.achievements or 0,
+		achievementStats.resolved or 0,
+		achievementStats.categories or 0)
 
 	-- Quand rien n'est rattaché, on dit tout de suite à quelle étape ça a cédé
 	-- au lieu de laisser un zéro nu. C'est la différence entre « il y a un
@@ -1027,10 +1049,38 @@ function Mapping:BuildReport()
 	end
 	Line("")
 
-	-- 4. Découpage et rapprochement, sur de vraies montures.
-	Line("[4] Texte de source, %d premières manquantes", DIAG_SAMPLES)
-	local shown = 0
+	-- 4. Ce qui RESTE non rattaché, par nature de source. C'est la question
+	--    utile : « il en manque plein » ne dit pas lesquelles.
+	Line("[4] Montures sans extension, par nature de source")
+	local unmappedByKind, unmappedOrder, unmappedTotal = {}, {}, 0
+	local unmappedSamples = {}
 	for _, entry in ipairs(ns.Collection:GetMissing()) do
+		local source = ns.db and ns.db.global.sourceCache[entry.mountID]
+		if not source or not source.tierName then
+			unmappedTotal = unmappedTotal + 1
+			local kind = entry.sourceTypeLabel or entry.kind or "?"
+			if not unmappedByKind[kind] then
+				unmappedByKind[kind] = 0
+				unmappedOrder[#unmappedOrder + 1] = kind
+			end
+			unmappedByKind[kind] = unmappedByKind[kind] + 1
+			if #unmappedSamples < DIAG_SAMPLES then
+				unmappedSamples[#unmappedSamples + 1] = entry
+			end
+		end
+	end
+	table.sort(unmappedOrder, function(a, b) return unmappedByKind[a] > unmappedByKind[b] end)
+	Line("    %d manquantes sans extension", unmappedTotal)
+	for _, kind in ipairs(unmappedOrder) do
+		Line("    %-28s %d", kind, unmappedByKind[kind])
+	end
+	Line("")
+
+	-- 5. Découpage et rapprochement, sur des montures RESTÉES sans extension :
+	--    ce sont elles qui portent l'information manquante.
+	Line("[5] Texte de source, %d montures encore sans extension", DIAG_SAMPLES)
+	local shown = 0
+	for _, entry in ipairs(unmappedSamples) do
 		if shown >= DIAG_SAMPLES then break end
 		local _, _, sourceText = C_MountJournal.GetMountInfoExtraByID(entry.mountID)
 		local boss, place = ParseSourceText(sourceText)
@@ -1049,8 +1099,8 @@ function Mapping:BuildReport()
 	end
 	Line("")
 
-	-- 5. Bilan du dernier passage.
-	Line("[5] Dernier scan")
+	-- 6. Bilan du dernier passage.
+	Line("[6] Dernier scan")
 	local meta = ns.db and ns.db.global.scanMeta
 	if type(meta) == "table" and meta.at then
 		Line("    %d/%d montures rattachées à une instance", meta.mapped or 0, meta.mounts or 0)
@@ -1058,6 +1108,15 @@ function Mapping:BuildReport()
 			meta.instances or 0, tostring(meta.lfgInstances), tostring(meta.journalInstances))
 		Line("    %s entrées de carte · approfondi : %s · il y a %s",
 			tostring(meta.nodes), tostring(meta.deep), ns.Util.FormatAge(meta.at))
+		local achievementStats = meta.achievementStats or {}
+		Line("    hauts faits indexés : %s (%s/%s catégories rattachées)",
+			tostring(meta.achievements), tostring(achievementStats.resolved),
+			tostring(achievementStats.categories))
+		local textStats = meta.textStats or {}
+		Line("    par lieu : exact %s, étiqueté %s, préfixe %s, partiel %s · par haut fait %s",
+			tostring(textStats.exact), tostring(textStats.labelled),
+			tostring(textStats.prefix), tostring(textStats.partial),
+			tostring(textStats.byAchievement))
 		Line("    algo v%s (courant v%d) · passages infructueux : %s · à refaire : %s",
 			tostring(meta.mappingVersion), MAPPING_VERSION,
 			tostring(meta.emptyRuns), tostring(self:IsStale()))
@@ -1066,7 +1125,7 @@ function Mapping:BuildReport()
 	end
 
 	Line("")
-	Line("[6] Collection")
+	Line("[7] Collection")
 	local counts = ns.Collection.counts or {}
 	Line("    %s possédées / %s obtenables / %s masquées · journal prêt : %s",
 		tostring(counts.owned), tostring(counts.total), tostring(counts.hidden),

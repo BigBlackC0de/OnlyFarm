@@ -800,6 +800,7 @@ UI.SORTS = {
 	{ value = "expansion", label = "SORT_EXPANSION" },
 	{ value = "status", label = "SORT_STATUS" },
 	{ value = "attempts", label = "SORT_ATTEMPTS" },
+	{ value = "owned", label = "SORT_OWNED" },
 }
 
 --- Comparateurs de tri. Tous retombent sur le nom en cas d'égalité : sans ce
@@ -825,6 +826,14 @@ local SORT_FUNCTIONS = {
 
 	attempts = function(a, b)
 		if a.tries ~= b.tries then return a.tries > b.tries end
+		return a.name < b.name
+	end,
+
+	-- Manquantes d'abord : c'est la question que pose l'addon. Les possédées
+	-- suivent, groupées, ce qui revient à trier sur une colonne « possédée
+	-- oui / non ».
+	owned = function(a, b)
+		if a.owned ~= b.owned then return not a.owned end
 		return a.name < b.name
 	end,
 }
@@ -865,6 +874,12 @@ function UI:BuildDataProvider()
 	local filters = ns.db.profile.filters
 	local needle = (filters.search or ""):lower()
 	local Theme = ns.Theme
+	-- `L` n'est PAS une variable de fichier dans ce module : chaque fonction le
+	-- reprend de ns. L'oublier ici faisait planter la construction de la liste
+	-- dès qu'une monture possédée devait être étiquetée, et comme le bus avale
+	-- les erreurs de handler, la case « Afficher les possédées » ne faisait
+	-- simplement rien.
+	local L = ns.L
 	local rows = {}
 
 	-- Les possédées ne sont ajoutées que sur demande. Elles n'ont pas de

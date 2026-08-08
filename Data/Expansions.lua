@@ -79,31 +79,71 @@ end
 --  faire converger les deux sources vers une seule barre.
 local reverseIndex
 
+-- Sous ce seuil, une correspondance partielle rapproche n'importe quoi.
+local MIN_ALIAS_LENGTH = 6
+
+local function BuildReverseIndex()
+	reverseIndex = {}
+	for level = 0, Data.MAX_EXPANSION_LEVEL do
+		for _, candidate in ipairs({
+			_G["EXPANSION_NAME" .. level],
+			Data.EXPANSION_FALLBACK[level],
+			Data.EXPANSION_OVERRIDES[level],
+		}) do
+			local candidateKey = ns.Util.NormalizeName(candidate)
+			if candidateKey and reverseIndex[candidateKey] == nil then
+				reverseIndex[candidateKey] = level
+			end
+		end
+	end
+	for key, level in pairs(Data.extraAliases or {}) do
+		if reverseIndex[key] == nil then reverseIndex[key] = level end
+	end
+end
+
+--- Enregistre un nom supplémentaire pour une extension.
+--
+--  Les catégories de hauts faits et les paliers du Journal désignent les mêmes
+--  extensions avec des libellés qui ne se recouvrent pas toujours — « Wrath of
+--  the Lich King » d'un côté, « Lich King » de l'autre selon la locale et
+--  l'écran. Chaque source qui découvre un libellé le déclare ici, et il
+--  devient utilisable par toutes les autres.
+function Data.RegisterExpansionAlias(name, level)
+	local key = ns.Util.NormalizeName(name)
+	if not key or type(level) ~= "number" then return end
+	Data.extraAliases = Data.extraAliases or {}
+	Data.extraAliases[key] = level
+	if reverseIndex then reverseIndex[key] = level end
+end
+
 function Data.ExpansionLevelFromName(name)
 	local key = ns.Util.NormalizeName(name)
 	if not key then return nil end
 
-	if not reverseIndex then
-		reverseIndex = {}
-		for level = 0, Data.MAX_EXPANSION_LEVEL do
-			for _, candidate in ipairs({
-				_G["EXPANSION_NAME" .. level],
-				Data.EXPANSION_FALLBACK[level],
-				Data.EXPANSION_OVERRIDES[level],
-			}) do
-				local candidateKey = ns.Util.NormalizeName(candidate)
-				if candidateKey and reverseIndex[candidateKey] == nil then
-					reverseIndex[candidateKey] = level
-				end
+	if not reverseIndex then BuildReverseIndex() end
+
+	local exact = reverseIndex[key]
+	if exact then return exact end
+
+	-- Repli par inclusion. « Donjons de Legion » doit tomber sur Legion, et
+	-- « Lich King » sur « Wrath of the Lich King ». Sans ce repli, seules les
+	-- catégories nommées EXACTEMENT comme l'extension se rattachaient — et
+	-- elles sont minoritaires.
+	if #key < MIN_ALIAS_LENGTH then return nil end
+	for candidate, level in pairs(reverseIndex) do
+		if #candidate >= MIN_ALIAS_LENGTH then
+			if key:find(candidate, 1, true) or candidate:find(key, 1, true) then
+				return level
 			end
 		end
 	end
 
-	return reverseIndex[key]
+	return nil
 end
 
 --- À appeler si la locale change en cours de session (elle ne change pas, mais
 --  les tests rechargent l'addon avec d'autres globales).
 function Data.ResetExpansionIndex()
 	reverseIndex = nil
+	Data.extraAliases = nil
 end
