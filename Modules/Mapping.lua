@@ -94,7 +94,9 @@ end
 --   3 — ajout de la liste du Recherche de groupe comme seconde source
 --   4 — découpage tolérant aux deux séparateurs de ligne, replis de
 --       rapprochement, extensions ramenées à un repère unique
-local MAPPING_VERSION = 4
+--   5 — le lieu est souvent étiqueté (« Région : … ») : on sait enlever
+--       l'étiquette, et plus seulement le suffixe d'aile
+local MAPPING_VERSION = 5
 
 -- Une cartographie qui ne rattache rien est ratée, pas fraîche : on la
 -- retente. Mais pas indéfiniment — sur un client où rien ne répondrait, on
@@ -374,11 +376,19 @@ local MIN_PARTIAL_LENGTH = 10
 
 --- Rapproche un lieu d'une instance de l'index, avec des replis.
 --
---  Le rapprochement exact suffit dans la majorité des cas, mais pas toujours :
---  le Recherche de groupe nomme ses ailes « Citadelle de la Couronne de glace :
---  Le Bastion inférieur » alors que le Journal des montures écrit simplement
---  « Citadelle de la Couronne de glace ». Sans repli, ces instances-là ne se
---  retrouvent jamais.
+--  Le rapprochement exact ne suffit pas, pour deux raisons opposées :
+--
+--    * la seconde ligne du texte de source est souvent ÉTIQUETÉE. Le Journal
+--      des montures écrit « Région : Libération de Terremine », pas
+--      « Libération de Terremine ». Il faut donc savoir enlever ce qui précède
+--      le deux-points ;
+--    * à l'inverse, le Recherche de groupe nomme ses ailes « Citadelle de la
+--      Couronne de glace : Le Bastion inférieur » là où le Journal écrit juste
+--      « Citadelle de la Couronne de glace ». Il faut alors enlever ce qui
+--      SUIT le deux-points.
+--
+--  Les deux cas ont la même forme et demandent des découpages inverses : on
+--  essaie les deux, dans cet ordre, puis une correspondance partielle bornée.
 --
 --  @return entrée d'index, nom de la stratégie qui a marché
 local function MatchPlace(index, place)
@@ -386,22 +396,31 @@ local function MatchPlace(index, place)
 	if not key then return nil, nil end
 
 	-- 1. Correspondance exacte.
-	local exact = index[key]
-	if exact then return exact, "exact" end
+	if index[key] then return index[key], "exact" end
 
-	-- 2. Sans le suffixe d'aile ou de difficulté (« … : Le Bastion inférieur »).
-	local trimmed = key:match("^(.-)%s*:%s*.+$")
-	if trimmed and #trimmed >= MIN_PARTIAL_LENGTH and index[trimmed] then
-		return index[trimmed], "prefix"
+	-- 2. Après le deux-points : « région : libération de terremine ».
+	local after = key:match("^[^:]+:%s*(.+)$")
+	if after and #after >= MIN_PARTIAL_LENGTH and index[after] then
+		return index[after], "labelled"
 	end
 
-	-- 3. Correspondance partielle, dans un sens ou dans l'autre. Bornée en
+	-- 3. Avant le deux-points : « citadelle … : le bastion inférieur ».
+	local before = key:match("^(.-)%s*:%s*.+$")
+	if before and #before >= MIN_PARTIAL_LENGTH and index[before] then
+		return index[before], "prefix"
+	end
+
+	-- 4. Correspondance partielle, dans un sens ou dans l'autre. Bornée en
 	--    longueur : « Karazhan » ne doit pas attraper autre chose au hasard.
-	if #key >= MIN_PARTIAL_LENGTH then
-		for candidate, entry in pairs(index) do
-			if #candidate >= MIN_PARTIAL_LENGTH then
-				if candidate:find(key, 1, true) or key:find(candidate, 1, true) then
-					return entry, "partial"
+	for _, candidateKey in ipairs({ key, after, before }) do
+		if candidateKey and #candidateKey >= MIN_PARTIAL_LENGTH then
+			for indexKey, entry in pairs(index) do
+				if #indexKey >= MIN_PARTIAL_LENGTH then
+					if indexKey:find(candidateKey, 1, true)
+						or candidateKey:find(indexKey, 1, true)
+					then
+						return entry, "partial"
+					end
 				end
 			end
 		end
@@ -424,6 +443,7 @@ local function MapFromSourceText(index)
 		withPlace = 0,
 		mapped = 0,
 		exact = 0,
+		labelled = 0,
 		prefix = 0,
 		partial = 0,
 	}

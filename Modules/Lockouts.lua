@@ -261,11 +261,18 @@ function Lockouts:GetLock(charKey, instanceID, difficultyID, instanceName)
 
 	local now = time()
 	local nameKey = ns.Util.NormalizeName(instanceName)
+	-- Le nom peut arriver étiqueté (« Région : Citadelle de la Couronne de
+	-- glace ») quand il vient du texte de source d'une monture. On essaie donc
+	-- les deux formes : c'est ce qui permet de lire le verrou même lorsque la
+	-- cartographie n'a pas su rattacher la monture à une instance.
+	local strippedKey = ns.Util.StripLabel(instanceName)
 	if instanceID == nil and nameKey == nil then return nil end
 
 	for _, lock in pairs(charEntry.lockouts) do
+		local lockKey = lock.nameKey or ns.Util.NormalizeName(lock.name)
 		local matches = (instanceID ~= nil and lock.instanceID == instanceID)
-			or (nameKey ~= nil and (lock.nameKey or ns.Util.NormalizeName(lock.name)) == nameKey)
+			or (nameKey ~= nil and lockKey == nameKey)
+			or (strippedKey ~= nil and lockKey == strippedKey)
 		if matches
 			and (difficultyID == nil or lock.difficultyID == difficultyID)
 			and (lock.expires or 0) > now

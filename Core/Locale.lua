@@ -26,6 +26,7 @@ local L = {
 	-- Colonnes
 	COL_MOUNT = "Mount",
 	COL_SOURCE = "Source",
+	COL_TYPE = "Type",
 	COL_TRIES = "Tries",
 	COL_STATUS = "Availability",
 
@@ -68,6 +69,21 @@ local L = {
 	FILTER_AVAILABLE_ONLY = "Available now only",
 	FILTER_HIDE_UNMAPPED = "Hide unmapped sources",
 	FILTER_HIDE_EXCLUDED = "Hide excluded",
+	FILTER_SOURCE = "Source",
+	FILTER_TYPE = "Type",
+	FILTER_TYPE_ALL = "Everywhere",
+	FILTER_TYPE_RAID = "Raids only",
+	FILTER_TYPE_DUNGEON = "Dungeons only",
+	FILTER_TYPE_OUTDOOR = "Outside instances",
+	TYPE_RAID = "Raid",
+	TYPE_DUNGEON = "Dungeon",
+	TYPE_OUTDOOR = "—",
+	SORT_BY = "Sort",
+	SORT_NAME = "Name",
+	SORT_SOURCE = "Source",
+	SORT_EXPANSION = "Expansion",
+	SORT_STATUS = "Availability",
+	SORT_ATTEMPTS = "Tries",
 	FILTER_EXPANSION = "Expansion",
 	FILTER_EXPANSION_ALL = "All",
 	FILTER_EXPANSION_NONE = "None",
@@ -82,6 +98,8 @@ local L = {
 	HINT_EXCLUDE = "Right-click: exclude from the list",
 	HINT_INCLUDE = "Right-click: put back in the list",
 	TAG_EXCLUDED = "excluded",
+	TOOLTIP_BOSS = "Boss",
+	TOOLTIP_DIFFICULTY = "Locked in",
 	MINIMAP_LEFT = "Left-click: open OnlyFarm",
 	MINIMAP_RIGHT = "Right-click: rescan collection and lockouts",
 	MINIMAP_RESCANNED = "rescan requested.",
@@ -153,6 +171,7 @@ if GetLocale and GetLocale() == "frFR" then
 
 	L.COL_MOUNT = "Monture"
 	L.COL_SOURCE = "Source"
+	L.COL_TYPE = "Type"
 	L.COL_TRIES = "Essais"
 	L.COL_STATUS = "Disponibilité"
 
@@ -191,6 +210,21 @@ if GetLocale and GetLocale() == "frFR" then
 	L.FILTER_AVAILABLE_ONLY = "Dispo maintenant uniquement"
 	L.FILTER_HIDE_UNMAPPED = "Masquer les sources non cartographiées"
 	L.FILTER_HIDE_EXCLUDED = "Masquer les exclues"
+	L.FILTER_SOURCE = "Source"
+	L.FILTER_TYPE = "Type"
+	L.FILTER_TYPE_ALL = "Partout"
+	L.FILTER_TYPE_RAID = "Raids uniquement"
+	L.FILTER_TYPE_DUNGEON = "Donjons uniquement"
+	L.FILTER_TYPE_OUTDOOR = "Hors instance"
+	L.TYPE_RAID = "Raid"
+	L.TYPE_DUNGEON = "Donjon"
+	L.TYPE_OUTDOOR = "—"
+	L.SORT_BY = "Trier"
+	L.SORT_NAME = "Nom"
+	L.SORT_SOURCE = "Source"
+	L.SORT_EXPANSION = "Extension"
+	L.SORT_STATUS = "Disponibilité"
+	L.SORT_ATTEMPTS = "Essais"
 	L.FILTER_EXPANSION = "Extension"
 	L.FILTER_EXPANSION_ALL = "Tout"
 	L.FILTER_EXPANSION_NONE = "Rien"
@@ -204,6 +238,8 @@ if GetLocale and GetLocale() == "frFR" then
 	L.HINT_EXCLUDE = "Clic droit : exclure de la liste"
 	L.HINT_INCLUDE = "Clic droit : remettre dans la liste"
 	L.TAG_EXCLUDED = "exclue"
+	L.TOOLTIP_BOSS = "Boss"
+	L.TOOLTIP_DIFFICULTY = "Verrou posé en"
 	L.MINIMAP_LEFT = "Clic gauche : ouvrir OnlyFarm"
 	L.MINIMAP_RIGHT = "Clic droit : rescanner collection et verrous"
 	L.MINIMAP_RESCANNED = "rescan demandé."

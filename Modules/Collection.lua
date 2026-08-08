@@ -197,6 +197,38 @@ function Collection:GetSourceSummary(mountID)
 	return (clean:gsub("^%s+", ""):gsub("%s+$", ""))
 end
 
+--- Natures de source réellement présentes dans les montures manquantes, avec
+--  leur libellé localisé et leur effectif.
+--
+--  On ne liste PAS les natures possibles mais celles qui existent chez ce
+--  joueur : un menu où la moitié des entrées donne zéro résultat se lit comme
+--  un menu cassé. Les effectifs sont affichés pour la même raison.
+--  @return liste triée { kind, label, count }
+function Collection:GetSourceKinds()
+	local buckets, order = {}, {}
+
+	for _, entry in ipairs(self.missing) do
+		local kind = entry.kind or "unknown"
+		local bucket = buckets[kind]
+		if not bucket then
+			bucket = {
+				kind = kind,
+				label = entry.sourceTypeLabel or kind,
+				count = 0,
+			}
+			buckets[kind] = bucket
+			order[#order + 1] = bucket
+		end
+		bucket.count = bucket.count + 1
+	end
+
+	table.sort(order, function(a, b)
+		if a.count ~= b.count then return a.count > b.count end
+		return a.label < b.label
+	end)
+	return order
+end
+
 function Collection:SetExcluded(mountID, excluded)
 	if not ns.db then return end
 	ns.db.global.excluded[mountID] = excluded or nil

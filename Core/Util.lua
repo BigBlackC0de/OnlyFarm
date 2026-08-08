@@ -186,9 +186,27 @@ end
 --- Clé de comparaison insensible à la casse et aux espaces, pour rapprocher
 --  un nom d'instance du Journal des rencontres d'un nom de verrou sauvegardé.
 --  Les deux viennent du même client, donc de la même locale.
+--
+--  L'espace insécable (U+00A0, soit \194\160 en UTF-8) est ramené à un espace
+--  ordinaire AVANT tout le reste : le client en met devant les deux-points des
+--  libellés français, et « %s » ne le reconnaît pas. Deux chaînes identiques à
+--  l'œil ne se rapprochaient donc pas.
 function Util.NormalizeName(name)
 	if type(name) ~= "string" then return nil end
-	return (name:lower():gsub("%s+", " "):gsub("^%s", ""):gsub("%s$", ""))
+	local normalized = name:gsub("\194\160", " ")
+	return (normalized:lower():gsub("%s+", " "):gsub("^%s", ""):gsub("%s$", ""))
+end
+
+--- Retire l'étiquette d'un libellé du client : « Région : Ulduar » -> « Ulduar ».
+--  Renvoie nil s'il n'y a pas d'étiquette, pour que l'appelant sache qu'il n'a
+--  pas de seconde variante à essayer.
+function Util.StripLabel(name)
+	if type(name) ~= "string" then return nil end
+	local stripped = Util.NormalizeName(name)
+	if not stripped then return nil end
+	local after = stripped:match("^[^:]+:%s*(.+)$")
+	if not after or after == "" then return nil end
+	return after
 end
 
 --------------------------------------------------------------------------------

@@ -291,17 +291,16 @@ function UI:CreateCollectionTab(frame)
 	end)
 	page.SearchBox = search
 
-	page.ExpansionDropdown = self:CreateExpansionDropdown(filters, search)
-
-	-- Le résumé est borné à GAUCHE par ce qui le précède, pas seulement calé à
-	-- droite : sans cette contrainte, une longue phrase (« 486/1231 possédées —
-	-- 745 manquantes · 395 hors de portée ») passait par-dessus le menu des
-	-- extensions au lieu d'être tronquée.
-	local summary = Theme.Text(filters, "GameFontHighlightSmall", Theme.colors.muted, "RIGHT")
-	summary:SetPoint("TOPRIGHT", -10, -12)
-	summary:SetPoint("TOPLEFT", page.ExpansionDropdown or search, "TOPRIGHT", 14, -3)
-	summary:SetWordWrap(false)
-	page.Summary = summary
+	-- Les quatre menus se suivent, chacun ancré au précédent : ajouter ou
+	-- retirer un filtre ne demande pas de recalculer des abscisses.
+	local anchor = search
+	page.ExpansionDropdown = self:CreateExpansionDropdown(filters, anchor)
+	anchor = page.ExpansionDropdown or anchor
+	page.SourceDropdown = self:CreateSourceDropdown(filters, anchor)
+	anchor = page.SourceDropdown or anchor
+	page.TypeDropdown = self:CreateTypeDropdown(filters, anchor)
+	anchor = page.TypeDropdown or anchor
+	page.SortDropdown = self:CreateSortDropdown(filters, anchor)
 
 	local function MakeFilter(label, key)
 		local check = CreateFrame("CheckButton", nil, filters, "UICheckButtonTemplate")
@@ -342,6 +341,15 @@ function UI:CreateCollectionTab(frame)
 	page.HideUnmapped = PlaceFilter(L.FILTER_HIDE_UNMAPPED, "hideUnmapped")
 	page.HideExcluded = PlaceFilter(L.FILTER_HIDE_EXCLUDED, "hideExcluded")
 
+	-- Le résumé occupe la fin de la seconde ligne : la première est pleine de
+	-- menus, et le borner à gauche l'empêche de passer par-dessus la dernière
+	-- case à cocher.
+	local summary = Theme.Text(filters, "GameFontHighlightSmall", Theme.colors.muted, "RIGHT")
+	summary:SetPoint("BOTTOMRIGHT", -10, 12)
+	summary:SetPoint("BOTTOMLEFT", page.HideExcluded, "BOTTOMRIGHT", 200, 12)
+	summary:SetWordWrap(false)
+	page.Summary = summary
+
 	-- Liste.
 	local list = Theme.Card(page, Theme.colors.panel)
 	list:SetPoint("TOPLEFT", filters, "BOTTOMLEFT", 0, -8)
@@ -351,14 +359,19 @@ function UI:CreateCollectionTab(frame)
 	local header = Theme.Text(list, "GameFontHighlightSmall", Theme.colors.faint)
 	header:SetPoint("TOPLEFT", 34, -8)
 	header:SetText(L.COL_MOUNT)
+	-- Les abscisses suivent celles des colonnes d'une ligne : icône (6+18+8),
+	-- nom (216+4), source (212+4), type (62+4), essais (46+16).
 	local headerSource = Theme.Text(list, "GameFontHighlightSmall", Theme.colors.faint)
-	headerSource:SetPoint("LEFT", header, "LEFT", 226, 0)
+	headerSource:SetPoint("LEFT", header, "LEFT", 220, 0)
 	headerSource:SetText(L.COL_SOURCE)
+	local headerType = Theme.Text(list, "GameFontHighlightSmall", Theme.colors.faint)
+	headerType:SetPoint("LEFT", header, "LEFT", 436, 0)
+	headerType:SetText(L.COL_TYPE)
 	local headerTries = Theme.Text(list, "GameFontHighlightSmall", Theme.colors.faint)
-	headerTries:SetPoint("LEFT", header, "LEFT", 466, 0)
+	headerTries:SetPoint("LEFT", header, "LEFT", 502, 0)
 	headerTries:SetText(L.COL_TRIES)
 	local headerStatus = Theme.Text(list, "GameFontHighlightSmall", Theme.colors.faint)
-	headerStatus:SetPoint("LEFT", header, "LEFT", 546, 0)
+	headerStatus:SetPoint("LEFT", header, "LEFT", 570, 0)
 	headerStatus:SetText(L.COL_STATUS)
 
 	local rule = Theme.Separator(list)
@@ -389,24 +402,135 @@ function UI:CreateCollectionTab(frame)
 	page.EmptyLabel = empty
 end
 
---- Menu des extensions. Le type de frame « DropdownButton » et le template
---  WowStyle1FilterDropdownTemplate sont ceux qu'utilise le Journal des
---  montures de Blizzard ; le menu se décrit via SetupMenu depuis la 11.0.
-function UI:CreateExpansionDropdown(parent, anchor)
-	local L = ns.L
-	-- CreateFrame lève une erreur sur un type ou un template inconnu, elle ne
-	-- renvoie pas nil. Sans ce pcall, un changement côté Blizzard casserait
-	-- toute la fenêtre au lieu de faire disparaître un seul filtre.
-	local ok, dropdown = pcall(CreateFrame, "DropdownButton", "OnlyFarmExpansionDropdown",
+--- Fabrique un menu déroulant de filtre, ancré au widget précédent.
+--
+--  Le type de frame « DropdownButton » et le template
+--  WowStyle1FilterDropdownTemplate sont ceux qu'utilise le Journal des montures
+--  de Blizzard ; le menu se décrit via SetupMenu depuis la 11.0.
+--
+--  CreateFrame lève une erreur sur un type ou un template inconnu, elle ne
+--  renvoie pas nil. Sans le pcall, un changement côté Blizzard casserait toute
+--  la fenêtre au lieu de faire disparaître un seul filtre.
+function UI:CreateDropdown(parent, name, anchor, label, width)
+	local ok, dropdown = pcall(CreateFrame, "DropdownButton", name,
 		parent, "WowStyle1FilterDropdownTemplate")
 	if not ok or not dropdown or type(dropdown.SetupMenu) ~= "function" then
-		ns:Debug("menu des extensions indisponible : %s", tostring(dropdown))
+		ns:Debug("menu %s indisponible : %s", tostring(name), tostring(dropdown))
 		return nil
 	end
 
-	dropdown:SetSize(150, 22)
-	dropdown:SetPoint("LEFT", anchor, "RIGHT", 10, 0)
-	if dropdown.SetText then dropdown:SetText(L.FILTER_EXPANSION) end
+	dropdown:SetSize(width or 132, 22)
+	dropdown:SetPoint("LEFT", anchor, "RIGHT", 8, 0)
+	if dropdown.SetText then dropdown:SetText(label) end
+	return dropdown
+end
+
+--- Menu des natures de source : butin, haut fait, vendeur, métier, événement…
+--  C'est le filtre qui permet « je ne veux voir que les montures de haut
+--  fait », et il vient entièrement du client : `sourceType` est fourni par le
+--  Journal des montures, son libellé aussi.
+function UI:CreateSourceDropdown(parent, anchor)
+	local L = ns.L
+	local dropdown = self:CreateDropdown(parent, "OnlyFarmSourceDropdown", anchor, L.FILTER_SOURCE)
+	if not dropdown then return nil end
+
+	local function IsShown(kind)
+		return not ns.db.profile.filters.kindsHidden[kind]
+	end
+	local function SetShown(kind, shown)
+		ns.db.profile.filters.kindsHidden[kind] = (not shown) or nil
+		self:Refresh()
+	end
+
+	dropdown:SetupMenu(function(_, rootDescription)
+		rootDescription:CreateTitle(L.FILTER_SOURCE)
+
+		local kinds = ns.Collection:GetSourceKinds()
+
+		rootDescription:CreateButton(L.FILTER_EXPANSION_ALL, function()
+			wipe(ns.db.profile.filters.kindsHidden)
+			self:Refresh()
+		end)
+		rootDescription:CreateButton(L.FILTER_EXPANSION_NONE, function()
+			local hidden = ns.db.profile.filters.kindsHidden
+			for _, entry in ipairs(kinds) do hidden[entry.kind] = true end
+			self:Refresh()
+		end)
+
+		for _, entry in ipairs(kinds) do
+			rootDescription:CreateCheckbox(
+				string.format("%s (%d)", entry.label, entry.count),
+				function() return IsShown(entry.kind) end,
+				function()
+					SetShown(entry.kind, not IsShown(entry.kind))
+					return MenuResponse.Refresh
+				end)
+		end
+	end)
+
+	return dropdown
+end
+
+--- Menu raid / donjon. Une monture de raid et une monture de donjon ne se
+--  farment pas de la même façon : l'une est hebdomadaire et se fait sur tous
+--  les alts, l'autre est quotidienne. Les séparer est le tri le plus utile
+--  après l'extension.
+function UI:CreateTypeDropdown(parent, anchor)
+	local L = ns.L
+	local dropdown = self:CreateDropdown(parent, "OnlyFarmTypeDropdown", anchor, L.FILTER_TYPE, 118)
+	if not dropdown then return nil end
+
+	local choices = {
+		{ value = "all", label = L.FILTER_TYPE_ALL },
+		{ value = "raid", label = L.FILTER_TYPE_RAID },
+		{ value = "dungeon", label = L.FILTER_TYPE_DUNGEON },
+		{ value = "outdoor", label = L.FILTER_TYPE_OUTDOOR },
+	}
+
+	dropdown:SetupMenu(function(_, rootDescription)
+		rootDescription:CreateTitle(L.FILTER_TYPE)
+		for _, choice in ipairs(choices) do
+			rootDescription:CreateRadio(choice.label,
+				function() return ns.db.profile.filters.instanceType == choice.value end,
+				function()
+					ns.db.profile.filters.instanceType = choice.value
+					self:Refresh()
+					return MenuResponse.Close
+				end)
+		end
+	end)
+
+	return dropdown
+end
+
+--- Menu de tri.
+function UI:CreateSortDropdown(parent, anchor)
+	local L = ns.L
+	local dropdown = self:CreateDropdown(parent, "OnlyFarmSortDropdown", anchor, L.SORT_BY, 126)
+	if not dropdown then return nil end
+
+	dropdown:SetupMenu(function(_, rootDescription)
+		rootDescription:CreateTitle(L.SORT_BY)
+		for _, choice in ipairs(UI.SORTS) do
+			rootDescription:CreateRadio(L[choice.label],
+				function() return ns.db.profile.filters.sort == choice.value end,
+				function()
+					ns.db.profile.filters.sort = choice.value
+					self:Refresh()
+					return MenuResponse.Close
+				end)
+		end
+	end)
+
+	return dropdown
+end
+
+--- Menu des extensions.
+function UI:CreateExpansionDropdown(parent, anchor)
+	local L = ns.L
+	local dropdown = self:CreateDropdown(parent, "OnlyFarmExpansionDropdown", anchor,
+		L.FILTER_EXPANSION)
+	if not dropdown then return nil end
 
 	local function IsShown(name)
 		return not ns.db.profile.filters.expansionsHidden[name]
@@ -461,6 +585,8 @@ end
 -- Lignes
 --------------------------------------------------------------------------------
 
+local TYPE_LABELS = { raid = "TYPE_RAID", dungeon = "TYPE_DUNGEON", outdoor = "TYPE_OUTDOOR" }
+
 --- Construit les widgets d'une ligne la première fois qu'elle est acquise,
 --  puis se contente de les remplir. Le pool de ScrollBox recycle les frames.
 function UI:InitRow(button, elementData)
@@ -486,12 +612,17 @@ function UI:InitRow(button, elementData)
 
 		button.Source = Theme.Text(button, "GameFontHighlightSmall", Theme.colors.muted)
 		button.Source:SetPoint("LEFT", button.Name, "RIGHT", 4, 0)
-		button.Source:SetWidth(236)
+		button.Source:SetWidth(212)
 		button.Source:SetWordWrap(false)
 
+		button.Type = Theme.Text(button, "GameFontHighlightSmall", Theme.colors.faint)
+		button.Type:SetPoint("LEFT", button.Source, "RIGHT", 4, 0)
+		button.Type:SetWidth(62)
+		button.Type:SetWordWrap(false)
+
 		button.Tries = Theme.Text(button, "GameFontHighlightSmall", Theme.colors.faint, "RIGHT")
-		button.Tries:SetPoint("LEFT", button.Source, "RIGHT", 4, 0)
-		button.Tries:SetWidth(56)
+		button.Tries:SetPoint("LEFT", button.Type, "RIGHT", 4, 0)
+		button.Tries:SetWidth(46)
 
 		button.Pill = Theme.Pill(button)
 		button.Pill:SetPoint("LEFT", button.Tries, "RIGHT", 16, 0)
@@ -538,6 +669,7 @@ function UI:InitRow(button, elementData)
 		button.Name:SetText(elementData.name)
 		button.Name:SetTextColor(faint[1], faint[2], faint[3])
 		button.Source:SetText(ns.L.TAG_EXCLUDED)
+		button.Type:SetText("")
 		button.Tries:SetText("")
 		button.Pill:Hide()
 		button.Icon:SetDesaturated(true)
@@ -547,7 +679,10 @@ function UI:InitRow(button, elementData)
 		button.Name:SetText(elementData.name)
 		button.Name:SetTextColor(text[1], text[2], text[3])
 		button.Source:SetText(elementData.sourceSummary or "")
-		button.Tries:SetText(elementData.tries or "")
+		button.Type:SetText(elementData.typeLabel or "")
+		local tc = elementData.typeColor or Theme.colors.faint
+		button.Type:SetTextColor(tc[1], tc[2], tc[3])
+		button.Tries:SetText(elementData.triesText or "")
 		button.Pill:Set(elementData.statusLabel, elementData.statusColor)
 		button.Pill:Show()
 		button.Icon:SetDesaturated(false)
@@ -567,6 +702,29 @@ function UI:ShowRowTooltip(row)
 	local sourceText = ns.Collection:GetSourceText(row.mountID)
 	if sourceText then
 		GameTooltip:AddLine(sourceText, 0.8, 0.8, 0.8, true)
+	end
+
+	-- Où et sous quelle forme. La difficulté EXACTE d'une monture (« 25
+	-- héroïque ») n'est exposée par aucune API : on affiche donc ce que le
+	-- client sait vraiment — le type d'instance, et la difficulté du verrou
+	-- quand il y en a un, parce que celle-là est mesurée et pas devinée.
+	local source = ns.Eligibility:GetSource(row.mountID)
+	if source then
+		local instanceType = self:GetInstanceType(source)
+		if source.instanceName then
+			GameTooltip:AddDoubleLine(source.instanceName,
+				ns.L[TYPE_LABELS[instanceType]] or "", 1, 0.82, 0, 0.7, 0.7, 0.7)
+		end
+		if source.encounterName and source.encounterName ~= "" then
+			GameTooltip:AddDoubleLine(L.TOOLTIP_BOSS, source.encounterName,
+				0.6, 0.6, 0.6, 0.9, 0.9, 0.9)
+		end
+	end
+
+	local status = ns.Eligibility:GetStatus(row.mountID)
+	if status.lock and status.lock.difficultyName then
+		GameTooltip:AddDoubleLine(L.TOOLTIP_DIFFICULTY, status.lock.difficultyName,
+			0.6, 0.6, 0.6, 0.9, 0.9, 0.9)
 	end
 
 	local rows, availableCount = ns.Eligibility:GetCharacterAvailability(row.mountID)
@@ -625,6 +783,51 @@ local STATE_LABELS = {
 	ineligible = "STATUS_INELIGIBLE",
 }
 
+-- Ordre d'urgence, pour le tri par disponibilité : ce qui est jouable
+-- maintenant en tête, ce dont on ne sait rien à la fin.
+local STATE_RANK = {
+	available = 1,
+	locked = 2,
+	unknown = 3,
+	unmapped = 4,
+	ineligible = 5,
+}
+
+UI.SORTS = {
+	{ value = "name", label = "SORT_NAME" },
+	{ value = "source", label = "SORT_SOURCE" },
+	{ value = "expansion", label = "SORT_EXPANSION" },
+	{ value = "status", label = "SORT_STATUS" },
+	{ value = "attempts", label = "SORT_ATTEMPTS" },
+}
+
+--- Comparateurs de tri. Tous retombent sur le nom en cas d'égalité : sans ce
+--  départage, l'ordre de deux lignes équivalentes change d'un rafraîchissement
+--  à l'autre et la liste paraît instable.
+local SORT_FUNCTIONS = {
+	name = function(a, b) return a.name < b.name end,
+
+	source = function(a, b)
+		if a.kind ~= b.kind then return a.kind < b.kind end
+		return a.name < b.name
+	end,
+
+	expansion = function(a, b)
+		if a.tier ~= b.tier then return a.tier < b.tier end
+		return a.name < b.name
+	end,
+
+	status = function(a, b)
+		if a.rank ~= b.rank then return a.rank < b.rank end
+		return a.name < b.name
+	end,
+
+	attempts = function(a, b)
+		if a.tries ~= b.tries then return a.tries > b.tries end
+		return a.name < b.name
+	end,
+}
+
 --- Libellé et couleur de la pastille d'une ligne.
 function UI:StatusVisual(status)
 	local L = ns.L
@@ -648,11 +851,20 @@ local function MatchesSearch(entry, needle)
 	return entry.name:lower():find(needle, 1, true) ~= nil
 end
 
+--- Type d'endroit d'une monture, pour la colonne et le filtre.
+--  @return "raid" | "dungeon" | "outdoor"
+function UI:GetInstanceType(source)
+	if type(source) ~= "table" then return "outdoor" end
+	if source.isRaid == true then return "raid" end
+	if source.isRaid == false then return "dungeon" end
+	return "outdoor"
+end
+
 function UI:BuildDataProvider()
 	local filters = ns.db.profile.filters
 	local needle = (filters.search or ""):lower()
-	local provider = CreateDataProvider()
-	local shown = 0
+	local Theme = ns.Theme
+	local rows = {}
 
 	for _, entry in ipairs(ns.Collection:GetMissing()) do
 		local keep = true
@@ -661,6 +873,18 @@ function UI:BuildDataProvider()
 		if keep and not MatchesSearch(entry, needle) then keep = false end
 		if keep and filters.expansionsHidden[ns.Eligibility:GetExpansion(entry.mountID)] then
 			keep = false
+		end
+		if keep and filters.kindsHidden[entry.kind] then keep = false end
+
+		local source, instanceType
+		if keep then
+			source = ns.Eligibility:GetSource(entry.mountID)
+			instanceType = self:GetInstanceType(source)
+			if filters.instanceType and filters.instanceType ~= "all"
+				and filters.instanceType ~= instanceType
+			then
+				keep = false
+			end
 		end
 
 		local status
@@ -675,24 +899,40 @@ function UI:BuildDataProvider()
 		end
 
 		if keep then
-			shown = shown + 1
 			local label, color = self:StatusVisual(status)
-			local tries = ns.Attempts:GetCount(entry.mountID)
-			provider:Insert({
-				index = shown,
+			rows[#rows + 1] = {
 				mountID = entry.mountID,
 				name = entry.name,
 				icon = entry.icon,
+				kind = entry.kind or "unknown",
 				excluded = entry.excluded,
 				sourceSummary = ns.Collection:GetSourceSummary(entry.mountID),
 				statusLabel = label,
 				statusColor = color,
-				tries = tries > 0 and tostring(tries) or "—",
-			})
+				rank = STATE_RANK[status.state] or 9,
+				tries = ns.Attempts:GetCount(entry.mountID),
+				-- math.huge pour les extensions inconnues : elles ferment la
+				-- marche au tri, comme sur le tableau de bord.
+				tier = (source and tonumber(source.tier)) or math.huge,
+				typeKey = instanceType,
+				typeLabel = ns.L[TYPE_LABELS[instanceType]],
+				typeColor = instanceType == "raid" and Theme.colors.purple
+					or instanceType == "dungeon" and Theme.colors.accent
+					or Theme.colors.faint,
+			}
 		end
 	end
 
-	return provider, shown
+	table.sort(rows, SORT_FUNCTIONS[filters.sort or "name"] or SORT_FUNCTIONS.name)
+
+	local provider = CreateDataProvider()
+	for index, row in ipairs(rows) do
+		row.index = index
+		row.triesText = row.tries > 0 and tostring(row.tries) or "—"
+		provider:Insert(row)
+	end
+
+	return provider, #rows
 end
 
 function UI:Refresh()

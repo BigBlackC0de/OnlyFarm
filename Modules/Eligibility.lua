@@ -168,26 +168,37 @@ function Eligibility:GetStatus(mountID, charKey)
 	end
 
 	local instanceID = self:ResolveInstanceID(source)
-	if not instanceID and not source.instanceName then
+	result.instanceID = instanceID
+
+	-- LE VERROU D'ABORD, avant toute question d'horloge.
+	--
+	-- Un verrou enregistré est un fait mesuré : le personnage a bel et bien
+	-- terminé cette instance. Le chercher en dernier, après avoir exigé une
+	-- instance correctement cartographiée, produisait l'incohérence la plus
+	-- visible de l'addon — le tableau de bord affichait « Citadelle de la
+	-- Couronne de glace, 11/12, reset dans 3j » pendant que la monture qui en
+	-- tombe restait « incertain ».
+	--
+	-- Le nom de lieu brut sert de repli quand la cartographie n'a pas abouti :
+	-- il est étiqueté (« Région : … »), et Lockouts sait le décoiffer.
+	local lockName = source.instanceName or source.placeName
+	local lock = ns.Lockouts:GetLock(charKey, instanceID, source.difficultyID, lockName)
+	if lock then
+		result.state = STATE.LOCKED
+		result.resetIn = math.max(0, (lock.expires or 0) - time())
+		result.detail = lock.difficultyName
+		result.lock = lock
+		return result
+	end
+
+	if not instanceID and not lockName then
 		-- Ni identifiant moteur ni nom : rien pour rapprocher un verrou.
 		result.state = STATE.UNKNOWN
 		result.detail = "instance_unresolved"
 		return result
 	end
-	result.instanceID = instanceID
 
 	if lockoutKind == ns.Data.LOCKOUT.WEEKLY then
-		-- Le nom est passé en plus de l'identifiant : c'est lui qui rattrape le
-		-- cas où GetSavedInstanceInfo n'expose pas d'instanceID exploitable.
-		local lock = ns.Lockouts:GetLock(charKey, instanceID, source.difficultyID,
-			source.instanceName)
-		if lock then
-			result.state = STATE.LOCKED
-			result.resetIn = math.max(0, (lock.expires or 0) - time())
-			result.detail = lock.difficultyName
-			result.lock = lock
-			return result
-		end
 		-- Pas de verrou enregistré : l'instance n'a jamais été entrée cette
 		-- semaine, donc elle est disponible. C'est la règle n°2 du module
 		-- Lockouts, et c'est contre-intuitif : l'absence vaut disponibilité.

@@ -59,6 +59,12 @@ local PROFILE_DEFAULTS = {
 		-- veut pas qu'un nouveau palier ajouté par un patch soit masqué par
 		-- défaut parce qu'il n'était pas dans la liste au moment du réglage.
 		expansionsHidden = {},
+		-- Même règle pour les natures de source (butin, haut fait, vendeur…).
+		kindsHidden = {},
+		-- "all" | "raid" | "dungeon" | "outdoor"
+		instanceType = "all",
+		-- "name" | "source" | "expansion" | "status" | "attempts"
+		sort = "name",
 	},
 	routing = {
 		flySpeed = 75,          -- yd/s, calibré par le joueur (phase 3)

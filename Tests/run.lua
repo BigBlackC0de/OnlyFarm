@@ -116,6 +116,9 @@ test("Util — normalisation de nom d'instance", function()
 	eq(ns.Util.NormalizeName("Le  Sanctum   de la Foudre"), "le sanctum de la foudre",
 		"espaces multiples réduits")
 	eq(ns.Util.NormalizeName(nil), nil, "entrée nil")
+	-- L'espace insécable du client français doit se comparer comme un espace.
+	eq(ns.Util.NormalizeName("Région\194\160: Ulduar"), "région : ulduar",
+		"espace insécable ramené à un espace ordinaire")
 end)
 
 --------------------------------------------------------------------------------
@@ -214,6 +217,28 @@ test("Collection — séparateur |n et codes couleur retirés du résumé", func
 	eq(ns.Collection:GetSourceSummary(302),
 		"Butin : Sartharion — L'Œil de l'éternité",
 		"codes couleur retirés")
+end)
+
+test("Collection — natures de source présentes, avec leurs effectifs", function()
+	stub.Reset()
+	stub.mounts = StandardMounts()
+	local ns = harness.Load(stub)
+
+	local kinds = ns.Collection:GetSourceKinds()
+	-- Deux butins manquants (201, 204) et un vendeur (202) ; la monture
+	-- possédée et celle masquée ne comptent pas.
+	eq(#kinds, 2, "deux natures présentes")
+	eq(kinds[1].kind, "boss", "la plus fournie en tête")
+	eq(kinds[1].count, 2, "deux butins")
+	eq(kinds[1].label, "Drop", "libellé fourni par le client")
+	eq(kinds[2].kind, "vendor", "puis le vendeur")
+	eq(kinds[2].count, 1, "un vendeur")
+
+	-- On ne liste QUE ce qui existe : un menu plein d'entrées à zéro résultat
+	-- se lit comme un menu cassé.
+	for _, entry in ipairs(kinds) do
+		eq(entry.count > 0, true, "aucune nature vide dans la liste")
+	end
 end)
 
 test("Collection — exclusions", function()
@@ -400,6 +425,34 @@ test("Eligibility — sans nom ni identifiant, on ne tranche pas", function()
 	local status = ns.Eligibility:GetStatus(201)
 	eq(status.state, ns.Eligibility.STATE.UNKNOWN, "rien pour rapprocher un verrou")
 	eq(status.detail, "instance_unresolved", "raison explicite")
+end)
+
+-- Régression : le tableau de bord affichait « Citadelle de la Couronne de
+-- glace, 11/12, reset dans 3j » pendant que la monture qui en tombe restait
+-- « incertain ». Le verrou est un fait mesuré ; il doit être consulté AVANT
+-- toute question d'horloge, et même quand la cartographie n'a pas abouti.
+test("Eligibility — le verrou prime, même sur une source non cartographiée", function()
+	stub.Reset()
+	stub.mounts = StandardMounts()
+	stub.savedInstances = {
+		{ name = "Citadelle de la Couronne de glace", instanceID = 631,
+		  difficultyID = 5, difficultyName = "25 joueurs (héroïque)",
+		  reset = 3 * 86400, isRaid = true, numEncounters = 12, encounterProgress = 11 },
+	}
+	-- La cartographie a échoué : pas d'instanceName, seulement le lieu brut du
+	-- texte de source, avec son étiquette « Région : » et un espace insécable.
+	local ns = LoadWithSources({
+		[201] = {
+			kind = "boss",
+			encounterName = "Le roi-liche",
+			placeName = "Région\194\160: Citadelle de la Couronne de glace",
+		},
+	})
+
+	local status = ns.Eligibility:GetStatus(201)
+	eq(status.state, ns.Eligibility.STATE.LOCKED, "verrou trouvé malgré l'étiquette")
+	eq(status.resetIn, 3 * 86400, "temps avant reset")
+	eq(status.detail, "25 joueurs (héroïque)", "difficulté du verrou remontée")
 end)
 
 -- Régression : le 14e retour de GetSavedInstanceInfo n'est documenté nulle
@@ -711,6 +764,17 @@ test("Mapping — replis de rapprochement des noms d'instance", function()
 		"Citadelle de la Couronne de glace : Le Bastion inférieur")
 	eq(match and match.name, "Citadelle de la Couronne de glace", "suffixe d'aile ignoré")
 	eq(how, "prefix", "repli par préfixe")
+
+	-- Régression : la seconde ligne du texte de source est souvent ÉTIQUETÉE
+	-- (« Région : Libération de Terremine »). Sans savoir enlever l'étiquette,
+	-- aucune de ces montures ne se rattachait.
+	local labelled = {
+		["libération de terremine"] = { name = "Libération de Terremine" },
+	}
+	-- Avec un espace insécable devant le deux-points, comme le client français.
+	match, how = ns.Mapping.MatchPlace(labelled, "Région\194\160: Libération de Terremine")
+	eq(match and match.name, "Libération de Terremine", "étiquette « Région : » retirée")
+	eq(how, "labelled", "repli par étiquette")
 
 	-- Un nom trop court ne doit rien attraper au hasard.
 	eq(ns.Mapping.MatchPlace(index, "Kara"), nil, "nom trop court, aucun rapprochement")
