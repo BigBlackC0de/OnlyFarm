@@ -168,9 +168,8 @@ function Eligibility:GetStatus(mountID, charKey)
 	end
 
 	local instanceID = self:ResolveInstanceID(source)
-	if not instanceID then
-		-- Source connue mais jamais rapprochée d'un identifiant moteur : on ne
-		-- saura pas lire le verrou tant que le joueur n'y est pas entré une fois.
+	if not instanceID and not source.instanceName then
+		-- Ni identifiant moteur ni nom : rien pour rapprocher un verrou.
 		result.state = STATE.UNKNOWN
 		result.detail = "instance_unresolved"
 		return result
@@ -178,7 +177,10 @@ function Eligibility:GetStatus(mountID, charKey)
 	result.instanceID = instanceID
 
 	if lockoutKind == ns.Data.LOCKOUT.WEEKLY then
-		local lock = ns.Lockouts:GetLock(charKey, instanceID, source.difficultyID)
+		-- Le nom est passé en plus de l'identifiant : c'est lui qui rattrape le
+		-- cas où GetSavedInstanceInfo n'expose pas d'instanceID exploitable.
+		local lock = ns.Lockouts:GetLock(charKey, instanceID, source.difficultyID,
+			source.instanceName)
 		if lock then
 			result.state = STATE.LOCKED
 			result.resetIn = math.max(0, (lock.expires or 0) - time())
@@ -194,6 +196,14 @@ function Eligibility:GetStatus(mountID, charKey)
 	end
 
 	if lockoutKind == ns.Data.LOCKOUT.DAILY then
+		-- Le verrou quotidien se lit dans NOS propres entrées d'instance, qui
+		-- sont indexées par identifiant moteur. Sans lui, pas de réponse — et
+		-- on le dit plutôt que de répondre « disponible » par défaut.
+		if not instanceID then
+			result.state = STATE.UNKNOWN
+			result.detail = "instance_unresolved"
+			return result
+		end
 		local entered = ns.Lockouts:HasEnteredToday(charKey, instanceID)
 		if entered == nil then
 			result.state = STATE.UNKNOWN

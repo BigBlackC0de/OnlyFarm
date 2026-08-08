@@ -195,6 +195,27 @@ test("Collection — texte de source en cache", function()
 	eq(ns.Collection:GetSourceText(999), nil, "monture inconnue")
 end)
 
+-- Régression : le Journal des montures sépare ses lignes par la séquence
+-- « |n » du client, pas par un vrai retour à la ligne. En ne traitant que
+-- « \n », la colonne affichait « Butin : Le roi-liche|... ».
+test("Collection — séparateur |n et codes couleur retirés du résumé", function()
+	stub.Reset()
+	stub.mounts = {
+		{ mountID = 301, name = "Invincible", sourceType = 1,
+		  source = "Butin : Le roi-liche|nCitadelle de la Couronne de glace" },
+		{ mountID = 302, name = "Autre", sourceType = 1,
+		  source = "|cffffd200Butin|r : Sartharion|nL'Œil de l'éternité" },
+	}
+	local ns = harness.Load(stub)
+
+	eq(ns.Collection:GetSourceSummary(301),
+		"Butin : Le roi-liche — Citadelle de la Couronne de glace",
+		"« |n » traité comme un saut de ligne")
+	eq(ns.Collection:GetSourceSummary(302),
+		"Butin : Sartharion — L'Œil de l'éternité",
+		"codes couleur retirés")
+end)
+
 test("Collection — exclusions", function()
 	stub.Reset()
 	stub.mounts = StandardMounts()
@@ -357,15 +378,55 @@ test("Eligibility — raid hebdomadaire disponible puis verrouillé", function()
 	eq(status.resetIn, 3 * 86400, "temps avant reset")
 end)
 
-test("Eligibility — instance jamais rapprochée d'un instanceID", function()
+test("Eligibility — sans identifiant moteur, le nom suffit", function()
 	stub.Reset()
 	stub.mounts = StandardMounts()
 	local ns = LoadWithSources({
 		[201] = { instanceName = "Ulduar", isRaid = true, kind = "boss" },
 	})
+	-- Aucun instanceID appris, et c'est le cas courant : le joueur n'a jamais
+	-- mis les pieds dans cette instance. Aucun verrou à ce nom non plus, donc
+	-- elle est disponible — l'absence de verrou VAUT disponibilité.
 	local status = ns.Eligibility:GetStatus(201)
-	eq(status.state, ns.Eligibility.STATE.UNKNOWN, "identifiant moteur inconnu")
+	eq(status.state, ns.Eligibility.STATE.AVAILABLE, "pas de verrou à ce nom -> disponible")
+end)
+
+test("Eligibility — sans nom ni identifiant, on ne tranche pas", function()
+	stub.Reset()
+	stub.mounts = StandardMounts()
+	local ns = LoadWithSources({
+		[201] = { isRaid = true, kind = "boss" },
+	})
+	local status = ns.Eligibility:GetStatus(201)
+	eq(status.state, ns.Eligibility.STATE.UNKNOWN, "rien pour rapprocher un verrou")
 	eq(status.detail, "instance_unresolved", "raison explicite")
+end)
+
+-- Régression : le 14e retour de GetSavedInstanceInfo n'est documenté nulle
+-- part. Quand il manque, un rapprochement fondé sur lui seul échouait en
+-- silence et l'addon annonçait « disponible » un raid tout juste terminé.
+test("Eligibility — verrou lu même sans instanceID exposé (cas ICC)", function()
+	stub.Reset()
+	stub.mounts = StandardMounts()
+	stub.savedInstances = {
+		{ name = "Citadelle de la Couronne de glace", instanceID = nil,
+		  difficultyID = 5, reset = 4 * 86400, isRaid = true,
+		  numEncounters = 12, encounterProgress = 12 },
+	}
+	local ns = LoadWithSources({
+		[201] = { instanceName = "Citadelle de la Couronne de glace",
+		          encounterName = "Le roi-liche", isRaid = true, kind = "boss" },
+	})
+
+	local status = ns.Eligibility:GetStatus(201)
+	eq(status.state, ns.Eligibility.STATE.LOCKED, "verrou trouvé par le nom")
+	eq(status.resetIn, 4 * 86400, "temps avant reset")
+
+	-- Et il doit être visible dans la liste des verrous du tableau de bord,
+	-- que la monture soit cartographiée ou non.
+	local locks = ns.Lockouts:GetActiveLocks()
+	eq(#locks, 1, "un verrou actif listé")
+	eq(locks[1].encounterProgress, 12, "progression conservée")
 end)
 
 test("Eligibility — donjon quotidien", function()
@@ -580,6 +641,102 @@ test("Database — une base neuve n'affiche pas les exclues masquées", function
 	eq(ns.db.profile.filters.hideExcluded, false, "défaut : exclues visibles, grisées")
 	eq(type(ns.db.profile.minimap), "table", "réglages du bouton minicarte présents")
 	eq(ns.db.profile.minimap.hide, false, "bouton minicarte affiché par défaut")
+end)
+
+--------------------------------------------------------------------------------
+-- Stats
+--------------------------------------------------------------------------------
+
+test("Stats — compteurs et ratio de collection", function()
+	stub.Reset()
+	stub.mounts = StandardMounts()
+	local ns = harness.Load(stub)
+
+	local stats = ns.Stats:Get()
+	eq(stats.owned, 1, "une possédée")
+	eq(stats.missing, 3, "trois manquantes")
+	eq(stats.total, 4, "total obtenable")
+	eq(stats.hidden, 1, "une hors de portée")
+	eq(math.abs(stats.ratio - 0.25) < 1e-9, true, "ratio de progression")
+end)
+
+test("Stats — répartition par statut", function()
+	stub.Reset()
+	stub.mounts = StandardMounts()
+	local ns = LoadWithSources({
+		[201] = { instanceName = "Ulduar", isRaid = true },
+		[202] = { kind = "vendor", lockout = "none" },
+	})
+	ns.db.global.instanceIDsByName["ulduar"] = 759
+	ns.Stats:Invalidate()
+
+	local STATE = ns.Eligibility.STATE
+	local stats = ns.Stats:Get()
+	eq(stats.byState[STATE.AVAILABLE], 2, "raid libre + vendeur")
+	eq(stats.byState[STATE.UNMAPPED], 1, "la troisième n'a pas de source")
+	eq(stats.availableCount, 2, "deux cibles ouvertes")
+end)
+
+test("Stats — progression par extension, les moins avancées d'abord", function()
+	stub.Reset()
+	stub.mounts = StandardMounts()
+	local ns = harness.Load(stub)
+	-- La monture possédée et une manquante sur le même palier ; une manquante
+	-- seule sur un autre. Le second palier est donc moins avancé.
+	ns.db.global.sourceCache = {
+		[100] = { tierName = "Wrath", tier = 3 },
+		[201] = { tierName = "Wrath", tier = 3 },
+		[202] = { tierName = "Legion", tier = 6 },
+	}
+	ns.Eligibility:Invalidate()
+	ns.Stats:Invalidate()
+
+	local stats = ns.Stats:Get()
+	eq(stats.expansions[1].name, "Legion", "0/1 passe devant 1/2")
+	eq(stats.expansions[1].owned, 0, "rien de possédé sur Legion")
+	eq(stats.expansions[1].total, 1, "une monture sur Legion")
+
+	-- Le panier « inconnue » est mécaniquement à 0 % : il doit rester dernier
+	-- au lieu de squatter la première barre en permanence.
+	eq(stats.expansions[#stats.expansions].name, ns.Eligibility.UNKNOWN_EXPANSION,
+		"les sources non cartographiées ferment la marche")
+
+	local wrath
+	for _, bucket in ipairs(stats.expansions) do
+		if bucket.name == "Wrath" then wrath = bucket end
+	end
+	eq(wrath and wrath.owned, 1, "la possédée compte dans son extension")
+	eq(wrath and wrath.total, 2, "dénominateur complet")
+end)
+
+test("Stats — cibles du moment triées par tentatives", function()
+	stub.Reset()
+	stub.mounts = StandardMounts()
+	local ns = LoadWithSources({
+		[201] = { kind = "vendor", lockout = "none" },
+		[202] = { kind = "vendor", lockout = "none" },
+	})
+	ns.Attempts:Bump(202, nil, 5)
+	ns.Stats:Invalidate()
+
+	local stats = ns.Stats:Get()
+	eq(#stats.topTargets, 2, "deux cibles disponibles")
+	eq(stats.topTargets[1].mountID, 202, "la plus attendue en tête")
+	eq(stats.topTargets[1].attempts, 5, "avec son compte")
+end)
+
+test("Stats — une monture exclue sort des agrégats", function()
+	stub.Reset()
+	stub.mounts = StandardMounts()
+	local ns = LoadWithSources({
+		[201] = { kind = "vendor", lockout = "none" },
+		[202] = { kind = "vendor", lockout = "none" },
+	})
+	eq(ns.Stats:Get().availableCount, 2, "deux cibles au départ")
+
+	ns.Collection:SetExcluded(202, true)
+	ns.Stats:Invalidate()
+	eq(ns.Stats:Get().availableCount, 1, "l'exclue ne compte plus")
 end)
 
 --------------------------------------------------------------------------------

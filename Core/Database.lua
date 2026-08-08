@@ -39,6 +39,8 @@ local PROFILE_DEFAULTS = {
 		point = "CENTER",
 		x = 0,
 		y = 0,
+		width = 900,
+		height = 620,
 		scale = 1.0,
 		activeTab = 1,
 	},

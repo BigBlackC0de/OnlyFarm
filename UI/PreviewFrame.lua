@@ -37,8 +37,11 @@ end
 function Preview:Create()
 	if self.frame then return self.frame end
 
-	local frame = CreateFrame("Frame", "OnlyFarmPreviewFrame", UIParent, "ButtonFrameTemplate")
+	local Theme = ns.Theme
+
+	local frame = CreateFrame("Frame", "OnlyFarmPreviewFrame", UIParent)
 	frame:SetSize(WIDTH, HEIGHT)
+	frame:SetFrameStrata("HIGH")
 	frame:SetMovable(true)
 	frame:EnableMouse(true)
 	frame:RegisterForDrag("LeftButton")
@@ -47,14 +50,34 @@ function Preview:Create()
 	frame:SetClampedToScreen(true)
 	frame:Hide()
 
-	if ButtonFrameTemplate_HideButtonBar then
-		pcall(ButtonFrameTemplate_HideButtonBar, frame)
-	end
+	Theme.Fill(frame, Theme.colors.bg)
+	Theme.Border(frame, Theme.colors.border)
 
-	local parent = frame.Inset or frame
+	local titleBar = CreateFrame("Frame", nil, frame)
+	titleBar:SetPoint("TOPLEFT")
+	titleBar:SetPoint("TOPRIGHT")
+	titleBar:SetHeight(28)
+	Theme.Fill(titleBar, Theme.colors.panel)
+
+	local rule = Theme.Separator(titleBar)
+	rule:SetPoint("BOTTOMLEFT")
+	rule:SetPoint("BOTTOMRIGHT")
+
+	local title = Theme.Text(titleBar, "GameFontNormal", Theme.colors.text)
+	title:SetPoint("LEFT", 10, 0)
+	title:SetPoint("RIGHT", -28, 0)
+	title:SetWordWrap(false)
+	frame.Title = title
+
+	local close = CreateFrame("Button", nil, titleBar, "UIPanelCloseButton")
+	close:SetSize(24, 24)
+	close:SetPoint("RIGHT", -2, 0)
+	close:SetScript("OnClick", function() Preview:Hide() end)
+
+	local parent = frame
 
 	local model = CreateFrame("PlayerModel", nil, parent)
-	model:SetPoint("TOPLEFT", 6, -6)
+	model:SetPoint("TOPLEFT", 6, -34)
 	model:SetPoint("BOTTOMRIGHT", -6, 58)
 	model:EnableMouse(true)
 	model:EnableMouseWheel(true)
@@ -81,15 +104,14 @@ function Preview:Create()
 	end)
 	frame.Model = model
 
-	local sourceText = parent:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
-	sourceText:SetPoint("BOTTOMLEFT", 8, 30)
-	sourceText:SetPoint("BOTTOMRIGHT", -8, 30)
-	sourceText:SetJustifyH("LEFT")
+	local sourceText = Theme.Text(parent, "GameFontHighlightSmall", Theme.colors.muted)
+	sourceText:SetPoint("BOTTOMLEFT", 10, 30)
+	sourceText:SetPoint("BOTTOMRIGHT", -10, 30)
 	sourceText:SetHeight(36)
 	frame.SourceText = sourceText
 
-	local hint = parent:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-	hint:SetPoint("BOTTOMLEFT", 8, 8)
+	local hint = Theme.Text(parent, "GameFontHighlightSmall", Theme.colors.faint)
+	hint:SetPoint("BOTTOMLEFT", 10, 9)
 	hint:SetText(ns.L.PREVIEW_HINT)
 	frame.Hint = hint
 
@@ -128,11 +150,7 @@ function Preview:Show(mountID)
 	local frame = self:Create()
 	self.mountID = mountID
 
-	if frame.SetTitle then
-		frame:SetTitle(entry.name)
-	elseif frame.TitleContainer and frame.TitleContainer.TitleText then
-		frame.TitleContainer.TitleText:SetText(entry.name)
-	end
+	frame.Title:SetText(entry.name)
 
 	frame:ClearAllPoints()
 	local anchor = ns.UI.frame
@@ -156,7 +174,7 @@ function Preview:Show(mountID)
 		-- Pas de modèle disponible : on le dit, plutôt que d'afficher un carré
 		-- noir qui ressemble à un bug.
 		model:Hide()
-		frame.SourceText:SetText("|cff999999" .. ns.L.PREVIEW_NONE .. "|r")
+		frame.SourceText:SetText(ns.Theme.Colorize(ns.Theme.colors.faint, ns.L.PREVIEW_NONE))
 	end
 
 	frame:Show()

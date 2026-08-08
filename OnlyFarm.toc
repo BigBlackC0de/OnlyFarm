@@ -24,8 +24,11 @@ Modules\Nodes.lua
 Modules\Teleports.lua
 Modules\Attempts.lua
 Modules\Eligibility.lua
+Modules\Stats.lua
 Modules\DevScan.lua
 
+UI\Theme.lua
+UI\Dashboard.lua
 UI\MainFrame.lua
 UI\MinimapButton.lua
 UI\PreviewFrame.lua

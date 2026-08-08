@@ -24,6 +24,7 @@ function Collection:OnInitialize()
 	self.owned = {}      -- [mountID] = true
 	self.missing = {}    -- tableau d'entrées triées par nom
 	self.byID = {}       -- [mountID] = entrée
+	self.allIDs = {}     -- tous les mountID obtenables sur ce perso, possédés compris
 	self.counts = { total = 0, owned = 0, missing = 0, hidden = 0 }
 	self.ready = false
 	self.retries = 0
@@ -68,7 +69,7 @@ function Collection:Scan()
 		return false
 	end
 
-	local owned, missing, byID = {}, {}, {}
+	local owned, missing, byID, allIDs = {}, {}, {}, {}
 	local counts = { total = 0, owned = 0, missing = 0, hidden = 0 }
 	local excluded = (ns.db and ns.db.global.excluded) or {}
 
@@ -85,6 +86,10 @@ function Collection:Scan()
 				counts.hidden = counts.hidden + 1
 			else
 				counts.total = counts.total + 1
+				-- Possédées comprises : le tableau de bord a besoin du
+				-- dénominateur pour dire « 12/31 sur Ulduar », pas seulement
+				-- de ce qui manque.
+				allIDs[#allIDs + 1] = mountID
 				if isCollected then
 					owned[mountID] = true
 					counts.owned = counts.owned + 1
@@ -117,6 +122,7 @@ function Collection:Scan()
 	self.owned = owned
 	self.missing = missing
 	self.byID = byID
+	self.allIDs = allIDs
 	self.counts = counts
 	self.ready = true
 	self.retries = 0
@@ -168,15 +174,25 @@ function Collection:GetSourceText(mountID)
 	return entry.sourceText or nil
 end
 
---- Première ligne du texte de source, sans les retours à la ligne — ce qui
---  tient dans une colonne de liste.
+--- Texte de source ramené sur une ligne, ce qui tient dans une colonne.
+--
+--  Attention au séparateur : le Journal des montures n'utilise PAS de vrai
+--  retour à la ligne, il utilise la séquence d'échappement « |n » du client.
+--  Ne traiter que « \n » laissait passer le « | » dans la colonne, et une
+--  troncature en plein milieu affichait « Le roi-liche|... ».
+--
+--  On enlève aussi les codes couleur : tronqués par la FontString, ils
+--  laissent des fragments de « |cffxxxxxx » à l'écran.
 function Collection:GetSourceSummary(mountID)
 	local text = self:GetSourceText(mountID)
 	if not text then
 		local entry = self.byID[mountID]
 		return entry and entry.sourceTypeLabel or nil
 	end
-	return (text:gsub("[\r\n]+", " — "))
+
+	local clean = text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+	clean = clean:gsub("|n", "\n"):gsub("[\r\n]+", " — ")
+	return (clean:gsub("^%s+", ""):gsub("%s+$", ""))
 end
 
 function Collection:SetExcluded(mountID, excluded)

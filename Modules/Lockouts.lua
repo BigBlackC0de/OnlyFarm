@@ -108,6 +108,12 @@ function Lockouts:OnInstanceInfo()
 
 			local entry = {
 				name = name,
+				-- Clé de rapprochement par nom, calculée UNE fois à l'écriture.
+				-- C'est elle qui fait le pont avec le Journal des rencontres :
+				-- l'identifiant moteur (14e retour) n'est documenté nulle part
+				-- et peut être absent, alors que le nom vient du même client
+				-- des deux côtés.
+				nameKey = ns.Util.NormalizeName(name),
 				lockoutID = lockoutID,
 				instanceID = instanceID,
 				difficultyID = difficultyID,
@@ -238,14 +244,29 @@ end
 --------------------------------------------------------------------------------
 
 --- Verrou d'un personnage sur une instance.
+--
+--  Deux clés de rapprochement, et c'est volontaire. `instanceID` est le 14e
+--  retour de GetSavedInstanceInfo : aucune documentation générée ne le décrit,
+--  le code de Blizzard ne le lit qu'en passant, et quand il manque, un
+--  rapprochement fondé sur lui seul échoue en silence — l'addon annonce
+--  « disponible » un raid qu'on vient de terminer. Le nom localisé, lui, vient
+--  du même client que celui du Journal des rencontres. On accepte donc l'un ou
+--  l'autre.
+--
+--  @param instanceName nom localisé de l'instance (facultatif mais recommandé)
 --  @return entrée de verrou, ou nil si aucun verrou (= disponible).
-function Lockouts:GetLock(charKey, instanceID, difficultyID)
+function Lockouts:GetLock(charKey, instanceID, difficultyID, instanceName)
 	local charEntry = ns.Database:GetChar(charKey)
 	if not charEntry or not charEntry.lockouts then return nil end
+
 	local now = time()
+	local nameKey = ns.Util.NormalizeName(instanceName)
+	if instanceID == nil and nameKey == nil then return nil end
 
 	for _, lock in pairs(charEntry.lockouts) do
-		if lock.instanceID == instanceID
+		local matches = (instanceID ~= nil and lock.instanceID == instanceID)
+			or (nameKey ~= nil and (lock.nameKey or ns.Util.NormalizeName(lock.name)) == nameKey)
+		if matches
 			and (difficultyID == nil or lock.difficultyID == difficultyID)
 			and (lock.expires or 0) > now
 		then
@@ -253,6 +274,30 @@ function Lockouts:GetLock(charKey, instanceID, difficultyID)
 		end
 	end
 	return nil
+end
+
+--- Tous les verrous actifs d'un personnage, triés par échéance.
+--  Sert au tableau de bord : « voilà ce que tu as déjà fait cette semaine »,
+--  indépendamment du fait qu'une monture y soit rattachée ou non.
+function Lockouts:GetActiveLocks(charKey)
+	local charEntry = ns.Database:GetChar(charKey or (ns.db and ns.db.charKey))
+	local locks = {}
+	if not charEntry or type(charEntry.lockouts) ~= "table" then return locks end
+
+	local now = time()
+	for _, lock in pairs(charEntry.lockouts) do
+		if (lock.expires or 0) > now then
+			locks[#locks + 1] = lock
+		end
+	end
+
+	table.sort(locks, function(a, b)
+		if (a.expires or 0) ~= (b.expires or 0) then
+			return (a.expires or 0) < (b.expires or 0)
+		end
+		return tostring(a.name) < tostring(b.name)
+	end)
+	return locks
 end
 
 --- Entré dans ce donjon depuis le dernier reset quotidien ?

@@ -16,6 +16,7 @@ local L = {
 
 	-- Fenêtre principale
 	TITLE = "OnlyFarm",
+	TAB_DASHBOARD = "Dashboard",
 	TAB_COLLECTION = "Collection",
 	TAB_ROUTE = "Route",
 	TAB_EDITOR = "Editor",
@@ -25,13 +26,33 @@ local L = {
 	-- Colonnes
 	COL_MOUNT = "Mount",
 	COL_SOURCE = "Source",
+	COL_TRIES = "Tries",
 	COL_STATUS = "Availability",
+
+	-- Tableau de bord
+	KPI_OWNED = "collected",
+	KPI_MISSING = "missing",
+	KPI_AVAILABLE = "available now",
+	KPI_ATTEMPTS = "tries logged",
+	KPI_ATTEMPTS_DETAIL = "on %d mounts",
+	KPI_LOCKS = "active lockouts",
+	KPI_INSTANCES = "%d/h · %d/day",
+	DASH_AVAILABILITY = "What is open right now",
+	DASH_PROGRESS = "%d of %d collected",
+	DASH_EXPANSIONS = "Progress by expansion",
+	DASH_EXPANSIONS_HINT = "least complete first",
+	DASH_TARGETS = "Start with these",
+	DASH_NO_TARGET = "Nothing available right now — everything is locked or unmapped.",
+	DASH_LOCKOUTS = "Done this week",
+	DASH_NO_LOCKOUT = "No lockout on this character — the week is untouched.",
+	DASH_NEEDS_SCAN = "Expansions appear once the Encounter Journal scan has run.",
 
 	-- Statuts
 	STATUS_AVAILABLE = "available",
 	STATUS_LOCKED = "locked",
 	STATUS_UNKNOWN = "unknown",
 	STATUS_NO_SOURCE = "source not mapped",
+	STATUS_NO_SOURCE_SHORT = "unmapped",
 	STATUS_INELIGIBLE = "not eligible",
 
 	-- Résumés
@@ -109,6 +130,7 @@ if GetLocale and GetLocale() == "frFR" then
 	L.UNIT_DAY = "j"
 	L.UNIT_MIN = "min"
 
+	L.TAB_DASHBOARD = "Tableau de bord"
 	L.TAB_COLLECTION = "Collection"
 	L.TAB_ROUTE = "Route"
 	L.TAB_EDITOR = "Éditeur"
@@ -117,12 +139,31 @@ if GetLocale and GetLocale() == "frFR" then
 
 	L.COL_MOUNT = "Monture"
 	L.COL_SOURCE = "Source"
+	L.COL_TRIES = "Essais"
 	L.COL_STATUS = "Disponibilité"
+
+	L.KPI_OWNED = "possédées"
+	L.KPI_MISSING = "manquantes"
+	L.KPI_AVAILABLE = "dispo maintenant"
+	L.KPI_ATTEMPTS = "essais comptés"
+	L.KPI_ATTEMPTS_DETAIL = "sur %d montures"
+	L.KPI_LOCKS = "verrous actifs"
+	L.KPI_INSTANCES = "%d/h · %d/jour"
+	L.DASH_AVAILABILITY = "Ce qui est ouvert maintenant"
+	L.DASH_PROGRESS = "%d sur %d possédées"
+	L.DASH_EXPANSIONS = "Progression par extension"
+	L.DASH_EXPANSIONS_HINT = "les moins avancées d'abord"
+	L.DASH_TARGETS = "Commence par là"
+	L.DASH_NO_TARGET = "Rien de disponible maintenant — tout est verrouillé ou non cartographié."
+	L.DASH_LOCKOUTS = "Déjà fait cette semaine"
+	L.DASH_NO_LOCKOUT = "Aucun verrou sur ce personnage — la semaine est intacte."
+	L.DASH_NEEDS_SCAN = "Les extensions apparaissent une fois le scan du Journal des rencontres passé."
 
 	L.STATUS_AVAILABLE = "disponible"
 	L.STATUS_LOCKED = "verrouillé"
 	L.STATUS_UNKNOWN = "incertain"
 	L.STATUS_NO_SOURCE = "source non cartographiée"
+	L.STATUS_NO_SOURCE_SHORT = "non cartographiée"
 	L.STATUS_INELIGIBLE = "non éligible"
 
 	L.SUMMARY = "%d/%d possédées — %d manquantes"

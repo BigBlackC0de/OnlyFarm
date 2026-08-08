@@ -68,7 +68,15 @@ Un module « écrit et syntaxiquement valide » n'est pas un module qui marche.
 * **Indentation** : tabulations, comme le code de Blizzard.
 * **Un module = un fichier** dans `Modules/`, déclaré par
   `ns:NewModule(nom, priorité)`. Priorité croissante = initialisé plus tôt
-  (Database 10, Collection 20, Lockouts 30, Eligibility 40, UI 80, Commands 90).
+  (Database 10, Collection 20, Lockouts 30, Nodes 32, Teleports 33,
+  TravelGraph 34, Attempts 35, Eligibility 40, Stats 45, DevScan 60, UI 80,
+  Dashboard 82, Preview 82, MinimapButton 85, Commands 90).
+* **Rien ne se dessine hors de `UI/Theme.lua`.** Couleurs, cartes, barres et
+  pastilles viennent toutes de là. Un `|cffxxxxxx` écrit en dur dans un module
+  est un bug de style : la couleur d'un statut est décidée une seule fois.
+* **Les agrégats se calculent dans un module, pas dans une frame.**
+  `Modules/Stats.lua` produit les chiffres du tableau de bord ; `UI/Dashboard.lua`
+  ne fait que les poser. C'est ce qui les rend testables hors du jeu.
 * **Pas de variable globale** hors `_G.OnlyFarm`, `OnlyFarmDB`, `OnlyFarmScanDB`
   et les frames nommées.
 * **Messages internes** préfixés `OF_` (`OF_COLLECTION_UPDATED`, …), via
