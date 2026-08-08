@@ -1,64 +1,59 @@
 # Media
 
-Identité visuelle d'OnlyFarm.
+Textures d'OnlyFarm.
 
 | Fichier | Rôle |
 |---|---|
-| `mark.svg` | symbole seul — **source vectorielle**, c'est le fichier à éditer |
-| `logo.svg` | logo complet (symbole + wordmark + accroche) |
-| `mark.png` | rendu 512 × 512 du symbole |
-| `logo.png` | rendu 1280 × 440 du logo complet, pour le README |
+| `source/` | logo source haute résolution — **le fichier de référence** |
 | `logo.tga` | 128 × 128 — portrait de la fenêtre et icône du `.toc` |
 | `minimap.tga` | 64 × 64 — bouton minimap (phase 4) |
+| `logo.png` | bandeau du README, généré depuis la source |
 
-Les deux `.tga` sont déjà en place et référencés par `OnlyFarm.toc` et
-`Core/Init.lua`. Rien à faire pour les utiliser.
+> ⚠️ Les `.tga` actuellement présents sont un **bouche-trou** : ils viennent
+> d'un dessin provisoire, pas du vrai logo. Ils évitent seulement le carré vert
+> en jeu. Ils sont écrasés dès le premier passage du script ci-dessous.
 
-## L'idée
-
-Un cadenas dont l'anse est un fer à cheval, posé sur un disque radar traversé
-par une route.
-
-Le fer à cheval dit « monture », le cadenas dit « contenu verrouillé » — et ça
-tombe bien, parce que **les verrous d'instance sont littéralement le sujet de
-l'addon**. Le clin d'œil au nom passe par là plutôt que par un pastiche de la
-charte de qui que ce soit : le dessin est original, aucune marque existante
-n'est reprise. Utile si tu publies un jour sur CurseForge, où une imitation
-trop littérale d'un logo connu se fait retirer.
-
-## Contrainte : WoW ne lit pas les PNG
-
-Le client n'accepte que `.tga` et `.blp`. Un `.png` posé ici ne s'affichera
-pas — c'est l'erreur classique. Et un chemin de texture invalide ne produit pas
-d'erreur Lua : ça s'affiche en **carré vert**. À vérifier à l'œil.
-
-## Régénérer après une modification du SVG
+## Mettre le vrai logo
 
 ```bash
-# Rendus PNG
-rsvg-convert -w 512  -h 512 Media/mark.svg -o Media/mark.png
-rsvg-convert -w 1280 -h 440 -b '#071624' Media/logo.svg -o Media/logo.png
-
-# Textures du jeu
-for size in 128 64; do rsvg-convert -w $size -h $size Media/mark.svg -o /tmp/mark$size.png; done
-convert /tmp/mark128.png -background none -alpha on -type TrueColorAlpha -depth 8 \
-        -compress none -define tga:image-origin=TopLeft Media/logo.tga
-convert /tmp/mark64.png  -background none -alpha on -type TrueColorAlpha -depth 8 \
-        -compress none -define tga:image-origin=TopLeft Media/minimap.tga
+cp ~/mon-logo.png Media/source/onlyfarm-logo.png
+./scripts/make-textures.sh Media/source/onlyfarm-logo.png
 ```
 
-Trois règles à ne pas casser :
+Le script détoure le fond, isole le symbole, et écrit les deux `.tga` plus le
+bandeau du README. Les chemins référencés par `OnlyFarm.toc` et
+`Core/Init.lua` ne changent jamais : il n'y a rien d'autre à modifier.
 
-* **dimensions en puissance de deux** (32, 64, 128, 256…), sinon la texture est
-  ignorée ou déformée ;
-* **32 bits avec canal alpha** (`-type TrueColorAlpha`), sinon plus de
-  transparence autour du badge ;
-* **non compressé** (`-compress none`) : le client gère mal la compression RLE
-  de certains encodeurs TGA.
+### Si le rendu 64 px ne va pas
 
-## Polices
+Regarde `Media/preview-minimap.png`, que le script produit exprès : c'est
+l'icône minimap agrandie, donc ce que tu verras vraiment en jeu. Si le symbole
+est trop petit ou mal centré, donne un recadrage explicite en second argument :
 
-Les rendus ci-dessus utilisent DejaVu Sans, qui est ce que la machine de build
-avait sous la main. Une police plus ronde (Nunito, Quicksand, Baloo…) collerait
-mieux au ton. Si tu en installes une, remplace `font-family` dans `logo.svg` et
-régénère — ou convertis le texte en tracés pour que le fichier soit autonome.
+```bash
+./scripts/make-textures.sh Media/source/onlyfarm-logo.png 620x560+390+40
+```
+
+Le format est `LARGEURxHAUTEUR+X+Y`, en pixels de l'image source. Par défaut le
+script garde les 68 % supérieurs, ce qui coupe le wordmark — voulu : à 64
+pixels un texte est illisible, seul le symbole doit rester.
+
+## Les trois pièges du format
+
+1. **WoW ne lit pas les PNG.** Seulement `.tga` et `.blp`. Un `.png` posé ici
+   ne s'affichera pas.
+2. **Un chemin de texture invalide ne lève pas d'erreur Lua** : ça s'affiche en
+   carré vert. C'est à vérifier à l'œil, pas en test.
+3. **Puissances de deux, 32 bits, non compressé.** Le script s'en charge
+   (`-type TrueColorAlpha -compress none`), mais si tu convertis à la main :
+   des dimensions hors 32/64/128/256 sont ignorées ou déformées, un TGA 24 bits
+   perd la transparence, et la compression RLE de certains encodeurs passe mal.
+
+## Détourage du fond blanc
+
+Le script part des quatre coins par remplissage de proche en proche
+(`-floodfill`), et surtout **pas** d'un `-transparent white` global : celui-ci
+percerait aussi les blancs internes du dessin — les reflets du dragon, par
+exemple, deviendraient des trous.
+
+Si ton logo a déjà un fond transparent, l'étape ne fait rien de nuisible.

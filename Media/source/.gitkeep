@@ -1,0 +1,3 @@
+Dépose ici le logo source (PNG haute résolution), puis :
+
+    ./scripts/make-textures.sh Media/source/onlyfarm-logo.png

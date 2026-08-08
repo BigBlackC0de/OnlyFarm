@@ -1,7 +1,5 @@
 # OnlyFarm
 
-![OnlyFarm](Media/logo.png)
-
 Addon World of Warcraft (Retail) qui répond à une question : **qu'est-ce que je
 fais cette semaine pour choper des montures, et dans quel ordre ?**
 
