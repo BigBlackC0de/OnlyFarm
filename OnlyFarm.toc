@@ -30,6 +30,7 @@ Modules\Mapping.lua
 UI\Theme.lua
 UI\Dashboard.lua
 UI\MainFrame.lua
+UI\CopyFrame.lua
 UI\MinimapButton.lua
 UI\PreviewFrame.lua
 

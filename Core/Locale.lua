@@ -73,7 +73,7 @@ local L = {
 	FILTER_EXPANSION_ALL = "All",
 	FILTER_EXPANSION_NONE = "None",
 	EXPANSION_UNKNOWN = "Unknown (unmapped source)",
-	EXPANSION_NEEDS_SCAN = "Run /of ejscan to fill this list.",
+	EXPANSION_NEEDS_SCAN = "Run /of scan to fill this list.",
 	EXPANSION_SCANNING = "Scan in progress — the list fills itself.",
 
 	-- Aperçu
@@ -108,7 +108,7 @@ local L = {
 	CMD_HELP_SCAN = "  /of scan      — rescan collection and lockouts",
 	CMD_HELP_CHARS = "  /of chars     — list known characters",
 	CMD_HELP_DEEPSCAN = "  /of deepscan  — deep pass: walk every boss's loot table (slow, optional)",
-	CMD_HELP_DIAG = "  /of diag      — why the mapping came back empty",
+	CMD_HELP_DIAG = "  /of diag      — why the mapping came back empty (copyable report)",
 	CMD_HELP_DEBUG = "  /of debug     — toggle debug traces",
 	CMD_HELP_RESET = "  /of reset     — wipe the saved database (asks twice)",
 
@@ -125,6 +125,12 @@ local L = {
 	SCAN_NEVER = "never mapped",
 	SCAN_BUSY = "A scan is already running.",
 	SCAN_NEEDS_EJ = "Encounter Journal unavailable — open it once, then retry.",
+
+	-- Diagnostic
+	DIAG_TITLE = "OnlyFarm — mapping diagnostic",
+	DIAG_SUMMARY = "diagnostic opened: %d of %d mounts tied to an instance. Ctrl+C to copy.",
+	COPY_TITLE = "OnlyFarm",
+	COPY_HINT = "Ctrl+C to copy · Escape to close",
 
 	-- Voyage
 	NODE_PLAYER = "Your position",
@@ -190,7 +196,7 @@ if GetLocale and GetLocale() == "frFR" then
 	L.FILTER_EXPANSION_ALL = "Tout"
 	L.FILTER_EXPANSION_NONE = "Rien"
 	L.EXPANSION_UNKNOWN = "Inconnue (source non cartographiée)"
-	L.EXPANSION_NEEDS_SCAN = "Lance /of ejscan pour remplir cette liste."
+	L.EXPANSION_NEEDS_SCAN = "Lance /of scan pour remplir cette liste."
 	L.EXPANSION_SCANNING = "Scan en cours — la liste se remplit toute seule."
 
 	L.PREVIEW_HINT = "Glisser pour tourner · molette pour zoomer"
@@ -221,7 +227,7 @@ if GetLocale and GetLocale() == "frFR" then
 	L.CMD_HELP_SCAN = "  /of scan      — rescanner collection et verrous"
 	L.CMD_HELP_CHARS = "  /of chars     — lister les personnages connus"
 	L.CMD_HELP_DEEPSCAN = "  /of deepscan  — passe approfondie : butin boss par boss (lent, facultatif)"
-	L.CMD_HELP_DIAG = "  /of diag      — pourquoi la cartographie est revenue vide"
+	L.CMD_HELP_DIAG = "  /of diag      — pourquoi la cartographie est revenue vide (rapport copiable)"
 	L.CMD_HELP_DEBUG = "  /of debug     — activer/couper les traces"
 	L.CMD_HELP_RESET = "  /of reset     — effacer la base sauvegardée (demande confirmation)"
 
@@ -237,6 +243,11 @@ if GetLocale and GetLocale() == "frFR" then
 	L.SCAN_NEVER = "jamais cartographié"
 	L.SCAN_BUSY = "Un scan est déjà en cours."
 	L.SCAN_NEEDS_EJ = "Journal des rencontres indisponible — ouvre-le une fois, puis réessaie."
+
+	L.DIAG_TITLE = "OnlyFarm — diagnostic de cartographie"
+	L.DIAG_SUMMARY = "diagnostic ouvert : %d montures sur %d rattachées à une instance. Ctrl+C pour copier."
+	L.COPY_TITLE = "OnlyFarm"
+	L.COPY_HINT = "Ctrl+C pour copier · Échap pour fermer"
 
 	L.NODE_PLAYER = "Ta position"
 

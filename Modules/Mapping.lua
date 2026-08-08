@@ -84,6 +84,21 @@ end
 -- Fraîcheur
 --------------------------------------------------------------------------------
 
+-- Version de l'ALGORITHME de cartographie, à incrémenter dès que la façon de
+-- construire l'index change. C'est ce qui force un recalcul chez les joueurs
+-- qui ont déjà un cache : sans ça, une correction de la logique reste sans
+-- effet tant que le client ne change pas de build, et le bug corrigé continue
+-- de s'afficher.
+--   1 — parcours du butin du Journal
+--   2 — texte de source + index des paliers
+--   3 — ajout de la liste du Recherche de groupe comme seconde source
+local MAPPING_VERSION = 3
+
+-- Une cartographie qui ne rattache rien est ratée, pas fraîche : on la
+-- retente. Mais pas indéfiniment — sur un client où rien ne répondrait, on
+-- s'arrêterait de relancer une passe inutile à chaque connexion.
+local MAX_EMPTY_RETRIES = 3
+
 --- La cartographie est-elle à refaire ?
 function Mapping:IsStale()
 	if not ns.db then return false end
@@ -91,8 +106,19 @@ function Mapping:IsStale()
 	if type(meta) ~= "table" or not meta.at then return true end
 	if ns.Util.Count(ns.db.global.sourceCache) == 0 then return true end
 
+	-- L'algorithme a changé depuis ce cache : il est périmé par construction.
+	if (meta.mappingVersion or 0) ~= MAPPING_VERSION then return true end
+
 	-- Changement de build = patch : des montures ont pu changer de source.
 	if meta.build ~= select(2, GetBuildInfo()) then return true end
+
+	-- Le scan précédent n'a rattaché AUCUNE monture à une instance. Il a beau
+	-- avoir « réussi » — il a bien écrit 1600 entrées — le résultat est
+	-- inexploitable, et le considérer comme frais empêchait justement toute
+	-- nouvelle tentative.
+	if (meta.mapped or 0) == 0 and (meta.emptyRuns or 0) < MAX_EMPTY_RETRIES then
+		return true
+	end
 
 	-- Le client a plus de montures qu'au dernier scan : il y a du nouveau à
 	-- cartographier, et ça ne coûte qu'une passe rapide.
@@ -662,9 +688,16 @@ function Mapping:Finish(payload)
 		end
 
 		local mountIDs = C_MountJournal and C_MountJournal.GetMountIDs()
+		local previous = ns.db.global.scanMeta
+		local previousEmpty = (type(previous) == "table" and previous.emptyRuns) or 0
+
 		ns.db.global.scanMeta = {
 			at = OnlyFarmScanDB.scannedAt,
 			build = OnlyFarmScanDB.build,
+			mappingVersion = MAPPING_VERSION,
+			-- Compteur de passages infructueux, remis à zéro dès qu'une passe
+			-- rattache quelque chose.
+			emptyRuns = (payload.mapped or 0) == 0 and (previousEmpty + 1) or 0,
 			mounts = payload.mounts,
 			mapped = payload.mapped,
 			instances = payload.instances,
@@ -692,59 +725,149 @@ end
 -- dit lequel, au lieu de laisser deviner.
 --------------------------------------------------------------------------------
 
-function Mapping:Diagnose()
+local DIAG_SAMPLES = 8
+
+--- Construit le rapport de diagnostic, ligne par ligne.
+--  Renvoie une liste de chaînes pour que l'appelant décide quoi en faire :
+--  l'afficher dans le chat, ou la poser dans une fenêtre copiable.
+function Mapping:BuildReport()
+	local lines = {}
 	local function Line(fmt, ...)
-		DEFAULT_CHAT_FRAME:AddMessage("  " .. string.format(fmt, ...))
+		lines[#lines + 1] = select("#", ...) > 0 and string.format(fmt, ...) or fmt
 	end
 
-	ns:Print("diagnostic de cartographie")
+	Line("=== OnlyFarm — diagnostic de cartographie ===")
+	Line("addon %s · client %s (%s) · locale %s",
+		tostring(ns.VERSION), tostring((GetBuildInfo())),
+		tostring(select(2, GetBuildInfo())), tostring(GetLocale()))
+	Line("")
 
 	-- 1. Journal des rencontres.
-	Line("Journal chargé : %s", tostring(TiersReady()))
+	Line("[1] Journal des rencontres")
+	Line("    globales présentes : %s", tostring(TiersReady()))
 	if type(EJ_GetNumTiers) == "function" then
 		local ok, tiers = pcall(EJ_GetNumTiers)
-		Line("EJ_GetNumTiers() = %s", ok and tostring(tiers) or "erreur")
+		Line("    EJ_GetNumTiers() = %s", ok and tostring(tiers) or "ERREUR")
+		if ok and type(tiers) == "number" and tiers > 0 then
+			-- Un palier au hasard, pour voir si l'énumération répond vraiment.
+			pcall(EJ_SelectTier, 1)
+			local okInst, id, name = pcall(EJ_GetInstanceByIndex, 1, true)
+			Line("    palier 1, 1re instance raid : %s (%s)",
+				okInst and tostring(name) or "ERREUR", tostring(id))
+		end
 	else
-		Line("EJ_GetNumTiers absente")
+		Line("    EJ_GetNumTiers ABSENTE")
 	end
+	Line("")
 
 	-- 2. Recherche de groupe.
+	Line("[2] Recherche de groupe")
 	if type(GetLFGDungeonInfo) == "function" then
-		local sampled, named = 0, 0
-		for dungeonID = 1, 500 do
-			local ok, name = pcall(GetLFGDungeonInfo, dungeonID)
-			sampled = sampled + 1
-			if ok and type(name) == "string" and name ~= "" then named = named + 1 end
+		local named, withExpansion = 0, 0
+		local firstExample
+		for dungeonID = 1, 1000 do
+			local ok, name, _, _, _, _, _, _, _, expansionLevel =
+				pcall(GetLFGDungeonInfo, dungeonID)
+			if ok and type(name) == "string" and name ~= "" then
+				named = named + 1
+				if _G["EXPANSION_NAME" .. tostring(expansionLevel)] then
+					withExpansion = withExpansion + 1
+					if not firstExample then
+						firstExample = string.format("%s -> %s", name,
+							_G["EXPANSION_NAME" .. tostring(expansionLevel)])
+					end
+				end
+			end
 		end
-		Line("GetLFGDungeonInfo : %d noms sur %d identifiants testés", named, sampled)
-		Line("EXPANSION_NAME0 = %s", tostring(_G.EXPANSION_NAME0))
+		Line("    %d noms sur 1000 identifiants, dont %d avec extension", named, withExpansion)
+		Line("    exemple : %s", tostring(firstExample))
 	else
-		Line("GetLFGDungeonInfo absente")
+		Line("    GetLFGDungeonInfo ABSENTE")
 	end
+	Line("    EXPANSION_NAME0 = %s", tostring(_G.EXPANSION_NAME0))
+	Line("")
 
-	-- 3. Découpage du texte de source, sur les premières montures manquantes.
+	-- 3. Index effectivement construit.
+	Line("[3] Index des instances en mémoire")
+	if type(self.instanceIndex) == "table" then
+		Line("    %d entrée(s)", ns.Util.Count(self.instanceIndex))
+		local shown = 0
+		for _, entry in pairs(self.instanceIndex) do
+			if shown >= 3 then break end
+			Line("    ex. %s [%s] %s", tostring(entry.name),
+				tostring(entry.origin), tostring(entry.tierName))
+			shown = shown + 1
+		end
+	else
+		Line("    aucun index (scan jamais lancé dans cette session)")
+	end
+	Line("")
+
+	-- 4. Découpage et rapprochement, sur de vraies montures.
+	Line("[4] Texte de source, %d premières manquantes", DIAG_SAMPLES)
 	local shown = 0
 	for _, entry in ipairs(ns.Collection:GetMissing()) do
-		if shown >= 3 then break end
+		if shown >= DIAG_SAMPLES then break end
 		local _, _, sourceText = C_MountJournal.GetMountInfoExtraByID(entry.mountID)
 		local boss, place = ParseSourceText(sourceText)
-		Line("« %s » -> boss=%s | lieu=%s", entry.name, tostring(boss), tostring(place))
-		if place and self.instanceIndex then
-			local match = self.instanceIndex[ns.Util.NormalizeName(place)]
-			Line("    rapprochement : %s", match and (match.tierName or "sans extension") or "AUCUN")
+		Line("    %s", tostring(entry.name))
+		Line("      brut  : %s", tostring(sourceText):gsub("\n", "\\n"))
+		Line("      boss  : %s", tostring(boss))
+		Line("      lieu  : %s", tostring(place))
+		if place then
+			local match = self.instanceIndex
+				and self.instanceIndex[ns.Util.NormalizeName(place)]
+			Line("      match : %s", match
+				and string.format("%s [%s]", tostring(match.tierName), tostring(match.origin))
+				or "AUCUN")
 		end
 		shown = shown + 1
 	end
+	Line("")
 
-	-- 4. Bilan du dernier passage.
+	-- 5. Bilan du dernier passage.
+	Line("[5] Dernier scan")
 	local meta = ns.db and ns.db.global.scanMeta
 	if type(meta) == "table" and meta.at then
-		Line("dernier scan : %d/%d rattachées, %d instances (%s via RdG, %s via Journal)",
-			meta.mapped or 0, meta.mounts or 0, meta.instances or 0,
-			tostring(meta.lfgInstances), tostring(meta.journalInstances))
+		Line("    %d/%d montures rattachées à une instance", meta.mapped or 0, meta.mounts or 0)
+		Line("    %d instances (%s via Recherche de groupe, %s via Journal)",
+			meta.instances or 0, tostring(meta.lfgInstances), tostring(meta.journalInstances))
+		Line("    %s entrées de carte · approfondi : %s · il y a %s",
+			tostring(meta.nodes), tostring(meta.deep), ns.Util.FormatAge(meta.at))
+		Line("    algo v%s (courant v%d) · passages infructueux : %s · à refaire : %s",
+			tostring(meta.mappingVersion), MAPPING_VERSION,
+			tostring(meta.emptyRuns), tostring(self:IsStale()))
 	else
-		Line("aucun scan enregistré")
+		Line("    aucun scan enregistré")
 	end
+
+	Line("")
+	Line("[6] Collection")
+	local counts = ns.Collection.counts or {}
+	Line("    %s possédées / %s obtenables / %s masquées · journal prêt : %s",
+		tostring(counts.owned), tostring(counts.total), tostring(counts.hidden),
+		tostring(ns.Collection.ready))
+
+	return lines
+end
+
+--- Affiche le diagnostic dans une fenêtre copiable, et un résumé dans le chat.
+function Mapping:Diagnose()
+	local lines = self:BuildReport()
+
+	local meta = ns.db and ns.db.global.scanMeta
+	ns:Print(ns.L.DIAG_SUMMARY,
+		(type(meta) == "table" and meta.mapped) or 0,
+		(type(meta) == "table" and meta.mounts) or 0)
+
+	if ns.Copy then
+		ns.Copy:ShowLines(ns.L.DIAG_TITLE, lines)
+	else
+		for _, line in ipairs(lines) do
+			DEFAULT_CHAT_FRAME:AddMessage(line)
+		end
+	end
+	return lines
 end
 
 --- Résumé du dernier scan, pour l'interface.

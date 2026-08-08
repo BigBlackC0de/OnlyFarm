@@ -745,6 +745,63 @@ test("Mapping — la cartographie survit et ne se refait pas pour rien", functio
 	eq(ns.Mapping:IsStale(), true, "plus de montures qu'au dernier scan -> à refaire")
 end)
 
+-- Régression : un scan qui écrit 1600 entrées mais n'en rattache AUCUNE à une
+-- instance passait pour frais. L'auto-scan ne se relançait donc jamais, et une
+-- correction de la logique restait sans effet jusqu'au patch suivant.
+test("Mapping — un scan qui ne rattache rien est à refaire", function()
+	stub.Reset()
+	stub.tiers = {}
+	stub.lfgDungeons = {}
+	stub.mounts = {
+		{ mountID = 201, name = "Invincible", sourceType = 1,
+		  source = "Butin : Le roi-liche|nCitadelle de la Couronne de glace" },
+	}
+	local ns = harness.Load(stub)
+
+	ns.Mapping:Run(false)
+	stub.RunFrames(80)
+
+	eq(ns.db.global.scanMeta.mapped, 0, "rien de rattaché, comme attendu")
+	eq(ns.db.global.scanMeta.emptyRuns, 1, "passage infructueux compté")
+	eq(ns.Mapping:IsStale(), true, "donc à refaire")
+
+	-- Mais pas indéfiniment : au bout de trois tentatives, on arrête d'insister.
+	ns.db.global.scanMeta.emptyRuns = 3
+	eq(ns.Mapping:IsStale(), false, "on n'insiste pas éternellement")
+
+	-- Et dès qu'une passe rattache quelque chose, le compteur retombe.
+	stub.lfgDungeons = {
+		[100] = { name = "Citadelle de la Couronne de glace", subtypeID = 3, expansionLevel = 2 },
+	}
+	ns.Mapping:Run(false)
+	stub.RunFrames(80)
+	eq(ns.db.global.scanMeta.mapped, 1, "rattachée cette fois")
+	eq(ns.db.global.scanMeta.emptyRuns, 0, "compteur remis à zéro")
+	eq(ns.Mapping:IsStale(), false, "et le cache redevient frais")
+end)
+
+-- Le cache d'un joueur ne connaît pas les corrections apportées au code. Sans
+-- ce garde-fou, une refonte de la cartographie reste invisible tant que le
+-- client ne change pas de build.
+test("Mapping — un changement d'algorithme périme les caches existants", function()
+	stub.Reset()
+	stub.lfgDungeons = {
+		[100] = { name = "Ulduar", subtypeID = 3, expansionLevel = 2 },
+	}
+	stub.mounts = {
+		{ mountID = 202, name = "Fumeronde", sourceType = 1,
+		  source = "Butin : Yogg-Saron|nUlduar" },
+	}
+	local ns = harness.Load(stub)
+
+	ns.Mapping:Run(false)
+	stub.RunFrames(80)
+	eq(ns.Mapping:IsStale(), false, "frais juste après")
+
+	ns.db.global.scanMeta.mappingVersion = 1   -- cache d'une version précédente
+	eq(ns.Mapping:IsStale(), true, "algorithme différent -> à refaire")
+end)
+
 -- Régression : en jeu, EJ_GetNumTiers renvoyait 0 et l'index restait vide, ce
 -- qui donnait « 0/1619 cartographiées » sans la moindre erreur. La liste du
 -- Recherche de groupe doit suffire à elle seule.
