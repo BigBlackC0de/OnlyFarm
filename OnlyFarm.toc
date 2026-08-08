@@ -7,7 +7,7 @@
 ## IconTexture: Interface\AddOns\OnlyFarm\Media\logo
 ## SavedVariables: OnlyFarmDB, OnlyFarmScanDB
 ## X-Phase: 1 (socle)
-## X-Website: https://github.com/BigBlackC0de/Optifarm
+## X-Website: https://github.com/BigBlackC0de/OnlyFarm
 
 Core\Init.lua
 Core\Util.lua
