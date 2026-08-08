@@ -1,0 +1,26 @@
+## Interface: 120007
+## Title: OptiFarm
+## Notes: Planificateur de farm de montures : diff de collection, verrous, disponibilite multi-perso.
+## Notes-frFR: Planificateur de farm de montures : diff de collection, verrous, disponibilité multi-personnage.
+## Author: BigBlackC0de
+## Version: 0.1.0
+## IconTexture: Interface\ICONS\Ability_Mount_Drake_Proto
+## SavedVariables: OptiFarmDB, OptiFarmScanDB
+## X-Phase: 1 (socle)
+## X-Website: https://github.com/BigBlackC0de/Optifarm
+
+Core\Init.lua
+Core\Util.lua
+Core\Locale.lua
+Core\Database.lua
+
+Data\Sources.lua
+
+Modules\Collection.lua
+Modules\Lockouts.lua
+Modules\Eligibility.lua
+Modules\DevScan.lua
+
+UI\MainFrame.lua
+
+Core\Commands.lua

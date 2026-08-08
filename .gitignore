@@ -1,0 +1,17 @@
+# Éditeurs
+.vscode/
+.idea/
+*.swp
+*~
+
+# Système
+.DS_Store
+Thumbs.db
+
+# Sorties de build (phase 2)
+Build/out/
+*.zip
+
+# SavedVariables copiées depuis le client pour analyse
+*.lua.bak
+Scratch/
