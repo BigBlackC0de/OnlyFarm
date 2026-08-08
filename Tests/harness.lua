@@ -17,6 +17,7 @@ harness.FILES = {
 	"Core/Util.lua",
 	"Core/Locale.lua",
 	"Core/Database.lua",
+	"Data/Expansions.lua",
 	"Data/Sources.lua",
 	"Data/Nodes.lua",
 	"Data/Travel.lua",

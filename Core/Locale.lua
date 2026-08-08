@@ -40,7 +40,7 @@ local L = {
 	DASH_AVAILABILITY = "What is open right now",
 	DASH_PROGRESS = "%d of %d collected",
 	DASH_EXPANSIONS = "Progress by expansion",
-	DASH_EXPANSIONS_HINT = "least complete first",
+	DASH_EXPANSIONS_HINT = "release order",
 	DASH_TARGETS = "Start with these",
 	DASH_NO_TARGET = "Nothing available right now — everything is locked or unmapped.",
 	DASH_LOCKOUTS = "Done this week",
@@ -123,6 +123,7 @@ local L = {
 	SCAN_BUTTON = "Rescan",
 	SCAN_BUTTON_DEEP = "Deep scan",
 	SCAN_NEVER = "never mapped",
+	SCAN_EMPTY_DETAIL = "nothing tied: %d mounts had source text, %d yielded a place, index holds %d instances. |cff7ac1ff/of diag|r for the detail.",
 	SCAN_BUSY = "A scan is already running.",
 	SCAN_NEEDS_EJ = "Encounter Journal unavailable — open it once, then retry.",
 
@@ -166,7 +167,7 @@ if GetLocale and GetLocale() == "frFR" then
 	L.DASH_AVAILABILITY = "Ce qui est ouvert maintenant"
 	L.DASH_PROGRESS = "%d sur %d possédées"
 	L.DASH_EXPANSIONS = "Progression par extension"
-	L.DASH_EXPANSIONS_HINT = "les moins avancées d'abord"
+	L.DASH_EXPANSIONS_HINT = "ordre de sortie"
 	L.DASH_TARGETS = "Commence par là"
 	L.DASH_NO_TARGET = "Rien de disponible maintenant — tout est verrouillé ou non cartographié."
 	L.DASH_LOCKOUTS = "Déjà fait cette semaine"
@@ -241,6 +242,7 @@ if GetLocale and GetLocale() == "frFR" then
 	L.SCAN_BUTTON = "Rescanner"
 	L.SCAN_BUTTON_DEEP = "Scan approfondi"
 	L.SCAN_NEVER = "jamais cartographié"
+	L.SCAN_EMPTY_DETAIL = "rien de rattaché : %d montures avec un texte de source, %d avec un lieu extrait, %d instances dans l'index. |cff7ac1ff/of diag|r pour le détail."
 	L.SCAN_BUSY = "Un scan est déjà en cours."
 	L.SCAN_NEEDS_EJ = "Journal des rencontres indisponible — ouvre-le une fois, puis réessaie."
 

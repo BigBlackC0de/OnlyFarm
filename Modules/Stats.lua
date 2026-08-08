@@ -13,9 +13,11 @@ local _, ns = ...
 
 local Stats = ns:NewModule("Stats", 45)
 
--- Au-delà, le graphe par extension devient un mur de barres illisible ; on
--- garde les extensions les moins complètes, c'est là qu'il reste à faire.
-local MAX_EXPANSION_ROWS = 12
+-- Douze extensions plus le panier « inconnue », plus une marge pour celle que
+-- Blizzard annoncera. La frise doit tenir entière : en couper la fin
+-- reviendrait à masquer les extensions récentes, qui sont justement celles où
+-- il reste le plus à faire.
+local MAX_EXPANSION_ROWS = 14
 local MAX_TOP_TARGETS = 6
 
 function Stats:OnInitialize()
@@ -87,20 +89,20 @@ function Stats:Compute()
 		end
 	end
 
-	-- Les moins avancées d'abord : c'est la question posée au tableau de bord,
-	-- « où me reste-t-il du travail ». Une extension terminée n'apprend rien.
+	-- Ordre chronologique : Vanilla, BC, Lich King… Midnight.
 	--
-	-- Le panier « inconnue » est renvoyé en dernier quel que soit son ratio.
-	-- C'est mécaniquement le moins avancé — rien n'y est cartographié — donc
-	-- il trusterait la première ligne en permanence, alors qu'il ne désigne
-	-- aucun endroit où aller.
+	-- Un tri par avancement remontait le plus urgent en tête, mais il faisait
+	-- danser les lignes d'un rafraîchissement à l'autre : une monture obtenue
+	-- change le classement, et l'œil perd ses repères. Une frise dans l'ordre
+	-- des sorties se lit toujours au même endroit.
+	--
+	-- Le panier « inconnue » ferme la marche : ce n'est pas une extension, et
+	-- il n'a pas de place sur la frise.
 	local UNKNOWN = ns.Eligibility.UNKNOWN_EXPANSION
 	table.sort(order, function(a, b)
 		local ua, ub = a.name == UNKNOWN, b.name == UNKNOWN
 		if ua ~= ub then return ub end
-		local ra = a.total > 0 and a.owned / a.total or 1
-		local rb = b.total > 0 and b.owned / b.total or 1
-		if ra ~= rb then return ra < rb end
+		if a.tier ~= b.tier then return a.tier < b.tier end
 		return a.name < b.name
 	end)
 	for i = 1, math.min(#order, MAX_EXPANSION_ROWS) do

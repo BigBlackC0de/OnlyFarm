@@ -8,8 +8,8 @@
 
 	  1. où j'en suis  — tuiles de compteurs et barre de progression globale ;
 	  2. qu'est-ce qui est ouvert maintenant — barre empilée par statut ;
-	  3. où il me reste du travail — progression par extension, les moins
-	     avancées en haut ;
+	  3. où il me reste du travail — progression par extension, dans l'ordre
+	     de sortie des extensions ;
 	  4. par quoi je commence — les cibles disponibles, les plus attendues
 	     d'abord.
 
@@ -23,7 +23,7 @@ local Dashboard = ns:NewModule("Dashboard", 82)
 
 local TILE_HEIGHT = 62
 local TILE_GAP = 8
-local BAR_ROW_HEIGHT = 18
+local BAR_ROW_HEIGHT = 19
 local TARGET_ROW_HEIGHT = 22
 
 function Dashboard:OnEnable()
@@ -156,8 +156,8 @@ function Dashboard:CreateExpansions(page)
 	card.Hint = hint
 
 	card.Rows = {}
-	for index = 1, 12 do
-		local row = Theme.BarRow(card, 150, 56)
+	for index = 1, 14 do
+		local row = Theme.BarRow(card, 185, 56)
 		row:SetHeight(BAR_ROW_HEIGHT)
 		row:SetPoint("LEFT", 10, 0)
 		row:SetPoint("RIGHT", -10, 0)

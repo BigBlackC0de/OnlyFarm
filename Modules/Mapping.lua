@@ -92,7 +92,9 @@ end
 --   1 — parcours du butin du Journal
 --   2 — texte de source + index des paliers
 --   3 — ajout de la liste du Recherche de groupe comme seconde source
-local MAPPING_VERSION = 3
+--   4 — découpage tolérant aux deux séparateurs de ligne, replis de
+--       rapprochement, extensions ramenées à un repère unique
+local MAPPING_VERSION = 4
 
 -- Une cartographie qui ne rattache rien est ratée, pas fraîche : on la
 -- retente. Mais pas indéfiniment — sur un client où rien ne répondrait, on
@@ -200,16 +202,6 @@ local LFG_IDS_PER_SLICE = 400
 -- subtypeID du Recherche de groupe : 3 = raid, 5 = raid flexible.
 local LFG_RAID_SUBTYPES = { [3] = true, [5] = true }
 
---- Nom localisé d'une extension à partir de son niveau.
---  EXPANSION_NAME0 = « Classic », EXPANSION_NAME1 = « The Burning Crusade »…
---  Ce sont les libellés du client, donc ceux que le joueur connaît.
-local function ExpansionName(level)
-	if type(level) ~= "number" then return nil end
-	local name = _G["EXPANSION_NAME" .. level]
-	if type(name) == "string" and name ~= "" then return name end
-	return nil
-end
-
 --- Index tiré de la liste des donjons du Recherche de groupe.
 local function BuildLFGIndex()
 	local index = {}
@@ -222,7 +214,7 @@ local function BuildLFGIndex()
 
 		if ok and type(name) == "string" and name ~= "" then
 			local key = ns.Util.NormalizeName(name)
-			local tierName = ExpansionName(expansionLevel)
+			local tierName = ns.Data.ExpansionName(expansionLevel)
 			-- On ne retient que si on a effectivement une extension à en tirer,
 			-- et on garde la première vue : un même nom apparaît en normal, en
 			-- héroïque et en Recherche de raid, avec la même extension.
@@ -268,6 +260,13 @@ local function BuildJournalIndex()
 			if ok then tierName = name end
 		end
 
+		-- Le Journal compte ses paliers à partir de 1, le client ses extensions
+		-- à partir de 0. On ramène les deux au même repère, sinon la même
+		-- extension apparaît deux fois dans le graphe sous deux noms.
+		local level = ns.Data.ExpansionLevelFromName(tierName)
+			or ns.Data.TierToExpansionLevel(tier)
+		local displayName = ns.Data.ExpansionName(level) or tierName
+
 		for _, isRaid in ipairs({ true, false }) do
 			local position = 1
 			while true do
@@ -280,8 +279,8 @@ local function BuildJournalIndex()
 					index[key] = {
 						name = instanceName,
 						journalInstanceID = journalInstanceID,
-						tier = tier,
-						tierName = tierName,
+						tier = level,
+						tierName = displayName,
 						isRaid = isRaid,
 						origin = "journal",
 					}
@@ -330,8 +329,15 @@ local function Trim(text)
 end
 
 --- Découpe un texte de source du Journal des montures.
---  « Butin : Le roi-liche|nCitadelle de la Couronne de glace »
+--  « Butin : Le roi-liche<saut>Citadelle de la Couronne de glace »
 --    -> encounterName = "Le roi-liche", placeName = "Citadelle de la Couronne de glace"
+--
+--  DEUX séparateurs possibles, et c'est tout le problème. Le client écrit
+--  tantôt un vrai saut de ligne, tantôt la séquence d'échappement « |n », selon
+--  la chaîne et la locale. Ne gérer que l'un des deux donne un texte d'une
+--  seule ligne : le lieu n'est jamais extrait, donc aucune monture n'est
+--  rattachée à une instance — et le scan rend « 0 sur 1619 » sans une erreur.
+--
 --  @return encounterName, placeName
 local function ParseSourceText(text)
 	if type(text) ~= "string" or text == "" then return nil, nil end
@@ -339,8 +345,11 @@ local function ParseSourceText(text)
 	-- Les codes couleur d'abord : ils traversent les découpages.
 	local clean = text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
 
+	-- On ramène les deux formes de saut de ligne à une seule avant de découper.
+	clean = clean:gsub("|n", "\n"):gsub("\r\n", "\n"):gsub("\r", "\n")
+
 	local segments = {}
-	for segment in (clean .. "|n"):gmatch("(.-)|n") do
+	for segment in (clean .. "\n"):gmatch("(.-)\n") do
 		segment = Trim(segment)
 		if segment ~= "" then segments[#segments + 1] = segment end
 	end
@@ -360,20 +369,78 @@ end
 
 Mapping.ParseSourceText = ParseSourceText
 
+-- Sous ce seuil, une correspondance partielle rapproche n'importe quoi.
+local MIN_PARTIAL_LENGTH = 10
+
+--- Rapproche un lieu d'une instance de l'index, avec des replis.
+--
+--  Le rapprochement exact suffit dans la majorité des cas, mais pas toujours :
+--  le Recherche de groupe nomme ses ailes « Citadelle de la Couronne de glace :
+--  Le Bastion inférieur » alors que le Journal des montures écrit simplement
+--  « Citadelle de la Couronne de glace ». Sans repli, ces instances-là ne se
+--  retrouvent jamais.
+--
+--  @return entrée d'index, nom de la stratégie qui a marché
+local function MatchPlace(index, place)
+	local key = ns.Util.NormalizeName(place)
+	if not key then return nil, nil end
+
+	-- 1. Correspondance exacte.
+	local exact = index[key]
+	if exact then return exact, "exact" end
+
+	-- 2. Sans le suffixe d'aile ou de difficulté (« … : Le Bastion inférieur »).
+	local trimmed = key:match("^(.-)%s*:%s*.+$")
+	if trimmed and #trimmed >= MIN_PARTIAL_LENGTH and index[trimmed] then
+		return index[trimmed], "prefix"
+	end
+
+	-- 3. Correspondance partielle, dans un sens ou dans l'autre. Bornée en
+	--    longueur : « Karazhan » ne doit pas attraper autre chose au hasard.
+	if #key >= MIN_PARTIAL_LENGTH then
+		for candidate, entry in pairs(index) do
+			if #candidate >= MIN_PARTIAL_LENGTH then
+				if candidate:find(key, 1, true) or key:find(candidate, 1, true) then
+					return entry, "partial"
+				end
+			end
+		end
+	end
+
+	return nil, nil
+end
+
+Mapping.MatchPlace = MatchPlace
+
 --- Cartographie toutes les montures à partir de leur texte de source.
---  @return table [mountID] = source, nombre de montures rattachées à une instance
+--  @return table [mountID] = source, statistiques du passage
 local function MapFromSourceText(index)
 	local results = {}
-	local mapped = 0
+	-- Compteurs par étape. Sans eux, « 0 rattachées » ne dit pas SI le texte a
+	-- été lu, SI un lieu en a été extrait, ou SI le rapprochement a échoué —
+	-- trois pannes très différentes qui donnent le même zéro.
+	local stats = {
+		withText = 0,
+		withPlace = 0,
+		mapped = 0,
+		exact = 0,
+		prefix = 0,
+		partial = 0,
+	}
 
 	local mountIDs = C_MountJournal and C_MountJournal.GetMountIDs()
-	if type(mountIDs) ~= "table" then return results, 0 end
+	if type(mountIDs) ~= "table" then return results, stats end
 
 	local since = 0
 	for position = 1, #mountIDs do
 		local mountID = mountIDs[position]
 		local _, _, sourceText = C_MountJournal.GetMountInfoExtraByID(mountID)
+		if type(sourceText) == "string" and sourceText ~= "" then
+			stats.withText = stats.withText + 1
+		end
+
 		local subject, place = ParseSourceText(sourceText)
+		if place then stats.withPlace = stats.withPlace + 1 end
 
 		if subject or place then
 			local sourceType = select(6, C_MountJournal.GetMountInfoByID(mountID))
@@ -385,16 +452,20 @@ local function MapFromSourceText(index)
 			}
 
 			-- Le lieu n'est retenu comme instance que s'il correspond à une
-			-- instance réelle du Journal. Sinon c'est une zone, un vendeur, un
-			-- événement — on garde le texte sans prétendre que c'est un raid.
-			local match = place and index[ns.Util.NormalizeName(place)]
+			-- instance réelle. Sinon c'est une zone, un vendeur, un événement —
+			-- on garde le texte sans prétendre que c'est un raid.
+			local match, strategy = nil, nil
+			if place then match, strategy = MatchPlace(index, place) end
+
 			if match then
 				entry.instanceName = match.name
 				entry.journalInstanceID = match.journalInstanceID
 				entry.tier = match.tier
 				entry.tierName = match.tierName
 				entry.isRaid = match.isRaid
-				mapped = mapped + 1
+				entry.matchedBy = strategy
+				stats.mapped = stats.mapped + 1
+				stats[strategy] = (stats[strategy] or 0) + 1
 			elseif place then
 				entry.placeName = place
 			end
@@ -409,7 +480,7 @@ local function MapFromSourceText(index)
 		end
 	end
 
-	return results, mapped
+	return results, stats
 end
 
 --------------------------------------------------------------------------------
@@ -590,7 +661,7 @@ local function ScanRoutine(self, deep)
 	local index, lfgCount, journalCount = BuildInstanceIndex()
 	self.instanceIndex = index
 
-	local results, mapped = MapFromSourceText(index)
+	local results, stats = MapFromSourceText(index)
 
 	local refined = 0
 	if deep then
@@ -599,8 +670,15 @@ local function ScanRoutine(self, deep)
 
 	local nodes, nodeCount = CollectEntrances()
 
-	local total = 0
-	for _ in pairs(results) do total = total + 1 end
+	-- On recompte à la fin plutôt que de faire confiance aux compteurs de
+	-- passage : la passe approfondie rattache elle aussi des montures, et un
+	-- « mapped » qui ne comptait que le texte de source annonçait zéro alors
+	-- que le tableau de bord affichait des extensions.
+	local total, mapped = 0, 0
+	for _, entry in pairs(results) do
+		total = total + 1
+		if entry.instanceName then mapped = mapped + 1 end
+	end
 
 	return {
 		sources = results,
@@ -609,6 +687,7 @@ local function ScanRoutine(self, deep)
 		journalInstances = journalCount,
 		mounts = total,
 		mapped = mapped,
+		textStats = stats,
 		refined = refined,
 		nodes = nodes,
 		nodeCount = nodeCount,
@@ -705,6 +784,8 @@ function Mapping:Finish(payload)
 			-- rien renvoyé » au lieu de « ça ne marche pas ».
 			lfgInstances = payload.lfgInstances,
 			journalInstances = payload.journalInstances,
+			textStats = payload.textStats,
+			refined = payload.refined,
 			nodes = payload.nodeCount,
 			deep = payload.deep or false,
 			mountsSeen = type(mountIDs) == "table" and #mountIDs or 0,
@@ -712,6 +793,16 @@ function Mapping:Finish(payload)
 	end
 
 	ns:Print(ns.L.SCAN_DONE, payload.mapped or 0, payload.mounts or 0, payload.instances or 0)
+
+	-- Quand rien n'est rattaché, on dit tout de suite à quelle étape ça a cédé
+	-- au lieu de laisser un zéro nu. C'est la différence entre « il y a un
+	-- problème » et « voilà le problème ».
+	if (payload.mapped or 0) == 0 then
+		local stats = payload.textStats or {}
+		ns:Print(ns.L.SCAN_EMPTY_DETAIL,
+			stats.withText or 0, stats.withPlace or 0, payload.instances or 0)
+	end
+
 	if silent then ns:Print(ns.L.SCAN_AUTO_DONE) end
 	self:SendMessage("OF_SCAN_COMPLETE")
 end

@@ -675,6 +675,104 @@ test("Mapping — découpage du texte de source", function()
 	eq(Parse(""), nil, "entrée vide")
 end)
 
+-- Régression : le client écrit tantôt un vrai saut de ligne, tantôt « |n ».
+-- N'en gérer qu'un donnait un texte d'une seule ligne, donc aucun lieu, donc
+-- « 0 sur 1619 rattachées » — sans la moindre erreur pour le signaler.
+test("Mapping — les deux séparateurs de ligne sont acceptés", function()
+	stub.Reset()
+	local ns = harness.Load(stub)
+	local Parse = ns.Mapping.ParseSourceText
+
+	local boss, place = Parse("Butin : Le roi-liche|nCitadelle de la Couronne de glace")
+	eq(boss, "Le roi-liche", "séquence |n : boss")
+	eq(place, "Citadelle de la Couronne de glace", "séquence |n : lieu")
+
+	boss, place = Parse("Butin : Le roi-liche\nCitadelle de la Couronne de glace")
+	eq(boss, "Le roi-liche", "vrai saut de ligne : boss")
+	eq(place, "Citadelle de la Couronne de glace", "vrai saut de ligne : lieu")
+
+	boss, place = Parse("Butin : Le roi-liche\r\nCitadelle de la Couronne de glace")
+	eq(place, "Citadelle de la Couronne de glace", "retour chariot Windows")
+end)
+
+test("Mapping — replis de rapprochement des noms d'instance", function()
+	stub.Reset()
+	local ns = harness.Load(stub)
+	local index = {
+		["citadelle de la couronne de glace"] = { name = "Citadelle de la Couronne de glace" },
+		["karazhan"] = { name = "Karazhan" },
+	}
+
+	local match, how = ns.Mapping.MatchPlace(index, "Citadelle de la Couronne de glace")
+	eq(how, "exact", "correspondance directe")
+
+	-- Le Recherche de groupe nomme ses ailes ; le Journal des montures non.
+	match, how = ns.Mapping.MatchPlace(index,
+		"Citadelle de la Couronne de glace : Le Bastion inférieur")
+	eq(match and match.name, "Citadelle de la Couronne de glace", "suffixe d'aile ignoré")
+	eq(how, "prefix", "repli par préfixe")
+
+	-- Un nom trop court ne doit rien attraper au hasard.
+	eq(ns.Mapping.MatchPlace(index, "Kara"), nil, "nom trop court, aucun rapprochement")
+	eq(ns.Mapping.MatchPlace(index, "Uldaman"), nil, "instance absente de l'index")
+end)
+
+test("Mapping — l'extension originale s'appelle Vanilla", function()
+	stub.Reset()
+	local ns = harness.Load(stub)
+	ns.Data.ResetExpansionIndex()
+
+	-- Le client la nomme « World of Warcraft », ce qui ne distingue rien dans
+	-- une liste où tout est une extension de World of Warcraft.
+	eq(_G.EXPANSION_NAME0, "Classic", "le client dit autre chose")
+	eq(ns.Data.ExpansionName(0), "Vanilla", "l'addon affiche Vanilla")
+	eq(ns.Data.ExpansionName(2), "Wrath of the Lich King", "les autres gardent le nom du client")
+
+	-- Journal et client comptent différemment : palier 1 = niveau 0.
+	eq(ns.Data.TierToExpansionLevel(1), 0, "palier 1 -> niveau 0")
+	eq(ns.Data.TierToExpansionLevel(3), 2, "palier 3 -> niveau 2")
+
+	-- Et un nom de palier doit retrouver son niveau, pour que les deux sources
+	-- convergent sur une seule barre.
+	eq(ns.Data.ExpansionLevelFromName("Wrath of the Lich King"), 2, "nom -> niveau")
+	eq(ns.Data.ExpansionLevelFromName("Vanilla"), 0, "l'alias marche aussi")
+end)
+
+test("Mapping — les deux sources convergent sur un seul nom d'extension", function()
+	stub.Reset()
+	-- Le Journal appelle le palier « Wrath of the Lich King », le Recherche de
+	-- groupe donne le niveau 2. Les deux doivent produire la même barre.
+	stub.tiers = {
+		{ name = "Classic", instances = { { id = 1, name = "Coeur du Magma", isRaid = true } } },
+		{ name = "The Burning Crusade", instances = {} },
+		{ name = "Wrath of the Lich King", instances = {
+			{ id = 186, name = "Citadelle de la Couronne de glace", isRaid = true },
+		} },
+	}
+	stub.lfgDungeons = {
+		[100] = { name = "Ulduar", subtypeID = 3, expansionLevel = 2 },
+	}
+	stub.mounts = {
+		{ mountID = 201, name = "Invincible", sourceType = 1,
+		  source = "Butin : Le roi-liche\nCitadelle de la Couronne de glace" },
+		{ mountID = 202, name = "Fumeronde", sourceType = 1,
+		  source = "Butin : Yogg-Saron\nUlduar" },
+		{ mountID = 203, name = "Coursier", sourceType = 1,
+		  source = "Butin : Ragnaros\nCoeur du Magma" },
+	}
+	local ns = harness.Load(stub)
+
+	ns.Mapping:Run(false)
+	stub.RunFrames(80)
+
+	local cache = ns.db.global.sourceCache
+	eq(cache[201].tierName, cache[202].tierName,
+		"Journal et Recherche de groupe donnent le même libellé")
+	eq(cache[201].tierName, "Wrath of the Lich King", "et c'est le bon")
+	eq(cache[203].tierName, "Vanilla", "le palier 1 du Journal devient Vanilla")
+	eq(ns.db.global.scanMeta.mapped, 3, "les trois montures rattachées")
+end)
+
 test("Mapping — extension et instance déduites du texte de source", function()
 	stub.Reset()
 	stub.tiers = {
@@ -911,36 +1009,33 @@ test("Stats — répartition par statut", function()
 	eq(stats.availableCount, 2, "deux cibles ouvertes")
 end)
 
-test("Stats — progression par extension, les moins avancées d'abord", function()
+test("Stats — progression par extension, dans l'ordre de sortie", function()
 	stub.Reset()
 	stub.mounts = StandardMounts()
 	local ns = harness.Load(stub)
 	-- La monture possédée et une manquante sur le même palier ; une manquante
 	-- seule sur un autre. Le second palier est donc moins avancé.
 	ns.db.global.sourceCache = {
-		[100] = { tierName = "Wrath", tier = 3 },
-		[201] = { tierName = "Wrath", tier = 3 },
+		[100] = { tierName = "Wrath", tier = 2 },
+		[201] = { tierName = "Wrath", tier = 2 },
 		[202] = { tierName = "Legion", tier = 6 },
 	}
 	ns.Eligibility:Invalidate()
 	ns.Stats:Invalidate()
 
+	-- L'ordre est chronologique, pas « le plus urgent d'abord » : une frise qui
+	-- se réordonne à chaque monture obtenue fait perdre ses repères.
 	local stats = ns.Stats:Get()
-	eq(stats.expansions[1].name, "Legion", "0/1 passe devant 1/2")
-	eq(stats.expansions[1].owned, 0, "rien de possédé sur Legion")
-	eq(stats.expansions[1].total, 1, "une monture sur Legion")
+	eq(stats.expansions[1].name, "Wrath", "Wrath (niveau 2) avant Legion (niveau 6)")
+	eq(stats.expansions[2].name, "Legion", "puis Legion")
 
 	-- Le panier « inconnue » est mécaniquement à 0 % : il doit rester dernier
 	-- au lieu de squatter la première barre en permanence.
 	eq(stats.expansions[#stats.expansions].name, ns.Eligibility.UNKNOWN_EXPANSION,
 		"les sources non cartographiées ferment la marche")
 
-	local wrath
-	for _, bucket in ipairs(stats.expansions) do
-		if bucket.name == "Wrath" then wrath = bucket end
-	end
-	eq(wrath and wrath.owned, 1, "la possédée compte dans son extension")
-	eq(wrath and wrath.total, 2, "dénominateur complet")
+	eq(stats.expansions[1].owned, 1, "la possédée compte dans son extension")
+	eq(stats.expansions[1].total, 2, "dénominateur complet")
 end)
 
 test("Stats — cibles du moment triées par tentatives", function()
