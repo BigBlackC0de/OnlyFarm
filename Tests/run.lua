@@ -241,6 +241,25 @@ test("Collection — natures de source présentes, avec leurs effectifs", functi
 	end
 end)
 
+test("Collection — les possédées sont listées aussi", function()
+	stub.Reset()
+	stub.mounts = StandardMounts()
+	local ns = harness.Load(stub)
+
+	local collected = ns.Collection:GetCollected()
+	eq(#collected, 1, "une monture possédée listée")
+	eq(collected[1].mountID, 100, "la bonne")
+	eq(collected[1].owned, true, "marquée comme possédée")
+
+	-- Une entrée existe pour les possédées : la liste doit pouvoir les
+	-- afficher, et l'aperçu 3D en a besoin.
+	eq(ns.Collection:GetEntry(100) ~= nil, true, "entrée disponible pour une possédée")
+	eq(ns.Collection:GetEntry(201).owned, false, "une manquante ne l'est pas")
+
+	-- Les manquantes ne bougent pas.
+	eq(#ns.Collection:GetMissing(), 3, "trois manquantes")
+end)
+
 test("Collection — exclusions", function()
 	stub.Reset()
 	stub.mounts = StandardMounts()

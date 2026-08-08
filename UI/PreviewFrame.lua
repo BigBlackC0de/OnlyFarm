@@ -20,14 +20,8 @@ local Preview = ns:NewModule("Preview", 82)
 local WIDTH, HEIGHT = 280, 360
 
 function Preview:OnEnable()
-	-- Une monture obtenue en cours de route n'a plus à être prévisualisée.
-	self:RegisterMessage("OF_COLLECTION_UPDATED", "OnCollectionUpdated")
-end
-
-function Preview:OnCollectionUpdated()
-	if self.frame and self.frame:IsShown() and self.mountID then
-		if ns.Collection:IsOwned(self.mountID) then self:Hide() end
-	end
+	-- La fenêtre ne se referme plus quand la monture est obtenue : la liste
+	-- sait désormais afficher les possédées, et on veut pouvoir les regarder.
 end
 
 --------------------------------------------------------------------------------

@@ -337,6 +337,7 @@ function UI:CreateCollectionTab(frame)
 		return check
 	end
 
+	page.ShowOwned = PlaceFilter(L.FILTER_SHOW_OWNED, "showOwned")
 	page.AvailableOnly = PlaceFilter(L.FILTER_AVAILABLE_ONLY, "availableOnly")
 	page.HideUnmapped = PlaceFilter(L.FILTER_HIDE_UNMAPPED, "hideUnmapped")
 	page.HideExcluded = PlaceFilter(L.FILTER_HIDE_EXCLUDED, "hideExcluded")
@@ -346,7 +347,7 @@ function UI:CreateCollectionTab(frame)
 	-- case à cocher.
 	local summary = Theme.Text(filters, "GameFontHighlightSmall", Theme.colors.muted, "RIGHT")
 	summary:SetPoint("BOTTOMRIGHT", -10, 12)
-	summary:SetPoint("BOTTOMLEFT", page.HideExcluded, "BOTTOMRIGHT", 200, 12)
+	summary:SetPoint("BOTTOMLEFT", page.HideExcluded, "BOTTOMRIGHT", 150, 12)
 	summary:SetWordWrap(false)
 	page.Summary = summary
 
@@ -866,7 +867,22 @@ function UI:BuildDataProvider()
 	local Theme = ns.Theme
 	local rows = {}
 
-	for _, entry in ipairs(ns.Collection:GetMissing()) do
+	-- Les possédées ne sont ajoutées que sur demande. Elles n'ont pas de
+	-- disponibilité — elles sont acquises — donc les filtres de statut ne
+	-- s'appliquent pas à elles ; seuls la recherche, l'extension, la source et
+	-- le type les concernent.
+	local candidates = ns.Collection:GetMissing()
+	if filters.showOwned then
+		candidates = {}
+		for _, entry in ipairs(ns.Collection:GetMissing()) do
+			candidates[#candidates + 1] = entry
+		end
+		for _, entry in ipairs(ns.Collection:GetCollected()) do
+			candidates[#candidates + 1] = entry
+		end
+	end
+
+	for _, entry in ipairs(candidates) do
 		local keep = true
 
 		if filters.hideExcluded and entry.excluded then keep = false end
@@ -888,7 +904,7 @@ function UI:BuildDataProvider()
 		end
 
 		local status
-		if keep then
+		if keep and not entry.owned then
 			status = ns.Eligibility:GetStatus(entry.mountID)
 			if filters.availableOnly and status.state ~= ns.Eligibility.STATE.AVAILABLE then
 				keep = false
@@ -899,7 +915,12 @@ function UI:BuildDataProvider()
 		end
 
 		if keep then
-			local label, color = self:StatusVisual(status)
+			local label, color
+			if entry.owned then
+				label, color = L.STATUS_OWNED, Theme.colors.green
+			else
+				label, color = self:StatusVisual(status)
+			end
 			rows[#rows + 1] = {
 				mountID = entry.mountID,
 				name = entry.name,
@@ -909,7 +930,10 @@ function UI:BuildDataProvider()
 				sourceSummary = ns.Collection:GetSourceSummary(entry.mountID),
 				statusLabel = label,
 				statusColor = color,
-				rank = STATE_RANK[status.state] or 9,
+				owned = entry.owned,
+				-- Les possédées ferment la marche au tri par disponibilité :
+				-- elles ne demandent plus rien.
+				rank = entry.owned and 0 or (STATE_RANK[status.state] or 9),
 				tries = ns.Attempts:GetCount(entry.mountID),
 				-- math.huge pour les extensions inconnues : elles ferment la
 				-- marche au tri, comme sur le tableau de bord.
@@ -1031,6 +1055,7 @@ function UI:Show()
 	local filters = ns.db.profile.filters
 	local page = frame.CollectionPage
 	page.SearchBox:SetText(filters.search or "")
+	page.ShowOwned:SetChecked(filters.showOwned)
 	page.AvailableOnly:SetChecked(filters.availableOnly)
 	page.HideUnmapped:SetChecked(filters.hideUnmapped)
 	page.HideExcluded:SetChecked(filters.hideExcluded)

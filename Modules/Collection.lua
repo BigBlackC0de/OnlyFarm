@@ -25,6 +25,7 @@ function Collection:OnInitialize()
 	self.missing = {}    -- tableau d'entrées triées par nom
 	self.byID = {}       -- [mountID] = entrée
 	self.allIDs = {}     -- tous les mountID obtenables sur ce perso, possédés compris
+	self.collected = {}  -- entrées des montures possédées, pour l'affichage
 	self.counts = { total = 0, owned = 0, missing = 0, hidden = 0 }
 	self.ready = false
 	self.retries = 0
@@ -69,7 +70,7 @@ function Collection:Scan()
 		return false
 	end
 
-	local owned, missing, byID, allIDs = {}, {}, {}, {}
+	local owned, missing, byID, allIDs, collected = {}, {}, {}, {}, {}
 	local counts = { total = 0, owned = 0, missing = 0, hidden = 0 }
 	local excluded = (ns.db and ns.db.global.excluded) or {}
 
@@ -92,23 +93,31 @@ function Collection:Scan()
 				-- dénominateur pour dire « 12/31 sur Ulduar », pas seulement
 				-- de ce qui manque.
 				allIDs[#allIDs + 1] = mountID
+
+				-- Une entrée est construite pour TOUTES les montures, possédées
+				-- comprises : la liste doit pouvoir les afficher, et une
+				-- monture obtenue ne perd pas son intérêt (on veut savoir d'où
+				-- elle venait). Le coût est d'environ 1600 petites tables.
+				local entry = {
+					mountID = mountID,
+					name = name,
+					spellID = spellID,
+					icon = icon,
+					sourceType = sourceType,
+					kind = ns.Data.GetSourceKind(sourceType),
+					sourceTypeLabel = ns.Data.GetSourceTypeLabel(sourceType),
+					isFactionSpecific = isFactionSpecific,
+					faction = faction,
+					owned = isCollected and true or false,
+					excluded = excluded[mountID] and true or false,
+				}
+				byID[mountID] = entry
+
 				if isCollected then
 					owned[mountID] = true
 					counts.owned = counts.owned + 1
+					collected[#collected + 1] = entry
 				else
-					local entry = {
-						mountID = mountID,
-						name = name,
-						spellID = spellID,
-						icon = icon,
-						sourceType = sourceType,
-						kind = ns.Data.GetSourceKind(sourceType),
-						sourceTypeLabel = ns.Data.GetSourceTypeLabel(sourceType),
-						isFactionSpecific = isFactionSpecific,
-						faction = faction,
-						excluded = excluded[mountID] and true or false,
-					}
-					byID[mountID] = entry
 					missing[#missing + 1] = entry
 					counts.missing = counts.missing + 1
 				end
@@ -116,15 +125,18 @@ function Collection:Scan()
 		end
 	end
 
-	table.sort(missing, function(a, b)
+	local function ByKindThenName(a, b)
 		if a.kind ~= b.kind then return a.kind < b.kind end
 		return a.name < b.name
-	end)
+	end
+	table.sort(missing, ByKindThenName)
+	table.sort(collected, ByKindThenName)
 
 	self.owned = owned
 	self.missing = missing
 	self.byID = byID
 	self.allIDs = allIDs
+	self.collected = collected
 	self.counts = counts
 	self.ready = true
 	self.retries = 0
@@ -158,6 +170,11 @@ end
 
 function Collection:GetMissing()
 	return self.missing
+end
+
+--- Montures déjà possédées, mêmes entrées que les manquantes.
+function Collection:GetCollected()
+	return self.collected
 end
 
 function Collection:GetEntry(mountID)

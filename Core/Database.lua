@@ -50,6 +50,9 @@ local PROFILE_DEFAULTS = {
 	},
 	filters = {
 		search = "",
+		-- Les possédées sont masquées par défaut : l'addon répond d'abord à
+		-- « qu'est-ce qu'il me manque ». Les revoir reste à un clic.
+		showOwned = false,
 		availableOnly = false,
 		hideUnmapped = false,
 		-- Une monture exclue reste visible, grisée. La faire disparaître d'un

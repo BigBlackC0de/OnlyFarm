@@ -56,6 +56,7 @@ local L = {
 	STATUS_NO_SOURCE = "source not mapped",
 	STATUS_NO_SOURCE_SHORT = "unmapped",
 	STATUS_INELIGIBLE = "not eligible",
+	STATUS_OWNED = "collected",
 
 	-- Résumés
 	SUMMARY = "%d/%d collected — %d missing",
@@ -66,6 +67,7 @@ local L = {
 
 	-- Filtres
 	FILTER_SEARCH = "Search",
+	FILTER_SHOW_OWNED = "Show collected",
 	FILTER_AVAILABLE_ONLY = "Available now only",
 	FILTER_HIDE_UNMAPPED = "Hide unmapped sources",
 	FILTER_HIDE_EXCLUDED = "Hide excluded",
@@ -199,6 +201,7 @@ if GetLocale and GetLocale() == "frFR" then
 	L.STATUS_NO_SOURCE = "source non cartographiée"
 	L.STATUS_NO_SOURCE_SHORT = "non cartographiée"
 	L.STATUS_INELIGIBLE = "non éligible"
+	L.STATUS_OWNED = "possédée"
 
 	L.SUMMARY = "%d/%d possédées — %d manquantes"
 	L.INSTANCE_COUNTER = "Instances : %d/%d cette heure · %d/%d aujourd'hui"
@@ -207,6 +210,7 @@ if GetLocale and GetLocale() == "frFR" then
 	L.NO_RESULT = "Aucun résultat pour ces filtres."
 
 	L.FILTER_SEARCH = "Rechercher"
+	L.FILTER_SHOW_OWNED = "Afficher les possédées"
 	L.FILTER_AVAILABLE_ONLY = "Dispo maintenant uniquement"
 	L.FILTER_HIDE_UNMAPPED = "Masquer les sources non cartographiées"
 	L.FILTER_HIDE_EXCLUDED = "Masquer les exclues"

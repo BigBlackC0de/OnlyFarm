@@ -96,7 +96,8 @@ end
 --       rapprochement, extensions ramenées à un repère unique
 --   5 — le lieu est souvent étiqueté (« Région : … ») : on sait enlever
 --       l'étiquette, et plus seulement le suffixe d'aile
-local MAPPING_VERSION = 5
+--   6 — extension des montures de haut fait, via l'arbre des catégories
+local MAPPING_VERSION = 6
 
 -- Une cartographie qui ne rattache rien est ratée, pas fraîche : on la
 -- retente. Mais pas indéfiniment — sur un client où rien ne répondrait, on
@@ -320,6 +321,96 @@ local function BuildInstanceIndex()
 end
 
 --------------------------------------------------------------------------------
+-- Passe A bis — index des hauts faits
+--
+-- Une monture sur cinq vient d'un haut fait, et son texte de source dit
+-- « Haut fait : <nom> » sans aucun lieu. L'index des instances ne peut rien
+-- pour elles : elles tombaient toutes dans le panier « inconnue ».
+--
+-- Or l'arbre des catégories de hauts faits EST organisé par extension —
+-- « Donjons et raids > Wrath of the Lich King », « Exploration > Legion ». En
+-- remontant les parents d'une catégorie jusqu'à trouver un nom qui correspond
+-- à une extension connue, on récupère l'extension du haut fait, donc celle de
+-- la monture. Entièrement dérivé du client, comme le reste.
+--------------------------------------------------------------------------------
+
+local ACHIEVEMENTS_PER_SLICE = 300
+
+local function AchievementsReady()
+	return type(GetCategoryList) == "function"
+		and type(GetCategoryInfo) == "function"
+		and type(GetCategoryNumAchievements) == "function"
+		and type(GetAchievementInfo) == "function"
+end
+
+--- Remonte l'arbre des catégories jusqu'à un nom d'extension reconnu.
+--  @return niveau d'extension, ou nil
+local function ResolveCategoryExpansion(categoryID, cache)
+	if cache[categoryID] ~= nil then
+		return cache[categoryID] or nil
+	end
+
+	local visited = 0
+	local cursor = categoryID
+	while cursor and cursor > 0 and visited < 8 do
+		local ok, name, parentID = pcall(GetCategoryInfo, cursor)
+		if not ok then break end
+
+		local level = ns.Data.ExpansionLevelFromName(name)
+		if level then
+			cache[categoryID] = level
+			return level
+		end
+		cursor = parentID
+		visited = visited + 1
+	end
+
+	-- `false` et pas nil : on retient aussi les échecs, sinon on refait le
+	-- parcours pour chaque haut fait de la même catégorie.
+	cache[categoryID] = false
+	return nil
+end
+
+--- Index « nom de haut fait normalisé » -> { tier, tierName }.
+local function BuildAchievementIndex()
+	local index = {}
+	if not AchievementsReady() then return index end
+
+	local okList, categories = pcall(GetCategoryList)
+	if not okList or type(categories) ~= "table" then return index end
+
+	local categoryCache = {}
+	local since = 0
+
+	for _, categoryID in ipairs(categories) do
+		local level = ResolveCategoryExpansion(categoryID, categoryCache)
+		if level then
+			local tierName = ns.Data.ExpansionName(level)
+			local okCount, count = pcall(GetCategoryNumAchievements, categoryID, true)
+			if okCount and type(count) == "number" then
+				for position = 1, count do
+					local okInfo, _, name = pcall(GetAchievementInfo, categoryID, position)
+					if okInfo and type(name) == "string" and name ~= "" then
+						local key = ns.Util.NormalizeName(name)
+						if key and not index[key] then
+							index[key] = { tier = level, tierName = tierName }
+						end
+					end
+
+					since = since + 1
+					if since >= ACHIEVEMENTS_PER_SLICE then
+						since = 0
+						coroutine.yield()
+					end
+				end
+			end
+		end
+	end
+
+	return index
+end
+
+--------------------------------------------------------------------------------
 -- Passe B — texte de source
 --------------------------------------------------------------------------------
 
@@ -433,7 +524,7 @@ Mapping.MatchPlace = MatchPlace
 
 --- Cartographie toutes les montures à partir de leur texte de source.
 --  @return table [mountID] = source, statistiques du passage
-local function MapFromSourceText(index)
+local function MapFromSourceText(index, achievements)
 	local results = {}
 	-- Compteurs par étape. Sans eux, « 0 rattachées » ne dit pas SI le texte a
 	-- été lu, SI un lieu en a été extrait, ou SI le rapprochement a échoué —
@@ -446,6 +537,7 @@ local function MapFromSourceText(index)
 		labelled = 0,
 		prefix = 0,
 		partial = 0,
+		byAchievement = 0,
 	}
 
 	local mountIDs = C_MountJournal and C_MountJournal.GetMountIDs()
@@ -486,8 +578,21 @@ local function MapFromSourceText(index)
 				entry.matchedBy = strategy
 				stats.mapped = stats.mapped + 1
 				stats[strategy] = (stats[strategy] or 0) + 1
-			elseif place then
-				entry.placeName = place
+			else
+				if place then entry.placeName = place end
+
+				-- Aucun lieu exploitable : le sujet est peut-être un haut
+				-- fait, auquel cas l'arbre des catégories donne l'extension.
+				-- Ça ne dit pas OÙ farmer, mais ça sort la monture du panier
+				-- « inconnue », et c'est déjà l'essentiel du filtre.
+				local achievement = achievements and subject
+					and achievements[ns.Util.NormalizeName(subject)]
+				if achievement then
+					entry.tier = achievement.tier
+					entry.tierName = achievement.tierName
+					entry.matchedBy = "achievement"
+					stats.byAchievement = stats.byAchievement + 1
+				end
 			end
 
 			results[mountID] = entry
@@ -681,7 +786,10 @@ local function ScanRoutine(self, deep)
 	local index, lfgCount, journalCount = BuildInstanceIndex()
 	self.instanceIndex = index
 
-	local results, stats = MapFromSourceText(index)
+	local achievements = BuildAchievementIndex()
+	self.achievementIndex = achievements
+
+	local results, stats = MapFromSourceText(index, achievements)
 
 	local refined = 0
 	if deep then
@@ -694,10 +802,13 @@ local function ScanRoutine(self, deep)
 	-- passage : la passe approfondie rattache elle aussi des montures, et un
 	-- « mapped » qui ne comptait que le texte de source annonçait zéro alors
 	-- que le tableau de bord affichait des extensions.
+	-- « Rattachée » = l'addon sait quelque chose d'utile : une instance, ou au
+	-- moins une extension. Compter uniquement les instances sous-estimait le
+	-- résultat et cachait tout l'apport des hauts faits.
 	local total, mapped = 0, 0
 	for _, entry in pairs(results) do
 		total = total + 1
-		if entry.instanceName then mapped = mapped + 1 end
+		if entry.instanceName or entry.tierName then mapped = mapped + 1 end
 	end
 
 	return {
@@ -705,6 +816,7 @@ local function ScanRoutine(self, deep)
 		instances = ns.Util.Count(index),
 		lfgInstances = lfgCount,
 		journalInstances = journalCount,
+		achievements = ns.Util.Count(achievements),
 		mounts = total,
 		mapped = mapped,
 		textStats = stats,
@@ -804,6 +916,7 @@ function Mapping:Finish(payload)
 			-- rien renvoyé » au lieu de « ça ne marche pas ».
 			lfgInstances = payload.lfgInstances,
 			journalInstances = payload.journalInstances,
+			achievements = payload.achievements,
 			textStats = payload.textStats,
 			refined = payload.refined,
 			nodes = payload.nodeCount,
