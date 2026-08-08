@@ -21,12 +21,19 @@ local GLOBAL_DEFAULTS = {
 	excluded = {},           -- [mountID] = true — montures que le joueur ignore
 	routes = {},             -- phase 5
 	travelTimings = {},      -- phase 3 : auto-apprentissage des durées de vol
-	sourceCache = {},        -- [mountID] = source résolue par DevScan (phase 2)
+	sourceCache = {},        -- [mountID] = source résolue par DevScan
+	nodeCache = {},          -- [nodeID] = entrée d'instance moissonnée par DevScan
+	customNodes = {},        -- [nodeID] = point posé par le joueur (éditeur de route)
 	instanceIDsByName = {},  -- [nom normalisé] = instanceID moteur (pont EJ <-> verrous)
 	scanMeta = {},           -- horodatage et build du dernier DevScan
 }
 
 local PROFILE_DEFAULTS = {
+	-- Le scan du Journal des rencontres tourne tout seul à la première
+	-- connexion et après chaque patch. C'est lui qui remplit le filtre par
+	-- extension et la géographie ; sans lui l'addon est à moitié muet, donc il
+	-- est actif par défaut et se coupe explicitement.
+	autoScan = true,
 	ui = {
 		point = "CENTER",
 		x = 0,

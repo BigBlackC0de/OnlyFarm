@@ -13,14 +13,21 @@ local _, ns = ...
 
 local MinimapButton = ns:NewModule("MinimapButton", 85)
 
--- Marge entre le bord de la minicarte et le centre du bouton.
+local BUTTON_SIZE = 31
+
+-- Écart entre le bord VISIBLE de l'icône et le bord de la minicarte.
 --
--- Ne PAS coder le rayon en dur : la minicarte de retail fait 198 px de côté
--- (Blizzard_Minimap/Mainline/Minimap.xml), pas les 140 px de l'époque où le
--- « rayon 80 » de LibDBIcon a été écrit. Avec 80, le bouton se retrouve à
--- l'intérieur du cadre. On le calcule donc à partir de la taille réelle, ce
--- qui suit aussi les addons qui redimensionnent la minicarte.
-local RING_MARGIN = 10
+-- Deux pièges empilés ici, et le second a survécu à la première correction :
+--
+-- 1. Ne pas coder le rayon en dur. La minicarte de retail fait 198 px de côté
+--    (Blizzard_Minimap/Mainline/Minimap.xml), pas les 140 px de l'époque où le
+--    « rayon 80 » de LibDBIcon a été écrit.
+-- 2. Le rayon positionne le CENTRE du bouton, pas son bord. Poser ce centre à
+--    « bord de la minicarte + 10 » laisse encore la moitié de l'icône (15 px)
+--    à l'intérieur du cadre — c'est le placement classique de LibDBIcon, où le
+--    bouton chevauche l'anneau. Pour qu'il soit franchement dehors, il faut
+--    décaler du rayon de l'icône EN PLUS de l'écart voulu.
+local RING_GAP = 3
 
 function MinimapButton:OnEnable()
 	if not Minimap then
@@ -40,7 +47,7 @@ function MinimapButton:Create()
 	if self.button then return self.button end
 
 	local button = CreateFrame("Button", "OnlyFarmMinimapButton", Minimap)
-	button:SetSize(31, 31)
+	button:SetSize(BUTTON_SIZE, BUTTON_SIZE)
 	button:SetFrameStrata("MEDIUM")
 	button:SetFrameLevel(Minimap:GetFrameLevel() + 8)
 	button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
@@ -94,11 +101,12 @@ end
 -- Position sur l'anneau
 --------------------------------------------------------------------------------
 
---- Rayon de l'anneau, recalculé à chaque positionnement.
+--- Rayon de l'anneau, recalculé à chaque positionnement : un addon qui
+--  redimensionne la minicarte est ainsi suivi sans réglage.
 local function RingRadius()
 	local width = Minimap:GetWidth()
 	if not width or width <= 0 then width = 198 end   -- taille de retail 12.x
-	return (width / 2) + RING_MARGIN
+	return (width / 2) + (BUTTON_SIZE / 2) + RING_GAP
 end
 
 function MinimapButton:UpdatePosition()

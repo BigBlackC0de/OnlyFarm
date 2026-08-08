@@ -248,5 +248,6 @@ ns:RegisterEvent("PLAYER_ENTERING_WORLD", bootstrap, "PLAYER_ENTERING_WORLD")
 -- donc c'est un point à vérifier à l'œil et pas en test.
 ns.LOGO_TEXTURE = "Interface\\AddOns\\OnlyFarm\\Media\\logo"
 ns.MINIMAP_TEXTURE = "Interface\\AddOns\\OnlyFarm\\Media\\minimap"
+ns.BANNER_TEXTURE = "Interface\\AddOns\\OnlyFarm\\Media\\banner"
 
 _G.OnlyFarm = ns

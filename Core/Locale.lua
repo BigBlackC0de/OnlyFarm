@@ -52,6 +52,7 @@ local L = {
 	FILTER_EXPANSION_NONE = "None",
 	EXPANSION_UNKNOWN = "Unknown (unmapped source)",
 	EXPANSION_NEEDS_SCAN = "Run /of ejscan to fill this list.",
+	EXPANSION_SCANNING = "Scan in progress — the list fills itself.",
 
 	-- Aperçu
 	PREVIEW_HINT = "Drag to rotate · wheel to zoom",
@@ -80,9 +81,14 @@ local L = {
 
 	-- DevScan
 	SCAN_START = "Encounter Journal scan started (a few seconds, the UI may stutter).",
-	SCAN_DONE = "Scan finished: %d mounts mapped across %d instances.",
+	SCAN_AUTO_START = "First-run scan of the Encounter Journal — mapping mounts and instance entrances.",
+	SCAN_DONE = "Scan finished: %d mounts across %d instances, %d entrances located.",
+	SCAN_AUTO_DONE = "Expansion filter and geography are ready. Runs again by itself after each patch.",
 	SCAN_BUSY = "A scan is already running.",
 	SCAN_NEEDS_EJ = "Encounter Journal unavailable — open it once, then retry.",
+
+	-- Voyage
+	NODE_PLAYER = "Your position",
 
 	-- Divers
 	RESET_CONFIRM = "Type |cffff5555/of reset confirm|r to wipe OnlyFarm's database.",
@@ -125,6 +131,7 @@ if GetLocale and GetLocale() == "frFR" then
 	L.FILTER_EXPANSION_NONE = "Rien"
 	L.EXPANSION_UNKNOWN = "Inconnue (source non cartographiée)"
 	L.EXPANSION_NEEDS_SCAN = "Lance /of ejscan pour remplir cette liste."
+	L.EXPANSION_SCANNING = "Scan en cours — la liste se remplit toute seule."
 
 	L.PREVIEW_HINT = "Glisser pour tourner · molette pour zoomer"
 	L.PREVIEW_NONE = "Aucun modèle disponible pour cette monture."
@@ -149,9 +156,13 @@ if GetLocale and GetLocale() == "frFR" then
 	L.CMD_HELP_RESET = "  /of reset     — effacer la base sauvegardée (demande confirmation)"
 
 	L.SCAN_START = "Scan du Journal des rencontres lancé (quelques secondes, l'interface peut saccader)."
-	L.SCAN_DONE = "Scan terminé : %d montures cartographiées sur %d instances."
+	L.SCAN_AUTO_START = "Premier scan du Journal des rencontres — cartographie des montures et des entrées d'instance."
+	L.SCAN_DONE = "Scan terminé : %d montures sur %d instances, %d entrées repérées."
+	L.SCAN_AUTO_DONE = "Filtre par extension et géographie prêts. Le scan se relancera seul après chaque patch."
 	L.SCAN_BUSY = "Un scan est déjà en cours."
 	L.SCAN_NEEDS_EJ = "Journal des rencontres indisponible — ouvre-le une fois, puis réessaie."
+
+	L.NODE_PLAYER = "Ta position"
 
 	L.RESET_CONFIRM = "Tape |cffff5555/of reset confirm|r pour effacer la base d'OnlyFarm."
 	L.RESET_DONE = "Base effacée. Recharge l'interface (/reload)."

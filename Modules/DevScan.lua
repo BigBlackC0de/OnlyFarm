@@ -19,18 +19,80 @@
 	Effets de bord : le scan manipule l'état de l'interface du Journal des
 	rencontres (palier, instance et boss sélectionnés). On restaure ce qu'on
 	peut à la fin, mais mieux vaut le lancer Journal fermé.
+
+	Le nom « DevScan » est un reste de la phase 1, où ce scan était un outil de
+	développement lancé à la main. Ce n'en est plus un : sans lui, l'addon ne
+	sait ni à quelle extension appartient une monture, ni où se trouve l'entrée
+	d'une instance. Il tourne donc TOUT SEUL à la première connexion, et de
+	nouveau après chaque changement de build du client — un joueur n'a pas à
+	connaître une commande pour que le filtre par extension soit rempli.
 -----------------------------------------------------------------------------]]
 
 local _, ns = ...
 
 local DevScan = ns:NewModule("DevScan", 60)
 
-local FRAME_BUDGET = 0.006   -- 6 ms par frame, comme le futur solveur de route
+local FRAME_BUDGET = 0.006   -- 6 ms par frame, comme le solveur de route
 local MAX_LOOT_PER_ENCOUNTER = 200
+
+-- Délai après l'entrée en jeu avant de lancer le scan automatique. Le client
+-- charge encore ses données pendant les premières secondes ; se précipiter
+-- donne un Journal des rencontres à moitié peuplé, donc un scan à refaire.
+local AUTO_SCAN_DELAY = 10
+local AUTO_SCAN_RETRY = 30
 
 function DevScan:OnInitialize()
 	self.running = false
 	self.driver = nil
+	self.autoTried = false
+end
+
+function DevScan:OnEnable()
+	self:RegisterMessage("OF_ENTERING_WORLD", "OnEnteringWorld")
+end
+
+function DevScan:OnEnteringWorld()
+	if self.autoTried then return end
+	self.autoTried = true
+	C_Timer.After(AUTO_SCAN_DELAY, function() self:AutoScan() end)
+end
+
+--------------------------------------------------------------------------------
+-- Scan automatique
+--------------------------------------------------------------------------------
+
+--- Le cache est-il périmé ? Un build différent, c'est un patch : des montures
+--  ont pu changer de boss, des instances de palier.
+function DevScan:IsStale()
+	if not ns.db then return false end
+	local meta = ns.db.global.scanMeta
+	if type(meta) ~= "table" or not meta.at then return true end
+	if ns.Util.Count(ns.db.global.sourceCache) == 0 then return true end
+	local build = select(2, GetBuildInfo())
+	return meta.build ~= build
+end
+
+--- Lance le scan si personne ne regarde. On s'abstient en combat et Journal
+--  des rencontres ouvert : le scan déplace la sélection de l'interface, et le
+--  faire sous le nez du joueur passerait pour un bug.
+function DevScan:AutoScan()
+	if not ns.db then return false end
+	if ns.db.profile.autoScan == false then return false end
+	if not self:IsStale() then
+		self:Debug("cache de scan à jour, pas de scan automatique")
+		return false
+	end
+
+	local busy = (InCombatLockdown and InCombatLockdown())
+		or (EncounterJournal and EncounterJournal.IsShown and EncounterJournal:IsShown())
+	if busy then
+		self:Debug("scan automatique reporté (combat ou Journal ouvert)")
+		C_Timer.After(AUTO_SCAN_RETRY, function() self:AutoScan() end)
+		return false
+	end
+
+	self.silent = true
+	return self:Start()
 end
 
 --------------------------------------------------------------------------------
@@ -93,6 +155,96 @@ local function CollectMountLoot()
 		end
 	end
 	return found
+end
+
+--------------------------------------------------------------------------------
+-- Entrées d'instance (géographie de la phase 3)
+--
+-- C_EncounterJournal.GetDungeonEntrancesForMap est la source qu'utilise la
+-- carte du monde pour poser ses icônes d'entrée de donjon. Elle est donc juste
+-- par construction, et elle suit les patchs sans qu'on écrive une coordonnée.
+--------------------------------------------------------------------------------
+
+-- Carte cosmique : la racine de l'arbre des cartes. Tout descend d'elle.
+local COSMIC_MAP_ID = 946
+local WORLD_MAP_ID = 947
+
+local function EntrancesReady()
+	return C_Map and type(C_Map.GetMapChildrenInfo) == "function"
+		and C_EncounterJournal
+		and type(C_EncounterJournal.GetDungeonEntrancesForMap) == "function"
+end
+
+--- Toutes les cartes descendantes de la racine, entrée cosmique comprise.
+local function AllMaps()
+	local maps = {}
+	for _, rootID in ipairs({ COSMIC_MAP_ID, WORLD_MAP_ID }) do
+		local ok, children = pcall(C_Map.GetMapChildrenInfo, rootID, nil, true)
+		if ok and type(children) == "table" then
+			for _, info in ipairs(children) do
+				if info.mapID then maps[info.mapID] = info end
+			end
+		end
+	end
+	return maps
+end
+
+--- Extrait x, y d'une position, qu'elle soit un Vector2DMixin ou une table nue.
+local function ReadPosition(position)
+	if type(position) ~= "table" then return nil end
+	if type(position.GetXY) == "function" then
+		local ok, x, y = pcall(position.GetXY, position)
+		if ok then return x, y end
+		return nil
+	end
+	return position.x, position.y
+end
+
+--- Moissonne les entrées d'instance de toutes les cartes.
+--  @return table [nodeID] = nœud, nombre de nœuds
+local function CollectEntrances()
+	local nodes = {}
+	local count = 0
+	if not EntrancesReady() then return nodes, count end
+
+	local since = 0
+	for uiMapID in pairs(AllMaps()) do
+		local ok, entrances = pcall(C_EncounterJournal.GetDungeonEntrancesForMap, uiMapID)
+		if ok and type(entrances) == "table" then
+			for _, entrance in ipairs(entrances) do
+				local x, y = ReadPosition(entrance.position)
+				if type(x) == "number" and type(y) == "number" and entrance.journalInstanceID then
+					local nodeID = ns.Data.InstanceNodeID(entrance.journalInstanceID)
+					if not nodes[nodeID] then
+						local continentID, wx, wy = ns.Nodes:ResolveWorldPos(uiMapID, x, y)
+						nodes[nodeID] = {
+							nodeID = nodeID,
+							name = entrance.name,
+							kind = ns.Data.NODE_KINDS.INSTANCE,
+							uiMapID = uiMapID,
+							x = x,
+							y = y,
+							continentID = continentID,
+							wx = wx,
+							wy = wy,
+							journalInstanceID = entrance.journalInstanceID,
+						}
+						count = count + 1
+					end
+				end
+			end
+		end
+
+		-- Il y a plus d'un millier de cartes : sans respiration régulière, la
+		-- boucle rendrait la main trop tard et le client saccaderait.
+		since = since + 1
+		if since >= 25 then
+			since = 0
+			coroutine.yield()
+		end
+	end
+
+	return nodes, count
 end
 
 --- Coroutine principale. `yield` après chaque boss : le client a besoin d'une
@@ -163,7 +315,18 @@ local function ScanRoutine(self)
 		end
 	end
 
-	return results, instanceCount, mountCount
+	local nodes, nodeCount = CollectEntrances()
+
+	-- Un seul retour agrégé : `coroutine.resume` rend les valeurs une à une, et
+	-- une signature qui s'allonge à chaque passe ajoutée finit toujours par
+	-- perdre un champ en route.
+	return {
+		sources = results,
+		instances = instanceCount,
+		mounts = mountCount,
+		nodes = nodes,
+		nodeCount = nodeCount,
+	}
 end
 
 --------------------------------------------------------------------------------
@@ -181,9 +344,10 @@ function DevScan:Start()
 		return false
 	end
 
-	ns:Print(L.SCAN_START)
+	ns:Print(self.silent and L.SCAN_AUTO_START or L.SCAN_START)
 	self.running = true
 	self.startedAt = time()
+	self:SendMessage("OF_SCAN_STARTED")
 
 	local thread = coroutine.create(ScanRoutine)
 	local driver = self.driver or CreateFrame("Frame")
@@ -192,18 +356,19 @@ function DevScan:Start()
 	driver:SetScript("OnUpdate", function()
 		local deadline = debugprofilestop() + (FRAME_BUDGET * 1000)
 		repeat
-			local ok, a, b, c = coroutine.resume(thread, self)
+			local ok, payload = coroutine.resume(thread, self)
 			if not ok then
 				driver:SetScript("OnUpdate", nil)
 				self.running = false
+				self.silent = false
 				local handler = geterrorhandler and geterrorhandler()
-				if handler then handler(a) end
+				if handler then handler(payload) end
 				return
 			end
 			if coroutine.status(thread) == "dead" then
 				driver:SetScript("OnUpdate", nil)
 				self.running = false
-				self:Finish(a, b, c)
+				self:Finish(payload)
 				return
 			end
 		until debugprofilestop() >= deadline
@@ -211,11 +376,14 @@ function DevScan:Start()
 	return true
 end
 
-function DevScan:Finish(results, instanceCount, mountCount)
-	if type(results) ~= "table" then return end
+function DevScan:Finish(payload)
+	local silent = self.silent
+	self.silent = false
+	if type(payload) ~= "table" or type(payload.sources) ~= "table" then return end
 
 	if type(OnlyFarmScanDB) ~= "table" then OnlyFarmScanDB = {} end
-	OnlyFarmScanDB.sources = results
+	OnlyFarmScanDB.sources = payload.sources
+	OnlyFarmScanDB.nodes = payload.nodes
 	OnlyFarmScanDB.scannedAt = time()
 	OnlyFarmScanDB.build = select(2, GetBuildInfo())
 	OnlyFarmScanDB.version = select(1, GetBuildInfo())
@@ -223,15 +391,24 @@ function DevScan:Finish(results, instanceCount, mountCount)
 	OnlyFarmScanDB.addonVersion = ns.VERSION
 
 	if ns.db then
-		ns.db.global.sourceCache = results
+		ns.db.global.sourceCache = payload.sources
+		-- Les nœuds moissonnés remplacent le cache précédent, mais seulement si
+		-- la passe a effectivement trouvé quelque chose : sur un client où
+		-- l'API des entrées de donjon a disparu, on garde ce qu'on avait plutôt
+		-- que de vider la géographie de l'addon.
+		if payload.nodeCount and payload.nodeCount > 0 then
+			ns.db.global.nodeCache = payload.nodes
+		end
 		ns.db.global.scanMeta = {
 			at = OnlyFarmScanDB.scannedAt,
 			build = OnlyFarmScanDB.build,
-			mounts = mountCount,
-			instances = instanceCount,
+			mounts = payload.mounts,
+			instances = payload.instances,
+			nodes = payload.nodeCount,
 		}
 	end
 
-	ns:Print(ns.L.SCAN_DONE, mountCount or 0, instanceCount or 0)
+	ns:Print(ns.L.SCAN_DONE, payload.mounts or 0, payload.instances or 0, payload.nodeCount or 0)
+	if silent then ns:Print(ns.L.SCAN_AUTO_DONE) end
 	self:SendMessage("OF_SCAN_COMPLETE")
 end

@@ -175,10 +175,13 @@ function UI:CreateExpansionDropdown(parent, anchor)
 				end)
 		end
 
-		-- Sans scan, la seule entrée est « inconnue » : on dit pourquoi plutôt
-		-- que de laisser croire à un menu cassé.
+		-- Sans scan, la seule entrée est « inconnue ». On dit pourquoi plutôt
+		-- que de laisser croire à un menu cassé — et si le scan automatique
+		-- est justement en train de tourner, on le dit aussi : « lance une
+		-- commande » serait un mauvais conseil pendant qu'elle s'exécute.
 		if #expansions <= 1 then
-			rootDescription:CreateTitle(L.EXPANSION_NEEDS_SCAN)
+			rootDescription:CreateTitle(ns.DevScan.running
+				and L.EXPANSION_SCANNING or L.EXPANSION_NEEDS_SCAN)
 		end
 	end)
 
@@ -205,8 +208,19 @@ function UI:CreateTabs(frame)
 		frame.Tabs[i] = tab
 	end
 
-	local placeholder = (frame.Inset or frame):CreateFontString(nil, "ARTWORK", "GameFontDisableLarge")
-	placeholder:SetPoint("CENTER")
+	-- Page de garde des onglets encore vides : le logo complet, puis la phrase
+	-- qui dit ce qui arrivera là. Une fenêtre vide donne l'impression d'un
+	-- onglet cassé ; une page de garde donne l'impression d'un chantier.
+	local parent = frame.Inset or frame
+	local banner = parent:CreateTexture(nil, "ARTWORK")
+	banner:SetSize(320, 160)
+	banner:SetPoint("CENTER", 0, 40)
+	banner:SetTexture(ns.BANNER_TEXTURE)
+	banner:Hide()
+	frame.Banner = banner
+
+	local placeholder = parent:CreateFontString(nil, "ARTWORK", "GameFontDisableLarge")
+	placeholder:SetPoint("TOP", banner, "BOTTOM", 0, -4)
 	placeholder:Hide()
 	frame.Placeholder = placeholder
 end
@@ -453,11 +467,13 @@ function UI:SelectTab(index)
 
 	if isCollection then
 		frame.Placeholder:Hide()
+		frame.Banner:Hide()
 		self:Refresh()
 	else
 		frame.Summary:SetText("")
 		frame.Placeholder:SetText(index == 2 and ns.L.ROUTE_PLACEHOLDER or ns.L.EDITOR_PLACEHOLDER)
 		frame.Placeholder:Show()
+		frame.Banner:Show()
 	end
 end
 

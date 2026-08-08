@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="Media/logo.png" alt="OnlyFarm" width="640">
+</p>
+
 # OnlyFarm
 
 Addon World of Warcraft (Retail) qui répond à une question : **qu'est-ce que je
@@ -41,15 +45,25 @@ l'addon.
 | `/of debug` | activer les traces |
 | `/of reset` | effacer la base sauvegardée (confirmation requise) |
 
-### À faire une fois : `/of ejscan`
+### Le scan du Journal des rencontres
 
 L'addon connaît les montures qui te manquent dès l'installation, mais pas
-encore quel boss les lâche. `/of ejscan` parcourt le Journal des rencontres et
-construit cette correspondance depuis **ton** client, donc pour le patch
-courant. Quelques secondes, à relancer après chaque patch majeur.
+encore quel boss les lâche, ni à quelle extension elles appartiennent, ni où se
+trouve l'entrée de l'instance. Ces trois choses viennent du Journal des
+rencontres.
 
-C'est aussi ce scan qui alimentera le générateur de données de la phase 2 : il
-écrit son résultat brut dans `OnlyFarmScanDB` (SavedVariables).
+**Tu n'as rien à lancer** : le scan part tout seul une dizaine de secondes
+après la première connexion, et se relance de lui-même après chaque patch
+(l'addon compare le build du client à celui du dernier scan). Il tourne en
+coroutine avec un budget de 6 ms par frame — pas de gel. `/of ejscan` reste là
+pour le forcer.
+
+Le scan attend si tu es en combat ou si le Journal des rencontres est ouvert :
+il déplace la sélection de cette fenêtre, et le faire sous ton nez passerait
+pour un bug.
+
+Il écrit aussi son résultat brut dans `OnlyFarmScanDB` (SavedVariables), qui
+alimente le générateur de données de la phase 2.
 
 ## Développement
 
