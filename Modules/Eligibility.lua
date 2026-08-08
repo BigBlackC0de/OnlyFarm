@@ -81,6 +81,49 @@ function Eligibility:GetLockoutKind(source)
 end
 
 --------------------------------------------------------------------------------
+-- Extensions
+--
+-- L'extension d'une monture n'est exposée par aucune API du Journal des
+-- montures. On la tient du palier du Journal des rencontres, donc uniquement
+-- pour les montures qu'un `/of ejscan` a cartographiées. Les autres tombent
+-- dans un panier « inconnue » — assumé et affiché comme tel, plutôt que
+-- rattachées au hasard à une extension plausible.
+--------------------------------------------------------------------------------
+
+Eligibility.UNKNOWN_EXPANSION = "?"
+
+--- Nom localisé de l'extension d'une monture, ou UNKNOWN_EXPANSION.
+function Eligibility:GetExpansion(mountID)
+	local source = self:GetSource(mountID)
+	if source and type(source.tierName) == "string" and source.tierName ~= "" then
+		return source.tierName
+	end
+	return self.UNKNOWN_EXPANSION
+end
+
+--- Extensions réellement présentes dans les données, dans l'ordre du Journal
+--  des rencontres (Classic d'abord). Le panier « inconnue » ferme la marche.
+--  @return liste de { name, tier }
+function Eligibility:GetKnownExpansions()
+	local seen, list = {}, {}
+	if ns.db then
+		for _, source in pairs(ns.db.global.sourceCache) do
+			local name = source.tierName
+			if type(name) == "string" and name ~= "" and not seen[name] then
+				seen[name] = true
+				list[#list + 1] = { name = name, tier = tonumber(source.tier) or 99 }
+			end
+		end
+	end
+	table.sort(list, function(a, b)
+		if a.tier ~= b.tier then return a.tier < b.tier end
+		return a.name < b.name
+	end)
+	list[#list + 1] = { name = self.UNKNOWN_EXPANSION, tier = math.huge }
+	return list
+end
+
+--------------------------------------------------------------------------------
 -- Statut par personnage
 --------------------------------------------------------------------------------
 

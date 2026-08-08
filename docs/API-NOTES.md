@@ -79,12 +79,17 @@ C_SpellBook.IsSpellInSpellBook(spellID, bank, includeOverrides)
 À corriger dans `TravelGraph:Build()` (phase 3), qui utilise `IsPlayerSpell`
 dans la spécification.
 
-### 4. `GetSavedInstanceEncounterInfo` n'est documentée nulle part
+### 4. `GetSavedInstanceEncounterInfo` n'est documentée nulle part — mais elle existe
 
 Elle n'apparaît ni dans la documentation générée, ni dans le code de
-l'interface Blizzard de la 12.0.7. Elle existe probablement toujours, mais rien
-ne le garantit. `Modules/Lockouts.lua` la teste (`type(...) == "function"`) et
-l'appelle en `pcall`, avec repli sur `encounterProgress`.
+l'interface Blizzard de la 12.0.7. **Vérifié en jeu sur un client 12.0.7 :
+`type(GetSavedInstanceEncounterInfo) == "function"`.** Elle est donc bien
+présente, simplement plus utilisée par Blizzard.
+
+Le garde-fou reste en place dans `Modules/Lockouts.lua` (`type(...) ==
+"function"` puis `pcall`, avec repli sur `encounterProgress`) : une fonction
+qu'aucun code de Blizzard n'appelle plus est exactement le genre de chose qui
+disparaît sans préavis à une extension.
 
 ### 5. Positions 11 et 12 de `GetSavedInstanceInfo` non confirmées
 

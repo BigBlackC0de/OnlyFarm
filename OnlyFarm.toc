@@ -22,5 +22,7 @@ Modules\Eligibility.lua
 Modules\DevScan.lua
 
 UI\MainFrame.lua
+UI\MinimapButton.lua
+UI\PreviewFrame.lua
 
 Core\Commands.lua

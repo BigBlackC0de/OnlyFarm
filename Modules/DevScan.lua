@@ -109,6 +109,14 @@ local function ScanRoutine(self)
 		EJ_SelectTier(tier)
 		coroutine.yield()
 
+		-- Nom localisé du palier : c'est l'extension, et c'est la seule source
+		-- fiable de cette information. Le Journal des montures ne l'expose pas.
+		local tierName
+		if type(EJ_GetTierInfo) == "function" then
+			local ok, name = pcall(EJ_GetTierInfo, tier)
+			if ok then tierName = name end
+		end
+
 		for _, isRaid in ipairs({ true, false }) do
 			local index = 1
 			while true do
@@ -143,6 +151,7 @@ local function ScanRoutine(self)
 							journalEncounterID = journalEncounterID,
 							isRaid = isRaid,
 							tier = tier,
+							tierName = tierName,
 							-- instanceID moteur volontairement absent : il est
 							-- résolu à l'exécution par le pont de Lockouts.
 						}

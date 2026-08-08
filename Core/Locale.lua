@@ -36,7 +36,9 @@ local L = {
 
 	-- Résumés
 	SUMMARY = "%d/%d collected — %d missing",
+	SUMMARY_HIDDEN = "%d unavailable to this character",
 	SUMMARY_FILTERED = "%d shown",
+	INSTANCE_COUNTER = "Instances: %d/%d this hour · %d/%d today",
 	JOURNAL_NOT_READY = "Mount Journal not populated yet, retrying…",
 	NO_RESULT = "Nothing matches the current filters.",
 
@@ -44,6 +46,23 @@ local L = {
 	FILTER_SEARCH = "Search",
 	FILTER_AVAILABLE_ONLY = "Available now only",
 	FILTER_HIDE_UNMAPPED = "Hide unmapped sources",
+	FILTER_HIDE_EXCLUDED = "Hide excluded",
+	FILTER_EXPANSION = "Expansion",
+	FILTER_EXPANSION_ALL = "All",
+	FILTER_EXPANSION_NONE = "None",
+	EXPANSION_UNKNOWN = "Unknown (unmapped source)",
+	EXPANSION_NEEDS_SCAN = "Run /of ejscan to fill this list.",
+
+	-- Aperçu
+	PREVIEW_HINT = "Drag to rotate · wheel to zoom",
+	PREVIEW_NONE = "No model available for this mount.",
+	HINT_PREVIEW = "Left-click: preview the mount",
+	HINT_EXCLUDE = "Right-click: exclude from the list",
+	HINT_INCLUDE = "Right-click: put back in the list",
+	TAG_EXCLUDED = "excluded",
+	MINIMAP_LEFT = "Left-click: open OnlyFarm",
+	MINIMAP_RIGHT = "Right-click: rescan collection and lockouts",
+	MINIMAP_RESCANNED = "rescan requested.",
 
 	-- Verrous
 	LOCK_RESETS_IN = "resets in %s",
@@ -91,6 +110,8 @@ if GetLocale and GetLocale() == "frFR" then
 	L.STATUS_INELIGIBLE = "non éligible"
 
 	L.SUMMARY = "%d/%d possédées — %d manquantes"
+	L.SUMMARY_HIDDEN = "%d hors de portée sur ce perso"
+	L.INSTANCE_COUNTER = "Instances : %d/%d cette heure · %d/%d aujourd'hui"
 	L.SUMMARY_FILTERED = "%d affichées"
 	L.JOURNAL_NOT_READY = "Journal des montures pas encore peuplé, nouvelle tentative…"
 	L.NO_RESULT = "Aucun résultat pour ces filtres."
@@ -98,6 +119,22 @@ if GetLocale and GetLocale() == "frFR" then
 	L.FILTER_SEARCH = "Rechercher"
 	L.FILTER_AVAILABLE_ONLY = "Dispo maintenant uniquement"
 	L.FILTER_HIDE_UNMAPPED = "Masquer les sources non cartographiées"
+	L.FILTER_HIDE_EXCLUDED = "Masquer les exclues"
+	L.FILTER_EXPANSION = "Extension"
+	L.FILTER_EXPANSION_ALL = "Tout"
+	L.FILTER_EXPANSION_NONE = "Rien"
+	L.EXPANSION_UNKNOWN = "Inconnue (source non cartographiée)"
+	L.EXPANSION_NEEDS_SCAN = "Lance /of ejscan pour remplir cette liste."
+
+	L.PREVIEW_HINT = "Glisser pour tourner · molette pour zoomer"
+	L.PREVIEW_NONE = "Aucun modèle disponible pour cette monture."
+	L.HINT_PREVIEW = "Clic gauche : aperçu de la monture"
+	L.HINT_EXCLUDE = "Clic droit : exclure de la liste"
+	L.HINT_INCLUDE = "Clic droit : remettre dans la liste"
+	L.TAG_EXCLUDED = "exclue"
+	L.MINIMAP_LEFT = "Clic gauche : ouvrir OnlyFarm"
+	L.MINIMAP_RIGHT = "Clic droit : rescanner collection et verrous"
+	L.MINIMAP_RESCANNED = "rescan demandé."
 
 	L.LOCK_RESETS_IN = "reset dans %s"
 	L.LOCK_CHARS = "%d perso(s) disponible(s)"

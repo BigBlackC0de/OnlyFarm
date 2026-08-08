@@ -125,7 +125,7 @@ end)
 test("Database — création et estampille de schéma", function()
 	stub.Reset()
 	local ns = harness.Load(stub)
-	eq(_G.OnlyFarmDB.schema, 1, "schéma estampillé")
+	eq(_G.OnlyFarmDB.schema, 2, "schéma estampillé à la version courante")
 	eq(ns.db.charKey, "Krayne-Hyjal", "clé de personnage")
 	eq(type(ns.db.global.chars["Krayne-Hyjal"]), "table", "entrée de personnage créée")
 	eq(ns.db.char.faction, "Alliance", "instantané écrit à PLAYER_LOGIN")
@@ -458,6 +458,33 @@ test("Database — remise à zéro reconstruit une base utilisable", function()
 	eq(type(ns.db), "table", "ns.db toujours exploitable après effacement")
 	eq(ns.db.global.excluded[202], nil, "exclusion effacée")
 	eq(ns.db.charKey, "Krayne-Hyjal", "personnage courant recréé")
+end)
+
+test("Database — migration 1 -> 2 : les exclues redeviennent visibles", function()
+	stub.Reset()
+	_G.OnlyFarmDB = {
+		schema = 1,
+		global = { chars = {}, excluded = {} },
+		profiles = {
+			["Krayne-Hyjal"] = { filters = { hideExcluded = true, search = "loup" } },
+			["Zaltus-Hyjal"] = { filters = { hideExcluded = false } },
+		},
+	}
+	local ns = harness.Load(stub)
+
+	eq(_G.OnlyFarmDB.schema, 2, "schéma migré")
+	eq(ns.db.profile.filters.hideExcluded, false, "profil courant corrigé")
+	eq(_G.OnlyFarmDB.profiles["Zaltus-Hyjal"].filters.hideExcluded, false,
+		"autre profil laissé cohérent")
+	eq(ns.db.profile.filters.search, "loup", "le reste du profil est intact")
+end)
+
+test("Database — une base neuve n'affiche pas les exclues masquées", function()
+	stub.Reset()
+	local ns = harness.Load(stub)
+	eq(ns.db.profile.filters.hideExcluded, false, "défaut : exclues visibles, grisées")
+	eq(type(ns.db.profile.minimap), "table", "réglages du bouton minicarte présents")
+	eq(ns.db.profile.minimap.hide, false, "bouton minicarte affiché par défaut")
 end)
 
 --------------------------------------------------------------------------------

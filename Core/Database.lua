@@ -14,7 +14,7 @@ local _, ns = ...
 
 local Database = ns:NewModule("Database", 10)
 
-local CURRENT_SCHEMA = 1
+local CURRENT_SCHEMA = 2
 
 local GLOBAL_DEFAULTS = {
 	chars = {},              -- [charKey] = { …, lockouts = {}, dungeonEntries = {} }
@@ -34,11 +34,21 @@ local PROFILE_DEFAULTS = {
 		scale = 1.0,
 		activeTab = 1,
 	},
+	minimap = {
+		angle = 205,       -- degrés, position sur l'anneau de la minicarte
+		hide = false,
+	},
 	filters = {
 		search = "",
 		availableOnly = false,
 		hideUnmapped = false,
-		hideExcluded = true,
+		-- Une monture exclue reste visible, grisée. La faire disparaître d'un
+		-- clic droit donnait l'impression d'avoir cassé quelque chose.
+		hideExcluded = false,
+		-- Extensions décochées dans le menu. Vide = tout est affiché : on ne
+		-- veut pas qu'un nouveau palier ajouté par un patch soit masqué par
+		-- défaut parce qu'il n'était pas dans la liste au moment du réglage.
+		expansionsHidden = {},
 	},
 	routing = {
 		flySpeed = 75,          -- yd/s, calibré par le joueur (phase 3)
@@ -58,9 +68,22 @@ local CHAR_DEFAULTS = {
 --------------------------------------------------------------------------------
 
 -- migrations[v] transforme un schéma de version v en version v+1.
--- Vide aujourd'hui : la 1 est la version initiale publiée.
 local migrations = {}
 Database.migrations = migrations
+
+--- 1 -> 2 : les montures exclues étaient masquées par défaut. Un clic droit
+--  les faisait donc littéralement disparaître de la liste, ce qui se lit comme
+--  un bug et pas comme une action. Elles restent désormais affichées, grisées.
+--  ApplyDefaults ne corrige pas les profils existants — il ne remplace jamais
+--  une valeur présente — d'où cette migration.
+migrations[1] = function(sv)
+	if type(sv.profiles) ~= "table" then return end
+	for _, profile in pairs(sv.profiles) do
+		if type(profile.filters) == "table" and profile.filters.hideExcluded == true then
+			profile.filters.hideExcluded = false
+		end
+	end
+end
 
 local function Migrate(sv)
 	local from = sv.schema or 0

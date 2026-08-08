@@ -97,27 +97,92 @@ function UI:CreateHeader(frame)
 	end)
 	frame.SearchBox = search
 
-	local availableOnly = CreateFrame("CheckButton", "OnlyFarmAvailableOnly", parent, "UICheckButtonTemplate")
-	availableOnly:SetSize(22, 22)
-	availableOnly:SetPoint("TOPLEFT", 10, -32)
-	availableOnly.text = availableOnly.text or availableOnly.Text
-	if availableOnly.text then availableOnly.text:SetText(L.FILTER_AVAILABLE_ONLY) end
-	availableOnly:SetScript("OnClick", function(button)
-		ns.db.profile.filters.availableOnly = button:GetChecked() and true or false
-		self:Refresh()
-	end)
-	frame.AvailableOnly = availableOnly
+	-- Les trois filtres partagent la même mécanique : une case, un libellé, une
+	-- clé dans le profil. Le libellé s'appelle `text` sur les anciennes
+	-- versions du template et `Text` sur les récentes.
+	local function MakeFilter(name, label, key, offsetX)
+		local check = CreateFrame("CheckButton", "OnlyFarm" .. name, parent, "UICheckButtonTemplate")
+		check:SetSize(22, 22)
+		check:SetPoint("TOPLEFT", offsetX, -32)
+		local caption = check.text or check.Text
+		if caption then caption:SetText(label) end
+		check:SetScript("OnClick", function(button)
+			ns.db.profile.filters[key] = button:GetChecked() and true or false
+			self:Refresh()
+		end)
+		return check
+	end
 
-	local hideUnmapped = CreateFrame("CheckButton", "OnlyFarmHideUnmapped", parent, "UICheckButtonTemplate")
-	hideUnmapped:SetSize(22, 22)
-	hideUnmapped:SetPoint("LEFT", availableOnly, "LEFT", 250, 0)
-	hideUnmapped.text = hideUnmapped.text or hideUnmapped.Text
-	if hideUnmapped.text then hideUnmapped.text:SetText(L.FILTER_HIDE_UNMAPPED) end
-	hideUnmapped:SetScript("OnClick", function(button)
-		ns.db.profile.filters.hideUnmapped = button:GetChecked() and true or false
+	frame.AvailableOnly = MakeFilter("AvailableOnly", L.FILTER_AVAILABLE_ONLY, "availableOnly", 10)
+	frame.HideUnmapped = MakeFilter("HideUnmapped", L.FILTER_HIDE_UNMAPPED, "hideUnmapped", 250)
+	frame.HideExcluded = MakeFilter("HideExcluded", L.FILTER_HIDE_EXCLUDED, "hideExcluded", 520)
+
+	frame.ExpansionDropdown = self:CreateExpansionDropdown(parent, search)
+end
+
+--- Menu des extensions. Le type de frame « DropdownButton » et le template
+--  WowStyle1FilterDropdownTemplate sont ceux qu'utilise le Journal des
+--  montures de Blizzard ; le menu se décrit via SetupMenu depuis la 11.0.
+function UI:CreateExpansionDropdown(parent, anchor)
+	local L = ns.L
+	-- CreateFrame lève une erreur sur un type ou un template inconnu, elle ne
+	-- renvoie pas nil. Sans ce pcall, un changement côté Blizzard casserait
+	-- toute la fenêtre au lieu de faire disparaître un seul filtre.
+	local ok, dropdown = pcall(CreateFrame, "DropdownButton", "OnlyFarmExpansionDropdown",
+		parent, "WowStyle1FilterDropdownTemplate")
+	if not ok or not dropdown or type(dropdown.SetupMenu) ~= "function" then
+		ns:Debug("menu des extensions indisponible : %s", tostring(dropdown))
+		return nil
+	end
+
+	dropdown:SetSize(150, 22)
+	dropdown:SetPoint("RIGHT", anchor, "LEFT", -8, 0)
+	if dropdown.SetText then dropdown:SetText(L.FILTER_EXPANSION) end
+
+	local function IsShown(name)
+		return not ns.db.profile.filters.expansionsHidden[name]
+	end
+	local function SetShown(name, shown)
+		ns.db.profile.filters.expansionsHidden[name] = (not shown) or nil
 		self:Refresh()
+	end
+
+	dropdown:SetupMenu(function(_, rootDescription)
+		rootDescription:CreateTitle(L.FILTER_EXPANSION)
+
+		local expansions = ns.Eligibility:GetKnownExpansions()
+
+		rootDescription:CreateButton(L.FILTER_EXPANSION_ALL, function()
+			wipe(ns.db.profile.filters.expansionsHidden)
+			self:Refresh()
+		end)
+		rootDescription:CreateButton(L.FILTER_EXPANSION_NONE, function()
+			local hidden = ns.db.profile.filters.expansionsHidden
+			for _, expansion in ipairs(expansions) do hidden[expansion.name] = true end
+			self:Refresh()
+		end)
+
+		for _, expansion in ipairs(expansions) do
+			local label = expansion.name
+			if label == ns.Eligibility.UNKNOWN_EXPANSION then
+				label = L.EXPANSION_UNKNOWN
+			end
+			rootDescription:CreateCheckbox(label,
+				function() return IsShown(expansion.name) end,
+				function()
+					SetShown(expansion.name, not IsShown(expansion.name))
+					return MenuResponse.Refresh
+				end)
+		end
+
+		-- Sans scan, la seule entrée est « inconnue » : on dit pourquoi plutôt
+		-- que de laisser croire à un menu cassé.
+		if #expansions <= 1 then
+			rootDescription:CreateTitle(L.EXPANSION_NEEDS_SCAN)
+		end
 	end)
-	frame.HideUnmapped = hideUnmapped
+
+	return dropdown
 end
 
 function UI:CreateTabs(frame)
@@ -213,9 +278,11 @@ function UI:InitRow(button, elementData)
 		button:SetScript("OnEnter", function(row) UI:ShowRowTooltip(row) end)
 		button:SetScript("OnLeave", function() GameTooltip:Hide() end)
 		button:SetScript("OnClick", function(row, mouseButton)
-			if mouseButton == "RightButton" and row.mountID then
-				local excluded = not ns.Collection:IsExcluded(row.mountID)
-				ns.Collection:SetExcluded(row.mountID, excluded)
+			if not row.mountID then return end
+			if mouseButton == "RightButton" then
+				ns.Collection:SetExcluded(row.mountID, not ns.Collection:IsExcluded(row.mountID))
+			else
+				ns.Preview:Toggle(row.mountID)
 			end
 		end)
 	end
@@ -223,13 +290,22 @@ function UI:InitRow(button, elementData)
 	button.mountID = elementData.mountID
 	button.Icon:SetTexture(elementData.icon)
 
-	local nameText = elementData.name
+	-- Une monture exclue reste dans la liste, grisée et étiquetée. Elle ne
+	-- disparaît que si le filtre « Masquer les exclues » est coché — le clic
+	-- droit doit se lire comme une action, pas comme une perte.
 	if elementData.excluded then
-		nameText = "|cff666666" .. nameText .. "|r"
+		button.Name:SetText("|cff707070" .. elementData.name .. "|r")
+		button.Source:SetText("|cff707070" .. ns.L.TAG_EXCLUDED .. "|r")
+		button.Status:SetText("")
+		button.Icon:SetDesaturated(true)
+		button.Icon:SetAlpha(0.45)
+	else
+		button.Name:SetText(elementData.name)
+		button.Source:SetText(elementData.sourceSummary or "")
+		button.Status:SetText(elementData.statusText or "")
+		button.Icon:SetDesaturated(false)
+		button.Icon:SetAlpha(1)
 	end
-	button.Name:SetText(nameText)
-	button.Source:SetText(elementData.sourceSummary or "")
-	button.Status:SetText(elementData.statusText or "")
 end
 
 function UI:ShowRowTooltip(row)
@@ -260,6 +336,10 @@ function UI:ShowRowTooltip(row)
 				ns.Eligibility:FormatStatus(status) .. suffix)
 		end
 	end
+
+	GameTooltip:AddLine(" ")
+	GameTooltip:AddLine(L.HINT_PREVIEW, 0.5, 0.5, 0.5)
+	GameTooltip:AddLine(entry.excluded and L.HINT_INCLUDE or L.HINT_EXCLUDE, 0.5, 0.5, 0.5)
 	GameTooltip:Show()
 end
 
@@ -283,6 +363,9 @@ function UI:BuildDataProvider()
 
 		if filters.hideExcluded and entry.excluded then keep = false end
 		if keep and not MatchesSearch(entry, needle) then keep = false end
+		if keep and filters.expansionsHidden[ns.Eligibility:GetExpansion(entry.mountID)] then
+			keep = false
+		end
 
 		local status
 		if keep then
@@ -323,8 +406,19 @@ function UI:Refresh()
 
 	local counts = ns.Collection.counts
 	local provider, shown = self:BuildDataProvider()
-	frame.Summary:SetText(L.SUMMARY:format(counts.owned, counts.total, counts.missing)
-		.. "  |cff888888(" .. L.SUMMARY_FILTERED:format(shown) .. ")|r")
+
+	-- `total` ne compte que ce que CE personnage peut obtenir. Les montures
+	-- d'une autre faction ou d'une autre classe sont comptées à part : les
+	-- noyer dans le total donnerait un nombre de « manquantes » démoralisant
+	-- et faux, puisqu'elles ne tomberont jamais ici.
+	local summary = L.SUMMARY:format(counts.owned, counts.total, counts.missing)
+	if counts.hidden > 0 then
+		summary = summary .. "  |cff888888· " .. L.SUMMARY_HIDDEN:format(counts.hidden) .. "|r"
+	end
+	if shown ~= counts.missing then
+		summary = summary .. "  |cff888888· " .. L.SUMMARY_FILTERED:format(shown) .. "|r"
+	end
+	frame.Summary:SetText(summary)
 
 	frame.ScrollBox:SetDataProvider(provider, ScrollBoxConstants.RetainScrollPosition)
 	frame.EmptyLabel:SetShown(shown == 0)
@@ -353,6 +447,8 @@ function UI:SelectTab(index)
 	frame.SearchBox:SetShown(isCollection)
 	frame.AvailableOnly:SetShown(isCollection)
 	frame.HideUnmapped:SetShown(isCollection)
+	frame.HideExcluded:SetShown(isCollection)
+	if frame.ExpansionDropdown then frame.ExpansionDropdown:SetShown(isCollection) end
 	frame.EmptyLabel:Hide()
 
 	if isCollection then
@@ -389,6 +485,7 @@ function UI:Show()
 	frame.SearchBox:SetText(filters.search or "")
 	frame.AvailableOnly:SetChecked(filters.availableOnly)
 	frame.HideUnmapped:SetChecked(filters.hideUnmapped)
+	frame.HideExcluded:SetChecked(filters.hideExcluded)
 	self:SelectTab(ns.db.profile.ui.activeTab or 1)
 end
 
