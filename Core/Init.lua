@@ -34,7 +34,7 @@ end
 function ns:Debug(fmt, ...)
 	if not ns.debugEnabled then return end
 	local msg = select("#", ...) > 0 and fmt:format(...) or fmt
-	DEFAULT_CHAT_FRAME:AddMessage("|cff888888MR|r " .. msg)
+	DEFAULT_CHAT_FRAME:AddMessage("|cff888888OF|r " .. msg)
 end
 
 -- On ne laisse jamais une erreur de handler casser la boucle de dispatch :

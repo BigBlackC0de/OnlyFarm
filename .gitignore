@@ -15,3 +15,6 @@ Build/out/
 # SavedVariables copiées depuis le client pour analyse
 *.lua.bak
 Scratch/
+
+# Consignes locales pour un assistant, non versionnées
+CLAUDE.md
