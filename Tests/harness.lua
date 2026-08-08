@@ -24,6 +24,7 @@ harness.FILES = {
 	"Modules/Lockouts.lua",
 	"Modules/Nodes.lua",
 	"Modules/Teleports.lua",
+	"Modules/Attempts.lua",
 	"Modules/Eligibility.lua",
 	"Modules/DevScan.lua",
 	"Core/Commands.lua",

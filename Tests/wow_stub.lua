@@ -284,6 +284,139 @@ _G.GetInstanceInfo = function()
 end
 
 --------------------------------------------------------------------------------
+-- Cartes et coordonnées monde
+--
+-- Fixture : `stub.maps[uiMapID] = { continentID, originX, originY, spanX, spanY }`.
+-- La projection carte -> monde est affine et volontairement triviale : ce qui
+-- se teste ici, c'est que le routeur refuse de comparer deux continents, pas
+-- la géométrie d'Azeroth.
+--------------------------------------------------------------------------------
+
+stub.maps = {}
+stub.playerMap = nil        -- { uiMapID, x, y }
+
+_G.C_Map = {
+	GetBestMapForUnit = function() return stub.playerMap and stub.playerMap.uiMapID or nil end,
+
+	GetPlayerMapPosition = function()
+		if not stub.playerMap then return nil end
+		return { x = stub.playerMap.x, y = stub.playerMap.y }
+	end,
+
+	GetWorldPosFromMapPos = function(uiMapID, position)
+		local map = stub.maps[uiMapID]
+		if not map then return nil end
+		return map.continentID, {
+			x = map.originX + position.x * map.spanX,
+			y = map.originY + position.y * map.spanY,
+		}
+	end,
+
+	GetMapChildrenInfo = function()
+		local list = {}
+		for uiMapID in pairs(stub.maps) do
+			table.insert(list, { mapID = uiMapID })
+		end
+		table.sort(list, function(a, b) return a.mapID < b.mapID end)
+		return list
+	end,
+
+	CanSetUserWaypointOnMap = function(uiMapID) return stub.maps[uiMapID] ~= nil end,
+	SetUserWaypoint = function(point) stub.waypoint = point end,
+	ClearUserWaypoint = function() stub.waypoint = nil end,
+}
+
+_G.UiMapPoint = {
+	CreateFromCoordinates = function(uiMapID, x, y)
+		return { uiMapID = uiMapID, position = { x = x, y = y } }
+	end,
+}
+
+_G.C_SuperTrack = {
+	SetSuperTrackedUserWaypoint = function(on) stub.superTracked = on and true or false end,
+}
+
+--------------------------------------------------------------------------------
+-- Grimoire, jouets, cooldowns
+--------------------------------------------------------------------------------
+
+stub.spells = {}      -- { { spellID, name, castTime, passive } }
+stub.toys = {}        -- { { itemID, name } }
+stub.cooldowns = {}   -- [spellID] = { startTime, duration }
+
+_G.Enum = { SpellBookSpellBank = { Player = 0 } }
+
+_G.C_SpellBook = {
+	GetNumSpellBookSkillLines = function() return 1 end,
+
+	GetSpellBookSkillLineInfo = function()
+		return { name = "Général", itemIndexOffset = 0, numSpellBookItems = #stub.spells }
+	end,
+
+	GetSpellBookItemInfo = function(index)
+		local spell = stub.spells[index]
+		if not spell then return nil end
+		return {
+			spellID = spell.spellID,
+			name = spell.name,
+			isPassive = spell.passive or false,
+		}
+	end,
+
+	IsSpellKnown = function(spellID)
+		for _, spell in ipairs(stub.spells) do
+			if spell.spellID == spellID then return true end
+		end
+		return false
+	end,
+}
+
+_G.C_Spell = {
+	GetSpellInfo = function(spellID)
+		for _, spell in ipairs(stub.spells) do
+			if spell.spellID == spellID then
+				return { name = spell.name, castTime = spell.castTime or 0, spellID = spellID }
+			end
+		end
+		return nil
+	end,
+
+	GetSpellCooldown = function(spellID)
+		local cd = stub.cooldowns[spellID]
+		if not cd then return { startTime = 0, duration = 0, isEnabled = true } end
+		-- `secret = true` simule les valeurs secrètes de la 12.0 : le champ
+		-- existe mais n'est pas un nombre, donc inutilisable en arithmétique.
+		if cd.secret then
+			return { startTime = "secret", duration = "secret", isEnabled = true }
+		end
+		return { startTime = cd.startTime, duration = cd.duration, isEnabled = true }
+	end,
+}
+
+_G.C_ToyBox = {
+	GetNumToys = function() return #stub.toys end,
+	GetToyFromIndex = function(index)
+		local toy = stub.toys[index]
+		return toy and toy.itemID or nil
+	end,
+	GetToyInfo = function(itemID)
+		for _, toy in ipairs(stub.toys) do
+			if toy.itemID == itemID then return itemID, toy.name end
+		end
+		return nil
+	end,
+}
+
+_G.PlayerHasToy = function(itemID)
+	for _, toy in ipairs(stub.toys) do
+		if toy.itemID == itemID then return true end
+	end
+	return false
+end
+
+_G.InCombatLockdown = function() return stub.inCombat == true end
+
+--------------------------------------------------------------------------------
 -- Horloges de reset
 --------------------------------------------------------------------------------
 
@@ -334,6 +467,14 @@ function stub.Reset()
 	stub.mounts = {}
 	stub.savedInstances = {}
 	stub.currentInstance = nil
+	stub.maps = {}
+	stub.playerMap = nil
+	stub.spells = {}
+	stub.toys = {}
+	stub.cooldowns = {}
+	stub.waypoint = nil
+	stub.superTracked = nil
+	stub.inCombat = false
 	stub.dailyResetAt = stub.now + 3600
 	stub.weeklyResetAt = stub.now + 3 * 86400
 	stub.dailyResetPeriod = 86400

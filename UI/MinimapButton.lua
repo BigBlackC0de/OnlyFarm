@@ -15,19 +15,21 @@ local MinimapButton = ns:NewModule("MinimapButton", 85)
 
 local BUTTON_SIZE = 31
 
--- Écart entre le bord VISIBLE de l'icône et le bord de la minicarte.
+-- Écart entre le bord de la minicarte et le CENTRE du bouton.
 --
--- Deux pièges empilés ici, et le second a survécu à la première correction :
+-- Ce réglage a fait deux allers-retours, autant écrire pourquoi :
 --
--- 1. Ne pas coder le rayon en dur. La minicarte de retail fait 198 px de côté
---    (Blizzard_Minimap/Mainline/Minimap.xml), pas les 140 px de l'époque où le
---    « rayon 80 » de LibDBIcon a été écrit.
--- 2. Le rayon positionne le CENTRE du bouton, pas son bord. Poser ce centre à
---    « bord de la minicarte + 10 » laisse encore la moitié de l'icône (15 px)
---    à l'intérieur du cadre — c'est le placement classique de LibDBIcon, où le
---    bouton chevauche l'anneau. Pour qu'il soit franchement dehors, il faut
---    décaler du rayon de l'icône EN PLUS de l'écart voulu.
-local RING_GAP = 3
+--   rayon 80 fixe            → bouton à l'intérieur du cadre (la minicarte de
+--                              retail fait 198 px, pas les 140 px de l'époque
+--                              où ce chiffre circulait) ;
+--   rayon + moitié du bouton → bouton franchement dehors, mais décalé d'une
+--                              demi-icône par rapport aux autres addons.
+--
+-- La bonne cible n'est ni « dedans » ni « dehors » dans l'absolu : c'est
+-- ALIGNÉ avec les voisins. Or les voisins utilisent presque tous LibDBIcon-1.0,
+-- qui place le centre du bouton à `largeur / 2 + 5`. On reprend exactement sa
+-- convention — un bouton qui chevauche légèrement l'anneau, comme les autres.
+local RING_MARGIN = 5
 
 function MinimapButton:OnEnable()
 	if not Minimap then
@@ -106,7 +108,7 @@ end
 local function RingRadius()
 	local width = Minimap:GetWidth()
 	if not width or width <= 0 then width = 198 end   -- taille de retail 12.x
-	return (width / 2) + (BUTTON_SIZE / 2) + RING_GAP
+	return (width / 2) + RING_MARGIN
 end
 
 function MinimapButton:UpdatePosition()

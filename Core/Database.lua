@@ -19,6 +19,7 @@ local CURRENT_SCHEMA = 2
 local GLOBAL_DEFAULTS = {
 	chars = {},              -- [charKey] = { …, lockouts = {}, dungeonEntries = {} }
 	excluded = {},           -- [mountID] = true — montures que le joueur ignore
+	attempts = {},           -- [mountID] = { count, lastAt, byChar = {} }
 	routes = {},             -- phase 5
 	travelTimings = {},      -- phase 3 : auto-apprentissage des durées de vol
 	sourceCache = {},        -- [mountID] = source résolue par DevScan

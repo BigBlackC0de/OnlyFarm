@@ -22,6 +22,7 @@ function UI:OnEnable()
 	self:RegisterMessage("OF_COLLECTION_UPDATED", "Refresh")
 	self:RegisterMessage("OF_LOCKOUTS_UPDATED", "Refresh")
 	self:RegisterMessage("OF_SCAN_COMPLETE", "Refresh")
+	self:RegisterMessage("OF_ATTEMPTS_UPDATED", "Refresh")
 end
 
 --------------------------------------------------------------------------------
@@ -295,6 +296,17 @@ function UI:InitRow(button, elementData)
 			if not row.mountID then return end
 			if mouseButton == "RightButton" then
 				ns.Collection:SetExcluded(row.mountID, not ns.Collection:IsExcluded(row.mountID))
+			-- Rattrapage manuel du compteur de tentatives. ENCOUNTER_END est
+			-- fiable en solo legacy, mais pas garanti : mieux vaut un +1 sous
+			-- la main qu'un compteur faux qu'on ne peut pas corriger.
+			elseif IsShiftKeyDown and IsShiftKeyDown() then
+				ns.Attempts:Bump(row.mountID, nil, 1)
+				ns.Attempts:SendMessage("OF_ATTEMPTS_UPDATED")
+				UI:ShowRowTooltip(row)
+			elseif IsControlKeyDown and IsControlKeyDown() then
+				ns.Attempts:Bump(row.mountID, nil, -1)
+				ns.Attempts:SendMessage("OF_ATTEMPTS_UPDATED")
+				UI:ShowRowTooltip(row)
 			else
 				ns.Preview:Toggle(row.mountID)
 			end
@@ -351,15 +363,38 @@ function UI:ShowRowTooltip(row)
 		end
 	end
 
+	local attempts = ns.Attempts:Get(row.mountID)
+	GameTooltip:AddLine(" ")
+	GameTooltip:AddLine(ns.UI:FormatAttempts(row.mountID), 1, 0.82, 0)
+	if attempts and attempts.lastAt then
+		GameTooltip:AddLine(L.ATTEMPTS_LAST:format(ns.Util.FormatAge(attempts.lastAt)),
+			0.7, 0.7, 0.7)
+	end
+	local dry = ns.Attempts:GetDryChance(row.mountID)
+	if dry then
+		GameTooltip:AddLine(L.ATTEMPTS_DRY:format(dry * 100), 0.7, 0.7, 0.7)
+	end
+
 	GameTooltip:AddLine(" ")
 	GameTooltip:AddLine(L.HINT_PREVIEW, 0.5, 0.5, 0.5)
 	GameTooltip:AddLine(entry.excluded and L.HINT_INCLUDE or L.HINT_EXCLUDE, 0.5, 0.5, 0.5)
+	GameTooltip:AddLine(L.HINT_ATTEMPT_ADD, 0.5, 0.5, 0.5)
+	GameTooltip:AddLine(L.HINT_ATTEMPT_SUB, 0.5, 0.5, 0.5)
 	GameTooltip:Show()
 end
 
 --------------------------------------------------------------------------------
 -- Rafraîchissement
 --------------------------------------------------------------------------------
+
+--- « aucun essai » / « 1 essai » / « 12 essais ».
+function UI:FormatAttempts(mountID)
+	local L = ns.L
+	local count = ns.Attempts:GetCount(mountID)
+	if count <= 0 then return L.ATTEMPTS_NONE end
+	if count == 1 then return L.ATTEMPTS_ONE end
+	return L.ATTEMPTS:format(count)
+end
 
 local function MatchesSearch(entry, needle)
 	if needle == "" then return true end

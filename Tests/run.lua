@@ -447,6 +447,101 @@ test("Eligibility — vue multi-personnage", function()
 	eq(byName.Morvani.stale, true, "l'alt oublié est marqué incertain")
 end)
 
+--------------------------------------------------------------------------------
+-- Attempts
+--------------------------------------------------------------------------------
+
+test("Attempts — un kill compte une tentative par monture manquante", function()
+	stub.Reset()
+	stub.mounts = StandardMounts()
+	local ns = LoadWithSources({
+		[201] = { instanceName = "Ulduar", encounterName = "Yogg-Saron", isRaid = true },
+	})
+	ns.Attempts:Invalidate()
+
+	eq(ns.Attempts:GetCount(201), 0, "aucune tentative au départ")
+
+	stub.Fire("ENCOUNTER_END", 1143, "Yogg-Saron", 14, 1, 1)
+	eq(ns.Attempts:GetCount(201), 1, "kill réussi compté")
+
+	-- Un échec ne compte pas : on n'a pas vu la table de butin.
+	stub.Advance(120)
+	stub.Fire("ENCOUNTER_END", 1143, "Yogg-Saron", 14, 1, 0)
+	eq(ns.Attempts:GetCount(201), 1, "wipe non compté")
+end)
+
+test("Attempts — ENCOUNTER_END et BOSS_KILL ne comptent pas deux fois", function()
+	stub.Reset()
+	stub.mounts = StandardMounts()
+	local ns = LoadWithSources({
+		[201] = { instanceName = "Ulduar", encounterName = "Yogg-Saron", isRaid = true },
+	})
+	ns.Attempts:Invalidate()
+
+	stub.Fire("ENCOUNTER_END", 1143, "Yogg-Saron", 14, 1, 1)
+	stub.Fire("BOSS_KILL", 1143, "Yogg-Saron")
+	eq(ns.Attempts:GetCount(201), 1, "le doublon est absorbé")
+
+	-- Passé la fenêtre d'anti-doublon, c'est une vraie seconde tentative.
+	stub.Advance(120)
+	stub.Fire("BOSS_KILL", 1143, "Yogg-Saron")
+	eq(ns.Attempts:GetCount(201), 2, "kill suivant compté")
+end)
+
+test("Attempts — le nom de rencontre fait le pont, pas l'encounterID", function()
+	stub.Reset()
+	stub.mounts = StandardMounts()
+	-- Le nom est stocké avec une casse et des espaces différents : le pont doit
+	-- tenir, c'est tout l'intérêt de passer par NormalizeName.
+	local ns = LoadWithSources({
+		[201] = { instanceName = "Ulduar", encounterName = "  YOGG-SARON  ", isRaid = true },
+	})
+	ns.Attempts:Invalidate()
+
+	stub.Fire("ENCOUNTER_END", 999999, "Yogg-Saron", 14, 1, 1)
+	eq(ns.Attempts:GetCount(201), 1, "rapprochement par nom insensible à la casse")
+end)
+
+test("Attempts — monture obtenue : le compteur se fige", function()
+	stub.Reset()
+	stub.mounts = StandardMounts()
+	local ns = LoadWithSources({
+		[201] = { instanceName = "Ulduar", encounterName = "Yogg-Saron", isRaid = true },
+	})
+	ns.Attempts:Invalidate()
+
+	stub.Fire("ENCOUNTER_END", 1143, "Yogg-Saron", 14, 1, 1)
+	local total, mounts = ns.Attempts:GetTotals()
+	eq(total, 1, "une tentative au total")
+	eq(mounts, 1, "sur une monture")
+
+	stub.mounts[2].isCollected = true
+	stub.Fire("NEW_MOUNT_ADDED", 201)
+	stub.AdvanceFrames(2)
+	stub.FlushTimers()
+
+	eq(ns.db.global.attempts[201].obtainedAt ~= nil, true, "date d'obtention posée")
+	total, mounts = ns.Attempts:GetTotals()
+	eq(total, 0, "la monture obtenue sort du total en cours")
+end)
+
+test("Attempts — proba cumulée seulement si le taux de drop est connu", function()
+	stub.Reset()
+	stub.mounts = StandardMounts()
+	local ns = LoadWithSources({
+		[201] = { instanceName = "Ulduar", encounterName = "Yogg-Saron", isRaid = true },
+	})
+	ns.Attempts:Invalidate()
+	stub.Fire("ENCOUNTER_END", 1143, "Yogg-Saron", 14, 1, 1)
+
+	eq(ns.Attempts:GetDryChance(201), nil, "sans taux de drop : pas de probabilité inventée")
+
+	ns.db.global.sourceCache[201].dropRate = 0.01
+	ns.Eligibility:Invalidate()
+	local dry = ns.Attempts:GetDryChance(201)
+	eq(dry ~= nil and math.abs(dry - 0.99) < 1e-9, true, "1 essai à 1 % : 99 % de rien")
+end)
+
 test("Database — remise à zéro reconstruit une base utilisable", function()
 	stub.Reset()
 	stub.mounts = StandardMounts()

@@ -65,6 +65,16 @@ local L = {
 	MINIMAP_RIGHT = "Right-click: rescan collection and lockouts",
 	MINIMAP_RESCANNED = "rescan requested.",
 
+	-- Tentatives
+	ATTEMPTS = "%d tries",
+	ATTEMPTS_ONE = "1 try",
+	ATTEMPTS_NONE = "no try yet",
+	ATTEMPTS_LAST = "last try %s ago",
+	ATTEMPTS_DRY = "%.0f%% chance of still having nothing",
+	ATTEMPTS_TOTAL = "%d tries on %d mounts",
+	HINT_ATTEMPT_ADD = "Shift-click: +1 try (if the automatic count missed it)",
+	HINT_ATTEMPT_SUB = "Ctrl-click: -1 try",
+
 	-- Verrous
 	LOCK_RESETS_IN = "resets in %s",
 	LOCK_CHARS = "%d character(s) available",
@@ -142,6 +152,15 @@ if GetLocale and GetLocale() == "frFR" then
 	L.MINIMAP_LEFT = "Clic gauche : ouvrir OnlyFarm"
 	L.MINIMAP_RIGHT = "Clic droit : rescanner collection et verrous"
 	L.MINIMAP_RESCANNED = "rescan demandé."
+
+	L.ATTEMPTS = "%d essais"
+	L.ATTEMPTS_ONE = "1 essai"
+	L.ATTEMPTS_NONE = "aucun essai"
+	L.ATTEMPTS_LAST = "dernier essai il y a %s"
+	L.ATTEMPTS_DRY = "%.0f%% de chances de n'avoir toujours rien"
+	L.ATTEMPTS_TOTAL = "%d essais sur %d montures"
+	L.HINT_ATTEMPT_ADD = "Maj+clic : +1 essai (si le comptage automatique a raté)"
+	L.HINT_ATTEMPT_SUB = "Ctrl+clic : -1 essai"
 
 	L.LOCK_RESETS_IN = "reset dans %s"
 	L.LOCK_CHARS = "%d perso(s) disponible(s)"
