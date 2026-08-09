@@ -40,14 +40,23 @@ local L = {
 	KPI_INSTANCES = "%d/h · %d/day",
 	DASH_AVAILABILITY = "What is open right now",
 	DASH_PROGRESS = "%d of %d collected",
-	DASH_EXPANSIONS = "Progress by expansion",
-	DASH_EXPANSIONS_HINT = "release order",
+	DASH_BREAKDOWN = "How your collection breaks down",
+	DASH_BREAKDOWN_HINT = "bar length = how many exist · filled = collected",
+	DASH_BREAKDOWN_MORE = "+%d more — enlarge the window",
+	DASH_AXIS_SOURCE = "By source",
+	DASH_AXIS_MOVEMENT = "By movement",
 	DASH_TARGETS = "Start with these",
 	DASH_NO_TARGET = "Nothing available right now — everything is locked or unmapped.",
 	DASH_LOCKOUTS = "Done this week",
 	DASH_NO_LOCKOUT = "No lockout on this character — the week is untouched.",
-	DASH_NEEDS_SCAN = "Expansions appear once the mapping has run.",
-	DASH_SCAN_EMPTY = "The mapping ran but tied no mount to an instance. |cff7ac1ff/of diag|r says where it broke.",
+
+	-- Modes de déplacement (mountTypeID)
+	MOVE_GROUND = "Ground",
+	MOVE_FLYING = "Flying",
+	MOVE_SKYRIDING = "Skyriding",
+	MOVE_AQUATIC = "Aquatic",
+	MOVE_OTHER = "Other",
+	SOURCE_UNKNOWN = "Unknown source",
 
 	-- Statuts
 	STATUS_AVAILABLE = "available",
@@ -190,14 +199,22 @@ if GetLocale and GetLocale() == "frFR" then
 	L.KPI_INSTANCES = "%d/h · %d/jour"
 	L.DASH_AVAILABILITY = "Ce qui est ouvert maintenant"
 	L.DASH_PROGRESS = "%d sur %d possédées"
-	L.DASH_EXPANSIONS = "Progression par extension"
-	L.DASH_EXPANSIONS_HINT = "ordre de sortie"
+	L.DASH_BREAKDOWN = "Comment se répartit ta collection"
+	L.DASH_BREAKDOWN_HINT = "longueur = effectif · rempli = possédées"
+	L.DASH_BREAKDOWN_MORE = "+%d autres — agrandis la fenêtre"
+	L.DASH_AXIS_SOURCE = "Par source"
+	L.DASH_AXIS_MOVEMENT = "Par déplacement"
 	L.DASH_TARGETS = "Commence par là"
 	L.DASH_NO_TARGET = "Rien de disponible maintenant — tout est verrouillé ou non cartographié."
 	L.DASH_LOCKOUTS = "Déjà fait cette semaine"
 	L.DASH_NO_LOCKOUT = "Aucun verrou sur ce personnage — la semaine est intacte."
-	L.DASH_NEEDS_SCAN = "Les extensions apparaissent une fois la cartographie passée."
-	L.DASH_SCAN_EMPTY = "La cartographie a tourné mais n'a rattaché aucune monture à une instance. |cff7ac1ff/of diag|r dit où ça coince."
+
+	L.MOVE_GROUND = "Terrestre"
+	L.MOVE_FLYING = "Volante"
+	L.MOVE_SKYRIDING = "Skyriding"
+	L.MOVE_AQUATIC = "Aquatique"
+	L.MOVE_OTHER = "Autre"
+	L.SOURCE_UNKNOWN = "Source inconnue"
 
 	L.STATUS_AVAILABLE = "disponible"
 	L.STATUS_LOCKED = "verrouillé"

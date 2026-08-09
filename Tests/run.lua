@@ -51,19 +51,22 @@ end
 local function StandardMounts()
 	return {
 		-- possédée
-		{ mountID = 100, name = "Cheval alezan", sourceType = 3, isCollected = true },
+		{ mountID = 100, name = "Cheval alezan", sourceType = 3, isCollected = true,
+		  mountTypeID = 230 },
 		-- manquante, butin de raid
 		{ mountID = 201, name = "Proto-drake fumeronde", sourceType = 1,
-		  itemID = 32458, source = "Butin : Yogg-Saron\nUlduar" },
+		  itemID = 32458, source = "Butin : Yogg-Saron\nUlduar", mountTypeID = 248 },
 		-- manquante, vendeur
 		{ mountID = 202, name = "Brutosaure gigantesque", sourceType = 3,
-		  source = "Vendeur : Talutu" },
+		  source = "Vendeur : Talutu", mountTypeID = 230 },
 		-- manquante, mais masquée sur ce personnage (faction adverse)
 		{ mountID = 203, name = "Loup de guerre", sourceType = 1,
-		  shouldHideOnChar = true, faction = 0 },
-		-- manquante, butin de donjon
+		  shouldHideOnChar = true, faction = 0, mountTypeID = 230 },
+		-- manquante, butin de donjon. Son mountTypeID est volontairement
+		-- inconnu : c'est le cas d'un type ajouté par un patch, qui doit tomber
+		-- dans « autre » sans rien inventer.
 		{ mountID = 204, name = "Cheval en flammes", sourceType = 1,
-		  source = "Butin : Attumen\nÉcurie" },
+		  source = "Butin : Attumen\nÉcurie", mountTypeID = 991 },
 	}
 end
 
@@ -1218,33 +1221,87 @@ test("Stats — répartition par statut", function()
 	eq(stats.availableCount, 2, "deux cibles ouvertes")
 end)
 
-test("Stats — progression par extension, dans l'ordre de sortie", function()
+test("Stats — répartition par nature de source", function()
 	stub.Reset()
 	stub.mounts = StandardMounts()
 	local ns = harness.Load(stub)
-	-- La monture possédée et une manquante sur le même palier ; une manquante
-	-- seule sur un autre. Le second palier est donc moins avancé.
-	ns.db.global.sourceCache = {
-		[100] = { tierName = "Wrath", tier = 2 },
-		[201] = { tierName = "Wrath", tier = 2 },
-		[202] = { tierName = "Legion", tier = 6 },
-	}
-	ns.Eligibility:Invalidate()
-	ns.Stats:Invalidate()
 
-	-- L'ordre est chronologique, pas « le plus urgent d'abord » : une frise qui
-	-- se réordonne à chaque monture obtenue fait perdre ses repères.
-	local stats = ns.Stats:Get()
-	eq(stats.expansions[1].name, "Wrath", "Wrath (niveau 2) avant Legion (niveau 6)")
-	eq(stats.expansions[2].name, "Legion", "puis Legion")
+	-- Deux butins (201, 204) et deux vendeurs (100 possédée, 202). La monture
+	-- masquée sur ce personnage ne compte nulle part : elle ne tombera jamais.
+	local breakdown = ns.Stats:GetBreakdown("source")
+	eq(#breakdown, 2, "deux natures de source présentes")
+	eq(breakdown.max, 2, "le plus gros effectif sert d'échelle")
 
-	-- Le panier « inconnue » est mécaniquement à 0 % : il doit rester dernier
-	-- au lieu de squatter la première barre en permanence.
-	eq(stats.expansions[#stats.expansions].name, ns.Eligibility.UNKNOWN_EXPANSION,
-		"les sources non cartographiées ferment la marche")
+	-- À effectif égal, l'ordre suit le libellé : il ne bouge donc pas d'un
+	-- rafraîchissement à l'autre.
+	eq(breakdown[1].label, "Drop", "le libellé vient du client")
+	eq(breakdown[1].owned, 0, "aucun butin possédé")
+	eq(breakdown[1].total, 2, "deux butins obtenables")
+	eq(breakdown[2].label, "Vendor", "puis les vendeurs")
+	eq(breakdown[2].owned, 1, "la possédée compte dans sa catégorie")
+	eq(breakdown[2].total, 2, "dénominateur complet")
+end)
 
-	eq(stats.expansions[1].owned, 1, "la possédée compte dans son extension")
-	eq(stats.expansions[1].total, 2, "dénominateur complet")
+test("Stats — répartition par mode de déplacement", function()
+	stub.Reset()
+	stub.mounts = StandardMounts()
+	local ns = harness.Load(stub)
+
+	local breakdown = ns.Stats:GetBreakdown("movement")
+	eq(#breakdown, 3, "terrestre, volante, autre")
+
+	-- L'ordre est celui de Data.MOVEMENT_ORDER, pas l'effectif : il se lit comme
+	-- une légende, et « autre » ferme la marche.
+	eq(breakdown[1].key, ns.Data.MOVEMENT.GROUND, "terrestre d'abord")
+	eq(breakdown[1].owned, 1, "la possédée est terrestre")
+	eq(breakdown[1].total, 2, "deux terrestres obtenables")
+	eq(breakdown[2].key, ns.Data.MOVEMENT.FLYING, "puis volante")
+	eq(breakdown[3].key, ns.Data.MOVEMENT.OTHER,
+		"un mountTypeID inconnu tombe dans « autre », sans supposition")
+	eq(breakdown[3].label, ns.L.MOVE_OTHER, "et il est étiqueté comme tel")
+end)
+
+test("Stats — un axe inconnu retombe sur celui par défaut", function()
+	stub.Reset()
+	stub.mounts = StandardMounts()
+	local ns = harness.Load(stub)
+
+	eq(ns.Stats:IsValidAxis("expansion"), false, "l'axe des extensions n'existe plus")
+	eq(ns.Stats:ResolveAxis("expansion"), ns.Stats.DEFAULT_AXIS,
+		"un réglage sauvegardé obsolète ne casse pas le graphe")
+	eq(#ns.Stats:GetBreakdown(nil), #ns.Stats:GetBreakdown("source"),
+		"sans axe, la répartition par source")
+end)
+
+test("Stats — la répartition retombe après un changement de collection", function()
+	stub.Reset()
+	stub.mounts = StandardMounts()
+	local ns = harness.Load(stub)
+	eq(ns.Stats:GetBreakdown("source")[2].owned, 1, "une possédée au départ")
+
+	-- Nouvelle monture apprise : le cache de répartition doit tomber avec le
+	-- reste, sinon le graphe reste sur la photo d'avant.
+	stub.mounts[3].isCollected = true
+	stub.Fire("NEW_MOUNT_ADDED", 202)
+	stub.AdvanceFrames(2)
+	stub.FlushTimers()
+
+	eq(ns.Stats:GetBreakdown("source")[2].owned, 2, "le graphe suit la collection")
+end)
+
+test("Collection — mode de déplacement lu et mis en cache", function()
+	stub.Reset()
+	stub.mounts = StandardMounts()
+	local ns = harness.Load(stub)
+
+	eq(ns.Collection:GetMovement(201), ns.Data.MOVEMENT.FLYING, "248 = volante")
+	eq(ns.Collection:GetMovement(204), ns.Data.MOVEMENT.OTHER, "type inconnu = autre")
+	eq(ns.Collection:GetEntry(201).mountTypeID, 248, "le mountTypeID est retenu")
+	-- Le texte de source vient du même appel : le résoudre ne doit pas le
+	-- redemander au client.
+	eq(ns.Collection:GetSourceText(201), "Butin : Yogg-Saron\nUlduar",
+		"un seul appel sert les deux données")
+	eq(ns.Collection:GetMovement(999), ns.Data.MOVEMENT.OTHER, "monture inconnue")
 end)
 
 test("Stats — cibles du moment triées par tentatives", function()

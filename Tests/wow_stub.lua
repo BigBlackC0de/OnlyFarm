@@ -226,10 +226,14 @@ _G.C_MountJournal = {
 		return nil
 	end,
 
+	-- 1 creatureDisplayInfoID  2 description  3 source  4 isSelfMount
+	-- 5 mountTypeID  6 uiModelSceneID  7 animID  8 spellVisualKitID
+	-- 9 disablePlayerMountPreview
 	GetMountInfoExtraByID = function(mountID)
 		for _, mount in ipairs(stub.mounts) do
 			if mount.mountID == mountID then
-				return nil, mount.description or "", mount.source or "", false, 0, 0, 0, 0, false
+				return nil, mount.description or "", mount.source or "", false,
+					mount.mountTypeID or 230, 0, 0, 0, false
 			end
 		end
 		return nil

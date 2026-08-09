@@ -18,6 +18,7 @@ harness.FILES = {
 	"Core/Locale.lua",
 	"Core/Database.lua",
 	"Data/Expansions.lua",
+	"Data/MountTypes.lua",
 	"Data/Mounts.lua",
 	"Data/Sources.lua",
 	"Data/Nodes.lua",

@@ -216,6 +216,55 @@ Journal des montures et change ce que renvoient `GetNumDisplayedMounts` et
 
 Elle ne donne pas non plus accès à l'extension, qui est le seul manque réel.
 
+## Classer les montures : les axes que le client donne vraiment
+
+L'extension étant hors d'atteinte (section précédente), la question devient :
+**par quoi peut-on classer une monture, tout de suite, sans scan et sans table
+curée de 1600 lignes ?** Inventaire complet des axes disponibles monture par
+monture, vérifié sur le dump 12.0.7.
+
+| Axe | Provenance | Couverture | Verdict |
+|---|---|---|---|
+| Nature de la source | `sourceType`, 6e retour de `GetMountInfoByID` ; libellé localisé par `_G["BATTLE_PET_SOURCE_"..sourceType]` | toutes | **retenu** — axe par défaut du graphe |
+| Mode de déplacement | `mountTypeID`, 5e retour de `GetMountInfoExtraByID` | toutes | **retenu** — second axe du graphe |
+| Faction | `isFactionSpecific` / `faction`, 8e et 9e retours de `GetMountInfoByID` | toutes | écarté : les montures de la faction adverse sont déjà exclues (`shouldHideOnChar`), il ne resterait qu'une barre |
+| Style de vol | `isSteadyFlight`, 13e retour de `GetMountInfoByID` | montures volantes | écarté : c'est un réglage du joueur, pas une propriété de la monture |
+| Race / famille (drake, cheval, félin…) | — | — | **impossible**, cf. ci-dessous |
+| Extension | — | — | impossible en jeu, cf. section précédente |
+
+### Le mode de déplacement : exact, mais muet
+
+`mountTypeID` est un entier fourni par le client pour toutes les montures. Ce
+que le client ne donne pas, c'est son **sens** : la table `MountType` et ses
+capacités (marcher, voler, nager) vivent dans les DB2. Il faut donc une table de
+correspondance, et elle est petite — une vingtaine de valeurs, stables depuis des
+années, dont trois (230 terrestre, 248 volante, 402 skyriding) couvrent la
+grande majorité de la collection.
+
+`Data/MountTypes.lua` la porte. Trois identifiants connus y sont volontairement
+absents (407, 408, 412) : les sources publiques les classent différemment et
+aucune n'est Blizzard. Un type non listé tombe dans « autre », y compris ceux
+qu'un patch futur ajoutera. C'est la même règle que pour l'extension — pas de
+réponse plutôt qu'une réponse indiscernablement fausse.
+
+### La race d'une monture : le mur, et pourquoi il ne se franchit pas en jeu
+
+Aucune API n'expose la famille d'une monture. `GetMountInfoExtraByID` donne un
+`creatureDisplayInfoID`, et c'est tout ; il faudrait remonter
+`CreatureDisplayInfo` → `CreatureModelData` → chemin de fichier du modèle
+(`creature/drake/...`) pour en tirer une famille. Deux obstacles :
+
+* ces tables sont des DB2, hors d'atteinte d'un addon ;
+* en jeu, `Model:SetDisplayInfo(id)` puis `Model:GetModelFileID()` ne rend qu'un
+  **fileDataID numérique**, pas un chemin. Le nom de dossier — la seule chose
+  qui porterait la famille — n'est plus exposé depuis le passage aux fileDataID.
+
+Un classement par race demanderait donc exactement le montage hors jeu qui a été
+tenté pour l'extension, avec en plus une nomenclature de familles à écrire à la
+main (« proto-drake » et « drake » sont-ils la même race ?) là où l'extension,
+elle, avait au moins une réponse canonique. Le rapport travail/valeur n'y est
+pas.
+
 ## Points à vérifier au prochain patch
 
 * `GetSavedInstanceEncounterInfo` existe-t-elle encore ?

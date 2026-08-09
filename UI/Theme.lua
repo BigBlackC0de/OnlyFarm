@@ -298,6 +298,167 @@ function Theme.BarRow(parent, labelWidth, valueWidth)
 end
 
 --------------------------------------------------------------------------------
+-- Ligne de répartition
+--
+-- Une BarRow classique dessine un pourcentage : toutes les barres ont la même
+-- longueur, seule la part remplie change. C'est ce qu'il faut pour comparer des
+-- avancements, et c'est exactement ce qu'il ne faut pas pour montrer une
+-- répartition — trois montures possédées sur trois y font une barre pleine, plus
+-- longue que cent-vingt sur deux-cents.
+--
+-- Ici la longueur dessinée porte l'EFFECTIF de la catégorie (rapporté à la plus
+-- grosse), et la part remplie porte les possédées. Une seule ligne répond donc à
+-- « combien y en a-t-il ? » et « où j'en suis ? ».
+--
+--   Butin      ██████████░░░░░░░░░░░░   128/312
+--   Vendeur    ████░░░░                  21/54
+--------------------------------------------------------------------------------
+
+function Theme.ShareRow(parent, labelWidth, valueWidth)
+	local row = CreateFrame("Frame", nil, parent)
+
+	row.Label = Theme.Text(row, "GameFontHighlightSmall", Theme.colors.text)
+	row.Label:SetPoint("LEFT", 0, 0)
+	row.Label:SetWidth(labelWidth or 130)
+	row.Label:SetWordWrap(false)
+
+	row.Value = Theme.Text(row, "GameFontHighlightSmall", Theme.colors.muted, "RIGHT")
+	row.Value:SetPoint("RIGHT", 0, 0)
+	row.Value:SetWidth(valueWidth or 64)
+
+	-- Zone de tracé : c'est elle qui donne la largeur disponible en pixels.
+	local plot = CreateFrame("Frame", nil, row)
+	plot:SetPoint("LEFT", row.Label, "RIGHT", 8, 0)
+	plot:SetPoint("RIGHT", row.Value, "LEFT", -8, 0)
+	plot:SetHeight(10)
+	row.Plot = plot
+
+	-- Effectif de la catégorie : l'aplat pâle.
+	row.Track = plot:CreateTexture(nil, "ARTWORK")
+	row.Track:SetPoint("LEFT")
+	row.Track:SetHeight(10)
+
+	-- Possédées : l'aplat plein, par-dessus, aligné à gauche.
+	row.Fill = plot:CreateTexture(nil, "OVERLAY")
+	row.Fill:SetPoint("LEFT")
+	row.Fill:SetHeight(10)
+
+	-- La largeur du tracé vaut zéro au premier rafraîchissement, tant que le
+	-- client n'a pas résolu les ancrages : sans ce rappel, les barres restent
+	-- invisibles jusqu'au prochain événement.
+	plot:SetScript("OnSizeChanged", function()
+		if row.lastValues then
+			row:Set(row.lastValues[1], row.lastValues[2], row.lastValues[3], row.lastValues[4])
+		end
+	end)
+
+	--- @param owned  possédées dans cette catégorie
+	--  @param total  effectif de la catégorie
+	--  @param max    plus gros effectif du graphe, pour l'échelle
+	function row:Set(label, owned, total, max)
+		self.lastValues = { label, owned, total, max }
+		self.Label:SetText(label)
+		self.Value:SetText(string.format("%d/%d", owned, total))
+
+		local width = self.Plot:GetWidth() or 0
+		if width <= 0 then
+			self.Track:Hide()
+			self.Fill:Hide()
+			return
+		end
+
+		max = (max and max > 0) and max or math.max(1, total)
+		-- Un minimum de deux pixels : une catégorie à une seule monture doit
+		-- rester visible à côté d'une catégorie à trois cents.
+		local span = math.max(2, (total / max) * width)
+		local ratio = total > 0 and (owned / total) or 0
+
+		local c = ratio >= 0.999 and Theme.colors.green or Theme.colors.accent
+		self.Track:SetWidth(span)
+		self.Track:SetColorTexture(c[1], c[2], c[3], 0.22)
+		self.Track:Show()
+
+		if owned > 0 then
+			self.Fill:SetWidth(math.max(1, span * ratio))
+			self.Fill:SetColorTexture(c[1], c[2], c[3], 1)
+			self.Fill:Show()
+		else
+			self.Fill:Hide()
+		end
+	end
+
+	return row
+end
+
+--------------------------------------------------------------------------------
+-- Sélecteur segmenté
+--
+-- Deux ou trois choix exclusifs, collés, l'actif en évidence. Une liste
+-- déroulante pour deux entrées demande un clic de plus pour rien.
+--------------------------------------------------------------------------------
+
+--- @param choices  liste { key, label }
+--  @param onSelect fonction(key) appelée au clic
+function Theme.Segmented(parent, choices, onSelect)
+	local frame = CreateFrame("Frame", nil, parent)
+	frame:SetHeight(18)
+	frame.buttons = {}
+
+	local offset = 0
+	for index, choice in ipairs(choices) do
+		local button = CreateFrame("Button", nil, frame)
+		button:SetHeight(18)
+		button.key = choice.key
+
+		button.Background = button:CreateTexture(nil, "BACKGROUND")
+		button.Background:SetAllPoints()
+		Theme.Border(button, Theme.colors.border)
+
+		button.Text = Theme.Text(button, "GameFontHighlightSmall", Theme.colors.muted, "CENTER")
+		button.Text:SetPoint("CENTER")
+		button.Text:SetText(choice.label)
+		button:SetWidth(button.Text:GetStringWidth() + 20)
+		button:SetPoint("LEFT", offset, 0)
+		-- Un pixel de recouvrement : les bordures voisines se confondent en un
+		-- seul trait, sinon le groupe se lit comme des boutons épars.
+		offset = offset + button:GetWidth() - 1
+
+		button:SetScript("OnClick", function(self_)
+			frame:SetValue(self_.key)
+			if onSelect then onSelect(self_.key) end
+		end)
+		button:SetScript("OnEnter", function(self_)
+			if not self_.active then
+				local c = Theme.colors.text
+				self_.Text:SetTextColor(c[1], c[2], c[3])
+			end
+		end)
+		button:SetScript("OnLeave", function(self_)
+			if not self_.active then
+				local c = Theme.colors.muted
+				self_.Text:SetTextColor(c[1], c[2], c[3])
+			end
+		end)
+
+		frame.buttons[index] = button
+	end
+	frame:SetWidth(math.max(1, offset + 1))
+
+	function frame:SetValue(key)
+		self.value = key
+		for _, button in ipairs(self.buttons) do
+			button.active = (button.key == key)
+			local background = button.active and Theme.colors.cardHi or Theme.colors.panel
+			button.Background:SetColorTexture(background[1], background[2], background[3], 1)
+			local text = button.active and Theme.colors.accent or Theme.colors.muted
+			button.Text:SetTextColor(text[1], text[2], text[3])
+		end
+	end
+
+	return frame
+end
+
+--------------------------------------------------------------------------------
 -- Pastille de statut
 --
 -- Un aplat translucide de la couleur du statut, avec le texte dedans. C'est ce

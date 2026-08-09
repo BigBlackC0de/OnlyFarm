@@ -12,10 +12,18 @@ multi-personnage fonctionnent. Les routes arrivent en phase 3.
 
 ## Ce que ça fait aujourd'hui
 
-* **Tableau de bord** : compteurs, progression par extension (les moins
-  avancées en tête), répartition de ce qui est ouvert / verrouillé / inconnu,
-  cibles à lancer maintenant, et la liste des raids déjà faits cette semaine
-  avec leur temps avant reset.
+* **Tableau de bord** : compteurs, répartition de ce qui est ouvert /
+  verrouillé / inconnu, cibles à lancer maintenant, et la liste des raids déjà
+  faits cette semaine avec leur temps avant reset.
+* **Graphe de répartition de ta collection**, sur deux axes que le client donne
+  pour *toutes* les montures, sans scan : la **nature de la source** (butin,
+  quête, vendeur, métier, haut fait, événement…) et le **mode de déplacement**
+  (terrestre, volante, skyriding, aquatique). La longueur d'une barre porte
+  l'effectif de la catégorie, la part pleine ce que tu possèdes : on voit du même
+  coup d'œil ce qui est gros et où tu en es. Il n'y a pas de graphe par
+  extension : le client ne donne pas l'extension d'une monture, et une barre
+  « inconnue » qui avalait les neuf dixièmes de la collection ne classait rien
+  (le détail est dans `docs/API-NOTES.md`).
 * Liste des montures qui te manquent **et que ce personnage peut obtenir** —
   les montures d'une autre faction ou d'une autre classe sont écartées, pas
   comptées comme « manquantes ».

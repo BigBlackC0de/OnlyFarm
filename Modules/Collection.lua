@@ -181,16 +181,44 @@ function Collection:GetEntry(mountID)
 	return self.byID[mountID]
 end
 
---- Texte de source du Journal (« Butin : Yogg-Saron\nUlduar »), coûteux à
---  récupérer pour 500 montures : on ne le résout qu'à la demande, en cache.
-function Collection:GetSourceText(mountID)
+--- Informations « extra » du Journal, résolues à la demande et mises en cache.
+--
+--  Un seul appel pour les deux données qui en viennent — le texte de source et
+--  le `mountTypeID` — parce que c'est l'appel qui coûte, pas ce qu'on en lit.
+--  Le faire pour 800 montures au moment du scan doublerait sa durée pour des
+--  colonnes que le joueur ne regarde peut-être jamais.
+--
+--  Retours de C_MountJournal.GetMountInfoExtraByID (vérifié sur 12.0.7) :
+--   1 creatureDisplayInfoID  2 description  3 source  4 isSelfMount
+--   5 mountTypeID  6 uiModelSceneID  7 animID  8 spellVisualKitID
+--   9 disablePlayerMountPreview
+function Collection:ResolveExtra(mountID)
 	local entry = self.byID[mountID]
 	if not entry then return nil end
-	if entry.sourceText == nil then
-		local _, _, source = C_MountJournal.GetMountInfoExtraByID(mountID)
-		entry.sourceText = source or false
-	end
+	if entry.extraResolved then return entry end
+
+	local _, _, source, _, mountTypeID = C_MountJournal.GetMountInfoExtraByID(mountID)
+	entry.sourceText = source or false
+	entry.mountTypeID = type(mountTypeID) == "number" and mountTypeID or false
+	entry.movement = ns.Data.GetMovementKind(entry.mountTypeID or nil)
+	entry.extraResolved = true
+	return entry
+end
+
+--- Texte de source du Journal (« Butin : Yogg-Saron\nUlduar »).
+function Collection:GetSourceText(mountID)
+	local entry = self:ResolveExtra(mountID)
+	if not entry then return nil end
 	return entry.sourceText or nil
+end
+
+--- Mode de déplacement d'une monture : terrestre, volante, skyriding,
+--  aquatique — ou « autre » quand le client renvoie un type qu'on ne sait pas
+--  encore lire (cf. Data/MountTypes.lua).
+function Collection:GetMovement(mountID)
+	local entry = self:ResolveExtra(mountID)
+	if not entry then return ns.Data.MOVEMENT.OTHER end
+	return entry.movement or ns.Data.MOVEMENT.OTHER
 end
 
 --- Texte de source ramené sur une ligne, ce qui tient dans une colonne.

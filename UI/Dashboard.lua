@@ -8,10 +8,17 @@
 
 	  1. où j'en suis  — tuiles de compteurs et barre de progression globale ;
 	  2. qu'est-ce qui est ouvert maintenant — barre empilée par statut ;
-	  3. où il me reste du travail — progression par extension, dans l'ordre
-	     de sortie des extensions ;
+	  3. comment se répartit ma collection — graphe de répartition, par nature
+	     de source ou par mode de déplacement ;
 	  4. par quoi je commence — les cibles disponibles, les plus attendues
 	     d'abord.
+
+	La question 3 était « où il me reste du travail », répondue par une frise des
+	extensions. Elle est retirée : le client n'expose pas l'extension d'une
+	monture, la frise dépendait donc d'un scan qui n'en rattachait qu'une
+	fraction, et l'essentiel de la collection s'entassait dans une barre
+	« inconnue ». Les deux axes qui la remplacent viennent du client pour toutes
+	les montures, sans scan (cf. Modules/Stats.lua).
 
 	Aucun chiffre n'est calculé ici : tout vient de Modules/Stats.lua, qui se
 	teste hors du jeu. Ce fichier ne fait que poser des frames.
@@ -25,6 +32,12 @@ local TILE_HEIGHT = 62
 local TILE_GAP = 8
 local BAR_ROW_HEIGHT = 19
 local TARGET_ROW_HEIGHT = 22
+
+-- Onze natures de source côté client, plus de la marge pour celles qu'un patch
+-- ajoutera. L'axe du déplacement n'en demande que cinq : la même carte sert aux
+-- deux, et les lignes en trop restent masquées. Le nombre réellement affiché
+-- dépend en plus de la hauteur de la fenêtre, cf. BreakdownRowBudget.
+local MAX_BREAKDOWN_ROWS = 14
 
 function Dashboard:OnEnable()
 	-- Le rafraîchissement général est piloté par UI:Refresh : un seul chef
@@ -40,7 +53,7 @@ end
 function Dashboard:OnScanProgress()
 	local page = self.page
 	if not page or not page:IsShown() then return end
-	page.ExpansionCard.ScanInfo:SetText(self:ScanProgressText())
+	page.AvailabilityCard.ScanInfo:SetText(self:ScanProgressText())
 end
 
 --------------------------------------------------------------------------------
@@ -57,7 +70,7 @@ function Dashboard:Create(parent)
 
 	self:CreateTiles(page)
 	self:CreateAvailability(page)
-	self:CreateExpansions(page)
+	self:CreateBreakdown(page)
 	self:CreateTargets(page)
 
 	return page
@@ -118,6 +131,12 @@ end
 --- Barre empilée « disponible / verrouillé / incertain / non cartographié »,
 --  avec sa légende. Une barre empilée plutôt qu'un camembert : le client n'a
 --  pas de primitive circulaire, et une barre se lit mieux de toute façon.
+--
+--  Le pied de carte porte l'état de la cartographie et sa relance. C'est ici
+--  qu'elle a sa place : le scan sert à rattacher une monture à une instance,
+--  donc à un verrou — c'est-à-dire exactement à ce que cette carte affiche.
+--  « Non cartographié » est un segment de cette barre ; le remède est sous le
+--  symptôme.
 function Dashboard:CreateAvailability(page)
 	local Theme = ns.Theme
 	local L = ns.L
@@ -125,7 +144,7 @@ function Dashboard:CreateAvailability(page)
 	local card = Theme.Card(page)
 	card:SetPoint("TOPLEFT", page.TileRow, "BOTTOMLEFT", 0, -TILE_GAP)
 	card:SetPoint("TOPRIGHT", page.TileRow, "BOTTOMRIGHT", 0, -TILE_GAP)
-	card:SetHeight(78)
+	card:SetHeight(110)
 	page.AvailabilityCard = card
 
 	local title = Theme.Text(card, "GameFontNormal", Theme.colors.text)
@@ -146,49 +165,7 @@ function Dashboard:CreateAvailability(page)
 	legend:SetPoint("TOPLEFT", bar, "BOTTOMLEFT", 0, -8)
 	legend:SetPoint("TOPRIGHT", bar, "BOTTOMRIGHT", 0, -8)
 	card.Legend = legend
-end
 
---- Graphe en barres horizontales : progression par extension.
-function Dashboard:CreateExpansions(page)
-	local Theme = ns.Theme
-	local L = ns.L
-
-	local card = Theme.Card(page)
-	card:SetPoint("TOPLEFT", page.AvailabilityCard, "BOTTOMLEFT", 0, -TILE_GAP)
-	card:SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT", -260, 0)
-	page.ExpansionCard = card
-
-	local title = Theme.Text(card, "GameFontNormal", Theme.colors.text)
-	title:SetPoint("TOPLEFT", 10, -8)
-	title:SetText(L.DASH_EXPANSIONS)
-
-	local hint = Theme.Text(card, "GameFontHighlightSmall", Theme.colors.faint, "RIGHT")
-	hint:SetPoint("TOPRIGHT", -10, -9)
-	hint:SetText(L.DASH_EXPANSIONS_HINT)
-	card.Hint = hint
-
-	card.Rows = {}
-	for index = 1, 14 do
-		local row = Theme.BarRow(card, 185, 56)
-		row:SetHeight(BAR_ROW_HEIGHT)
-		row:SetPoint("LEFT", 10, 0)
-		row:SetPoint("RIGHT", -10, 0)
-		row:SetPoint("TOP", card, "TOP", 0, -28 - (index - 1) * BAR_ROW_HEIGHT)
-		row:Hide()
-		card.Rows[index] = row
-	end
-
-	card.Empty = Theme.Text(card, "GameFontHighlightSmall", Theme.colors.faint, "CENTER")
-	card.Empty:SetPoint("CENTER", 0, -10)
-	-- Bornée à gauche et à droite : le message d'échec est une phrase, pas une
-	-- étiquette, et il doit passer à la ligne au lieu de déborder de la carte.
-	card.Empty:SetPoint("LEFT", 24, 0)
-	card.Empty:SetPoint("RIGHT", -24, 0)
-	card.Empty:SetText(L.DASH_NEEDS_SCAN)
-	card.Empty:Hide()
-
-	-- Pied de carte : état de la cartographie et relance manuelle. C'est ici
-	-- que le manque se voit, donc c'est ici que doit se trouver le remède.
 	local rule = Theme.Separator(card)
 	rule:SetPoint("BOTTOMLEFT", 1, 30)
 	rule:SetPoint("BOTTOMRIGHT", -1, 30)
@@ -207,6 +184,95 @@ function Dashboard:CreateExpansions(page)
 	card.ScanInfo:SetWordWrap(false)
 end
 
+--- Graphe de répartition de la collection, avec son sélecteur d'axe.
+--
+--  Les barres sont à l'échelle des effectifs (cf. Theme.ShareRow) : la plus
+--  longue est la catégorie la plus fournie, et la part pleine dit où on en est
+--  dedans. Le classement se lit donc d'un coup d'œil, sans légende à décoder.
+function Dashboard:CreateBreakdown(page)
+	local Theme = ns.Theme
+	local L = ns.L
+
+	local card = Theme.Card(page)
+	card:SetPoint("TOPLEFT", page.AvailabilityCard, "BOTTOMLEFT", 0, -TILE_GAP)
+	card:SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT", -260, 0)
+	page.BreakdownCard = card
+
+	local title = Theme.Text(card, "GameFontNormal", Theme.colors.text)
+	title:SetPoint("TOPLEFT", 10, -8)
+	title:SetText(L.DASH_BREAKDOWN)
+
+	-- Sélecteur d'axe. Deux axes, donc deux boutons collés : le choix se voit
+	-- et se change d'un clic, sans ouvrir de menu.
+	local choices = {}
+	for index, axis in ipairs(ns.Stats.AXES) do
+		choices[index] = { key = axis.key, label = L[axis.label] or axis.key }
+	end
+	local selector = Theme.Segmented(card, choices, function(key)
+		self:SetAxis(key)
+	end)
+	selector:SetPoint("TOPRIGHT", -10, -8)
+	-- Peint dès la construction : sans ça, le sélecteur reste transparent tant
+	-- que le premier rafraîchissement n'a pas eu lieu — et il n'a pas lieu si le
+	-- Journal des montures se peuple lentement.
+	selector:SetValue(self:GetAxis())
+	card.Selector = selector
+
+	-- La légende va EN PIED, pas sous le sélecteur : là-haut elle recouvrait la
+	-- première ligne du graphe, dont le compteur est aussi cadré à droite.
+	local hint = Theme.Text(card, "GameFontHighlightSmall", Theme.colors.faint, "RIGHT")
+	hint:SetPoint("BOTTOMRIGHT", -10, 6)
+	hint:SetText(L.DASH_BREAKDOWN_HINT)
+	card.Hint = hint
+
+	card.Rows = {}
+	for index = 1, MAX_BREAKDOWN_ROWS do
+		local row = Theme.ShareRow(card, 185, 62)
+		row:SetHeight(BAR_ROW_HEIGHT)
+		row:SetPoint("LEFT", 10, 0)
+		row:SetPoint("RIGHT", -10, 0)
+		row:SetPoint("TOP", card, "TOP", 0, -32 - (index - 1) * BAR_ROW_HEIGHT)
+		row:Hide()
+		card.Rows[index] = row
+	end
+
+	card.Empty = Theme.Text(card, "GameFontHighlightSmall", Theme.colors.faint, "CENTER")
+	card.Empty:SetPoint("CENTER", 0, 0)
+	card.Empty:SetPoint("LEFT", 24, 0)
+	card.Empty:SetPoint("RIGHT", -24, 0)
+	card.Empty:SetText(L.JOURNAL_NOT_READY)
+	card.Empty:Hide()
+end
+
+--- Nombre de lignes que la carte peut afficher sans déborder de sa bordure.
+--
+--  La fenêtre est redimensionnable : à la hauteur minimale, une carte de 140
+--  pixels ne peut pas montrer douze barres de dix-neuf. Les dessiner quand même
+--  les faisait sortir de la carte et de la fenêtre.
+function Dashboard:BreakdownRowBudget()
+	local card = self.page and self.page.BreakdownCard
+	if not card then return MAX_BREAKDOWN_ROWS end
+	local height = card:GetHeight() or 0
+	-- 32 pixels d'en-tête (titre et sélecteur), 20 de pied (la légende).
+	local budget = math.floor((height - 52) / BAR_ROW_HEIGHT)
+	if budget < 1 then return 1 end
+	return math.min(budget, MAX_BREAKDOWN_ROWS)
+end
+
+--- Axe de répartition retenu, ramené à un axe valide.
+function Dashboard:GetAxis()
+	local saved = ns.db and ns.db.profile.dashboard and ns.db.profile.dashboard.axis
+	return ns.Stats:ResolveAxis(saved)
+end
+
+function Dashboard:SetAxis(axis)
+	axis = ns.Stats:ResolveAxis(axis)
+	if ns.db and ns.db.profile.dashboard then
+		ns.db.profile.dashboard.axis = axis
+	end
+	self:Refresh()
+end
+
 --- Colonne de droite, en deux cartes : ce qui est ouvert, puis ce qui est déjà
 --  consommé cette semaine.
 function Dashboard:CreateTargets(page)
@@ -214,7 +280,7 @@ function Dashboard:CreateTargets(page)
 	local L = ns.L
 
 	local card = Theme.Card(page)
-	card:SetPoint("TOPLEFT", page.ExpansionCard, "TOPRIGHT", TILE_GAP, 0)
+	card:SetPoint("TOPLEFT", page.BreakdownCard, "TOPRIGHT", TILE_GAP, 0)
 	card:SetPoint("RIGHT", page, "RIGHT", 0, 0)
 	card:SetHeight(28 + 6 * TARGET_ROW_HEIGHT + 8)
 	page.TargetCard = card
@@ -348,6 +414,11 @@ function Dashboard:Refresh()
 
 	if not ns.Collection.ready then
 		self.tiles.owned:Set("—", L.JOURNAL_NOT_READY)
+		-- Le graphe le dit aussi : une carte vide sans un mot se lit comme une
+		-- panne, alors que le Journal est simplement encore en train de se
+		-- peupler.
+		page.BreakdownCard.Empty:Show()
+		page.BreakdownCard.Hint:Hide()
 		return
 	end
 
@@ -390,39 +461,47 @@ function Dashboard:Refresh()
 	end
 	card.Legend:SetText(table.concat(legend, "   "))
 
-	-- 3. Progression par extension.
-	local expansionCard = page.ExpansionCard
-	local hasExpansions = #stats.expansions > 0
-		and not (#stats.expansions == 1
-			and stats.expansions[1].name == ns.Eligibility.UNKNOWN_EXPANSION)
+	-- État de la cartographie, et bouton coupé pendant qu'elle tourne.
+	if ns.Mapping.running then
+		card.ScanInfo:SetText(self:ScanProgressText())
+	else
+		card.ScanInfo:SetText(ns.Mapping:GetSummary() or L.SCAN_NEVER)
+	end
+	card.RescanButton:SetEnabled(not ns.Mapping.running)
 
-	for index, row in ipairs(expansionCard.Rows) do
-		local bucket = stats.expansions[index]
-		if bucket and hasExpansions then
-			local name = bucket.name
-			if name == ns.Eligibility.UNKNOWN_EXPANSION then name = L.EXPANSION_UNKNOWN end
-			row:Set(name, bucket.owned, bucket.total)
+	-- 3. Répartition de la collection, selon l'axe choisi.
+	--
+	-- Aucun scan là-dedans : les deux axes viennent du client, monture par
+	-- monture. La carte a donc quelque chose à montrer dès la première
+	-- connexion, ce que la frise des extensions n'a jamais su faire.
+	local breakdownCard = page.BreakdownCard
+	local axis = self:GetAxis()
+	breakdownCard.Selector:SetValue(axis)
+
+	local breakdown = ns.Stats:GetBreakdown(axis)
+	local visible = self:BreakdownRowBudget()
+	for index, row in ipairs(breakdownCard.Rows) do
+		local bucket = index <= visible and breakdown[index] or nil
+		if bucket then
+			row:Set(bucket.label, bucket.owned, bucket.total, breakdown.max)
 			row:Show()
 		else
 			row:Hide()
 		end
 	end
-	-- Deux messages distincts pour deux situations distinctes : « pas encore
-	-- scanné » et « scanné, mais rien n'est ressorti ». Le second est un
-	-- problème, et il doit se lire comme tel plutôt que comme une attente.
-	local meta = ns.db and ns.db.global.scanMeta
-	local hasScanned = type(meta) == "table" and meta.at ~= nil
-	expansionCard.Empty:SetText(hasScanned and L.DASH_SCAN_EMPTY or L.DASH_NEEDS_SCAN)
-	expansionCard.Empty:SetShown(not hasExpansions)
-	expansionCard.Hint:SetShown(hasExpansions)
+	breakdownCard.Empty:SetShown(#breakdown == 0)
 
-	-- État de la cartographie, et boutons coupés pendant qu'elle tourne.
-	if ns.Mapping.running then
-		expansionCard.ScanInfo:SetText(self:ScanProgressText())
+	-- Sur une fenêtre rétrécie, toutes les catégories ne tiennent pas. Les
+	-- dernières sont les moins fournies, donc les moins intéressantes à voir —
+	-- mais on ne les escamote pas en silence : le nombre manquant est dit, avec
+	-- le remède.
+	local hidden = math.max(0, #breakdown - visible)
+	if hidden > 0 then
+		breakdownCard.Hint:SetText(L.DASH_BREAKDOWN_MORE:format(hidden))
 	else
-		expansionCard.ScanInfo:SetText(ns.Mapping:GetSummary() or L.SCAN_NEVER)
+		breakdownCard.Hint:SetText(L.DASH_BREAKDOWN_HINT)
 	end
-	expansionCard.RescanButton:SetEnabled(not ns.Mapping.running)
+	breakdownCard.Hint:SetShown(#breakdown > 0)
 
 	-- 4. Cibles du moment.
 	local targetCard = page.TargetCard

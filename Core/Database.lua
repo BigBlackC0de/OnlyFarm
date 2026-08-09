@@ -48,6 +48,12 @@ local PROFILE_DEFAULTS = {
 		angle = 205,       -- degrés, position sur l'anneau de la minicarte
 		hide = false,
 	},
+	dashboard = {
+		-- Axe du graphe de répartition : "source" | "movement". La nature de la
+		-- source d'abord, parce que c'est celle sur laquelle on agit — c'est
+		-- elle qui dit où aller farmer.
+		axis = "source",
+	},
 	filters = {
 		search = "",
 		-- Les possédées sont masquées par défaut : l'addon répond d'abord à
