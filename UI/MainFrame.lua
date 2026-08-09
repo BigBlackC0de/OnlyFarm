@@ -48,14 +48,17 @@ UI.TAB_DASHBOARD, UI.TAB_COLLECTION, UI.TAB_ROUTE, UI.TAB_EDITOR = 1, 2, 3, 4
 --             quand la cartographie le sait. Toujours fourni.
 --   Type      mode de déplacement (mountTypeID). Toujours fourni.
 --   Essais    compteur de tentatives, zéro compris.
+--   Possédée  oui / non. Le nom doré le dit déjà, mais une colonne se trie et
+--             se lit en balayant du regard, ce qu'une couleur ne permet pas.
 --------------------------------------------------------------------------------
 
 UI.COLUMNS = {
-	{ key = "name", label = "COL_MOUNT", width = 210, justify = "LEFT" },
-	{ key = "source", label = "COL_SOURCE", width = 216, justify = "LEFT" },
-	{ key = "category", label = "COL_CATEGORY", width = 80, justify = "LEFT" },
-	{ key = "type", label = "COL_TYPE", width = 80, justify = "LEFT" },
-	{ key = "tries", label = "COL_TRIES", width = 46, justify = "RIGHT", numeric = true },
+	{ key = "name", label = "COL_MOUNT", width = 200, justify = "LEFT" },
+	{ key = "source", label = "COL_SOURCE", width = 206, justify = "LEFT" },
+	{ key = "category", label = "COL_CATEGORY", width = 78, justify = "LEFT" },
+	{ key = "type", label = "COL_TYPE", width = 74, justify = "LEFT" },
+	{ key = "tries", label = "COL_TRIES", width = 44, justify = "RIGHT", numeric = true },
+	{ key = "owned", label = "COL_OWNED", width = 54, justify = "RIGHT" },
 }
 
 UI.COLUMNS_BY_KEY = {}
@@ -117,6 +120,7 @@ function UI:CreateFrame()
 	self:CreateContent(frame)
 	self:CreateCollectionTab(frame)
 	ns.Dashboard:Create(frame.Content)
+	ns.RoutePage:Create(frame.Content)
 	self:CreatePlaceholder(frame)
 	self:RestorePosition()
 	return frame
@@ -662,6 +666,36 @@ function UI:InitRow(button, elementData)
 		button.Category = button.Cells.category
 		button.Type = button.Cells.type
 		button.Tries = button.Cells.tries
+		button.Owned = button.Cells.owned
+
+		-- Bouton d'exclusion, à droite de la ligne. L'action existait déjà au
+		-- clic droit, mais une action qu'aucun élément à l'écran n'annonce n'est
+		-- pas une action : c'est un secret.
+		button.ExcludeButton = CreateFrame("Button", nil, button)
+		button.ExcludeButton:SetSize(18, 18)
+		button.ExcludeButton:SetPoint("LEFT", button.Owned, "RIGHT", 8, 0)
+		button.ExcludeButton.Text = Theme.Text(button.ExcludeButton, "GameFontHighlightSmall",
+			Theme.colors.faint, "CENTER")
+		button.ExcludeButton.Text:SetPoint("CENTER")
+		button.ExcludeButton:SetScript("OnClick", function(self_)
+			local mountID = self_:GetParent().mountID
+			if not mountID then return end
+			ns.Collection:SetExcluded(mountID, not ns.Collection:IsExcluded(mountID))
+		end)
+		button.ExcludeButton:SetScript("OnEnter", function(self_)
+			local c = Theme.colors.red
+			self_.Text:SetTextColor(c[1], c[2], c[3])
+			local mountID = self_:GetParent().mountID
+			GameTooltip:SetOwner(self_, "ANCHOR_RIGHT")
+			GameTooltip:AddLine(ns.Collection:IsExcluded(mountID)
+				and ns.L.ACTION_INCLUDE or ns.L.ACTION_EXCLUDE, 1, 1, 1)
+			GameTooltip:Show()
+		end)
+		button.ExcludeButton:SetScript("OnLeave", function(self_)
+			local c = Theme.colors.faint
+			self_.Text:SetTextColor(c[1], c[2], c[3])
+			GameTooltip:Hide()
+		end)
 
 		button.Highlight = button:CreateTexture(nil, "HIGHLIGHT")
 		button.Highlight:SetAllPoints()
@@ -673,7 +707,7 @@ function UI:InitRow(button, elementData)
 		button:SetScript("OnClick", function(row, mouseButton)
 			if not row.mountID then return end
 			if mouseButton == "RightButton" then
-				ns.Collection:SetExcluded(row.mountID, not ns.Collection:IsExcluded(row.mountID))
+				UI:ShowRowMenu(row)
 			-- Rattrapage manuel du compteur de tentatives. ENCOUNTER_END est
 			-- fiable en solo legacy, mais pas garanti : mieux vaut un +1 sous
 			-- la main qu'un compteur faux qu'on ne peut pas corriger.
@@ -700,6 +734,10 @@ function UI:InitRow(button, elementData)
 	-- Une monture exclue reste dans la liste, grisée et étiquetée. Elle ne
 	-- disparaît que si le filtre « Masquer les exclues » est coché — le clic
 	-- droit doit se lire comme une action, pas comme une perte.
+	-- La croix devient une flèche de retour sur une ligne exclue : c'est le même
+	-- bouton, il fait l'aller et le retour.
+	button.ExcludeButton.Text:SetText(elementData.excluded and "+" or "×")
+
 	if elementData.excluded then
 		local faint = Theme.colors.faint
 		button.Name:SetText(elementData.name)
@@ -712,6 +750,8 @@ function UI:InitRow(button, elementData)
 		button.Type:SetTextColor(faint[1], faint[2], faint[3])
 		button.Tries:SetText(elementData.triesText or "")
 		button.Tries:SetTextColor(faint[1], faint[2], faint[3])
+		button.Owned:SetText(elementData.ownedText or "")
+		button.Owned:SetTextColor(faint[1], faint[2], faint[3])
 		button.Icon:SetDesaturated(true)
 		button.Icon:SetAlpha(0.4)
 	else
@@ -738,9 +778,105 @@ function UI:InitRow(button, elementData)
 		button.Tries:SetText(elementData.triesText or "")
 		button.Tries:SetTextColor(faint[1], faint[2], faint[3])
 
+		-- « oui » en doré, « non » en discret : la colonne se balaie du regard
+		-- sans avoir à lire chaque mot.
+		button.Owned:SetText(elementData.ownedText or "")
+		local oc = elementData.owned and Theme.colors.gold or Theme.colors.faint
+		button.Owned:SetTextColor(oc[1], oc[2], oc[3])
+
 		button.Icon:SetDesaturated(false)
 		button.Icon:SetAlpha(1)
 	end
+end
+
+--------------------------------------------------------------------------------
+-- Menu contextuel d'une ligne
+--
+-- Le clic droit posait l'exclusion, directement. Deux défauts : l'action était
+-- invisible tant qu'on ne lisait pas l'infobulle, et le clic droit ne pouvait
+-- rien faire d'autre. Il ouvre maintenant un menu, et l'exclusion a son propre
+-- bouton sur la ligne.
+--------------------------------------------------------------------------------
+
+--- Actions du menu, dans l'ordre d'affichage.
+--  Chaque entrée décide elle-même de son libellé : « Exclure » et
+--  « Réintégrer » sont le même item selon l'état de la ligne.
+function UI:GetRowActions(mountID)
+	local L = ns.L
+	local excluded = ns.Collection:IsExcluded(mountID)
+	local mission = ns.Route:GetMissionFor(mountID)
+
+	return {
+		{
+			label = L.ACTION_PREVIEW,
+			action = function() ns.Preview:Toggle(mountID) end,
+		},
+		{
+			label = L.ACTION_COPY_NAME,
+			-- Copy:Show(titre, texte), et le champ est présélectionné : un
+			-- Ctrl+C suffit. Pas d'accès au presse-papiers depuis un addon, donc
+			-- c'est le seul chemin possible.
+			action = function()
+				local entry = ns.Collection:GetEntry(mountID)
+				ns.Copy:Show(L.COPY_TITLE, entry and entry.name or "")
+			end,
+		},
+		{
+			label = L.ACTION_ROUTE,
+			-- Grisé plutôt qu'absent quand la monture n'a pas d'entrée
+			-- cartographiée : un item qui disparaît fait douter de l'avoir vu,
+			-- un item grisé dit qu'il existe et pourquoi il ne marche pas ici.
+			disabled = mission == nil,
+			tooltip = mission == nil and L.ACTION_ROUTE_IMPOSSIBLE or nil,
+			action = function()
+				ns.Route:SetTarget(mountID)
+				self:SelectTab(self.TAB_ROUTE)
+			end,
+		},
+		{
+			label = excluded and L.ACTION_INCLUDE or L.ACTION_EXCLUDE,
+			action = function() ns.Collection:SetExcluded(mountID, not excluded) end,
+		},
+	}
+end
+
+--- Ouvre le menu contextuel d'une ligne.
+--
+--  MenuUtil.CreateContextMenu est l'API de la 11.0 ; elle n'existe pas sur un
+--  client plus ancien, et un menu manquant ne doit pas casser le clic droit. Le
+--  repli applique alors l'action la plus attendue — l'exclusion — pour que le
+--  geste garde son ancien effet plutôt que de ne rien faire.
+function UI:ShowRowMenu(row)
+	local mountID = row.mountID
+	if not mountID then return end
+
+	local actions = self:GetRowActions(mountID)
+
+	if MenuUtil and type(MenuUtil.CreateContextMenu) == "function" then
+		local ok = pcall(MenuUtil.CreateContextMenu, row, function(_, rootDescription)
+			local entry = ns.Collection:GetEntry(mountID)
+			rootDescription:CreateTitle(entry and entry.name or ns.L.COL_MOUNT)
+			for _, item in ipairs(actions) do
+				local button = rootDescription:CreateButton(item.label, item.action)
+				if item.disabled and button then
+					button:SetEnabled(false)
+					if item.tooltip and type(button.SetTooltip) == "function" then
+						button:SetTooltip(function(tooltip)
+							if type(GameTooltip_AddNormalLine) == "function" then
+								GameTooltip_AddNormalLine(tooltip, item.tooltip)
+							elseif tooltip and type(tooltip.AddLine) == "function" then
+								tooltip:AddLine(item.tooltip)
+							end
+						end)
+					end
+				end
+			end
+		end)
+		if ok then return end
+	end
+
+	ns:Debug("menu contextuel indisponible, repli sur l'exclusion")
+	ns.Collection:SetExcluded(mountID, not ns.Collection:IsExcluded(mountID))
 end
 
 function UI:ShowRowTooltip(row)
@@ -843,7 +979,7 @@ function UI:ShowRowTooltip(row)
 
 	GameTooltip:AddLine(" ")
 	GameTooltip:AddLine(L.HINT_PREVIEW, 0.5, 0.5, 0.5)
-	GameTooltip:AddLine(entry.excluded and L.HINT_INCLUDE or L.HINT_EXCLUDE, 0.5, 0.5, 0.5)
+	GameTooltip:AddLine(L.HINT_MENU, 0.5, 0.5, 0.5)
 	GameTooltip:AddLine(L.HINT_ATTEMPT_ADD, 0.5, 0.5, 0.5)
 	GameTooltip:AddLine(L.HINT_ATTEMPT_SUB, 0.5, 0.5, 0.5)
 	GameTooltip:Show()
@@ -886,6 +1022,11 @@ local COMPARATORS = {
 	-- volante, skyriding, aquatique, autre. C'est celui du graphe.
 	type = function(a, b) return CompareNumber(a.movementRank, b.movementRank) end,
 	tries = function(a, b) return CompareNumber(a.tries, b.tries) end,
+	-- Les manquantes d'abord au premier clic : c'est la question que pose
+	-- l'addon. Un second clic remonte les possédées.
+	owned = function(a, b)
+		return CompareNumber(a.owned and 1 or 0, b.owned and 1 or 0)
+	end,
 }
 
 --- Ramène un critère de tri sauvegardé à une colonne qui existe encore. Les
@@ -1018,6 +1159,7 @@ function UI:BuildDataProvider()
 		-- Zéro s'écrit « 0 », pas « — ». Un tiret dans une colonne de nombres se
 		-- lit comme une donnée absente, alors que la donnée est là et vaut zéro.
 		row.triesText = tostring(row.tries)
+		row.ownedText = row.owned and L.YES or L.NO
 		provider:Insert(row)
 	end
 
@@ -1034,6 +1176,10 @@ function UI:Refresh()
 
 	if ns.db.profile.ui.activeTab == self.TAB_DASHBOARD then
 		ns.Dashboard:Refresh()
+		return
+	end
+	if ns.db.profile.ui.activeTab == self.TAB_ROUTE then
+		ns.RoutePage:Refresh()
 		return
 	end
 	if ns.db.profile.ui.activeTab ~= self.TAB_COLLECTION then return end
@@ -1082,12 +1228,13 @@ function UI:SelectTab(index)
 
 	frame.CollectionPage:SetShown(index == self.TAB_COLLECTION)
 	ns.Dashboard:SetShown(index == self.TAB_DASHBOARD)
+	ns.RoutePage:SetShown(index == self.TAB_ROUTE)
 
-	local isPlaceholder = (index == self.TAB_ROUTE or index == self.TAB_EDITOR)
+	-- L'écran d'attente ne sert plus qu'à l'éditeur.
+	local isPlaceholder = (index == self.TAB_EDITOR)
 	frame.Placeholder:SetShown(isPlaceholder)
 	if isPlaceholder then
-		frame.Placeholder.Text:SetText(index == self.TAB_ROUTE
-			and ns.L.ROUTE_PLACEHOLDER or ns.L.EDITOR_PLACEHOLDER)
+		frame.Placeholder.Text:SetText(ns.L.EDITOR_PLACEHOLDER)
 	end
 
 	self:Refresh()

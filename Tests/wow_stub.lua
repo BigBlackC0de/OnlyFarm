@@ -411,6 +411,12 @@ _G.C_Map = {
 		return list
 	end,
 
+	GetMapInfo = function(uiMapID)
+		local map = stub.maps[uiMapID]
+		if not map then return nil end
+		return { mapID = uiMapID, name = map.name or ("Carte " .. tostring(uiMapID)) }
+	end,
+
 	CanSetUserWaypointOnMap = function(uiMapID) return stub.maps[uiMapID] ~= nil end,
 	SetUserWaypoint = function(point) stub.waypoint = point end,
 	ClearUserWaypoint = function() stub.waypoint = nil end,

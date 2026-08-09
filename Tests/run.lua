@@ -1382,6 +1382,145 @@ test("Stats — une monture exclue sort des agrégats", function()
 end)
 
 --------------------------------------------------------------------------------
+-- Route
+--------------------------------------------------------------------------------
+
+--- Charge l'addon avec une géographie : une entrée d'instance cartographiée,
+--  sur une carte projetable.
+local function LoadWithRoute()
+	stub.Reset()
+	stub.mounts = StandardMounts()
+	stub.maps[492] = {
+		name = "Désolation des Dragons",
+		continentID = 113, originX = 0, originY = 0, spanX = 1000, spanY = 1000,
+	}
+
+	local ns = harness.Load(stub)
+	ns.db.global.sourceCache = {
+		-- Monture de raid, avec boss et instance.
+		[201] = {
+			kind = "boss", instanceName = "Ulduar", journalInstanceID = 187,
+			isRaid = true, encounterName = "Yogg-Saron",
+		},
+		-- Monture de vendeur : le « boss » extrait du texte est en réalité le
+		-- vendeur, et l'entrée est la même instance pour les besoins du test.
+		[202] = {
+			kind = "vendor", instanceName = "Ulduar", journalInstanceID = 187,
+			isRaid = false, encounterName = "Talutu",
+		},
+	}
+	ns.db.global.nodeCache = {
+		["ej:187"] = {
+			nodeID = "ej:187", name = "Ulduar", kind = "instance",
+			uiMapID = 492, x = 0.41, y = 0.18, journalInstanceID = 187,
+			continentID = 113, wx = 410, wy = 180,
+		},
+	}
+	ns.Eligibility:Invalidate()
+	ns.Nodes:Invalidate()
+	ns.Route:Invalidate()
+	return ns
+end
+
+test("Route — mission construite depuis l'entrée cartographiée", function()
+	local ns = LoadWithRoute()
+
+	local mission = ns.Route:GetMissionFor(201)
+	eq(mission ~= nil, true, "mission trouvée")
+	eq(mission.instanceName, "Ulduar", "instance nommée")
+	eq(mission.encounterName, "Yogg-Saron", "boss retenu")
+	eq(mission.isRaid, true, "raid reconnu")
+	eq(mission.node.uiMapID, 492, "carte de l'entrée")
+	eq(mission.zoneName, "Désolation des Dragons", "zone nommée")
+end)
+
+test("Route — pas d'entrée cartographiée, pas de mission", function()
+	local ns = LoadWithRoute()
+	-- 204 n'a ni source ni nœud : l'addon ne sait pas où l'envoyer, et il le dit
+	-- en ne proposant rien plutôt qu'en plantant une épingle au hasard.
+	eq(ns.Route:GetMissionFor(204), nil, "aucune mission sans coordonnées")
+	eq(ns.Route:GetMissionFor(nil), nil, "identifiant absent")
+end)
+
+test("Route — le vendeur n'est pas annoncé comme un boss", function()
+	local ns = LoadWithRoute()
+	local mission = ns.Route:GetMissionFor(202)
+	eq(mission ~= nil, true, "mission trouvée quand même")
+	eq(mission.encounterName, nil,
+		"le sujet d'un texte de vendeur ne devient pas un boss")
+end)
+
+test("Route — le choix automatique met le raid devant", function()
+	local ns = LoadWithRoute()
+	-- 202 (donjon, vendeur) a plus d'essais, mais 201 est un raid : le raid
+	-- passe devant, c'est le cas le plus net à router.
+	ns.Attempts:Bump(202, nil, 20)
+	ns.Route:Invalidate()
+
+	local mission = ns.Route:GetMission()
+	eq(mission ~= nil, true, "une mission est proposée")
+	eq(mission.mountID, 201, "le raid d'abord")
+end)
+
+test("Route — la cible épinglée gagne, jusqu'à ce qu'elle tombe", function()
+	local ns = LoadWithRoute()
+	ns.Route:SetTarget(202)
+	eq(ns.Route:GetMission().mountID, 202, "la cible épinglée est retenue")
+	eq(ns.Route:GetMission().pinned, true, "et signalée comme telle")
+
+	-- Monture obtenue : la cible ne tient plus, on repasse au choix
+	-- automatique plutôt que d'afficher une mission périmée.
+	stub.mounts[3].isCollected = true
+	stub.Fire("NEW_MOUNT_ADDED", 202)
+	stub.AdvanceFrames(2)
+	stub.FlushTimers()
+
+	eq(ns.Route:GetMission().mountID, 201, "retour au choix automatique")
+end)
+
+test("Route — Start pose le point de passage du client et le suit", function()
+	local ns = LoadWithRoute()
+	local mission = ns.Route:GetMissionFor(201)
+
+	local backend, reason = ns.Route:Start(mission)
+	eq(backend, "native", "point de passage natif, sans TomTom")
+	eq(reason, nil, "aucune raison d'échec")
+	eq(stub.waypoint ~= nil, true, "le point est posé")
+	eq(stub.waypoint.uiMapID, 492, "sur la bonne carte")
+	eq(stub.superTracked, true, "et suivi à l'écran")
+end)
+
+test("Route — une carte qui refuse le point de passage est signalée", function()
+	local ns = LoadWithRoute()
+	local mission = ns.Route:GetMissionFor(201)
+	-- Les cartes d'intérieur d'instance refusent le point de passage. On le
+	-- rapporte au lieu de laisser croire que la flèche est posée.
+	stub.maps[492] = nil
+
+	local backend, reason = ns.Route:Start(mission)
+	eq(backend, nil, "rien n'est posé")
+	eq(reason, "map_refuses", "et la raison est nommée")
+end)
+
+test("Route — TomTom est utilisé quand il est là", function()
+	local ns = LoadWithRoute()
+	local received
+	_G.TomTom = {
+		AddWaypoint = function(_, uiMapID, x, y, options)
+			received = { uiMapID = uiMapID, x = x, y = y, options = options }
+		end,
+	}
+
+	eq(ns.Route:HasTomTom(), true, "TomTom détecté")
+	local backend = ns.Route:Start(ns.Route:GetMissionFor(201))
+	_G.TomTom = nil
+
+	eq(backend, "tomtom", "c'est TomTom qui prend le point")
+	eq(received.uiMapID, 492, "avec la bonne carte")
+	eq(stub.waypoint, nil, "et le point natif n'est pas posé en double")
+end)
+
+--------------------------------------------------------------------------------
 -- Bus d'événements
 --------------------------------------------------------------------------------
 

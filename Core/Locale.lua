@@ -29,6 +29,9 @@ local L = {
 	COL_CATEGORY = "Category",
 	COL_TYPE = "Type",
 	COL_TRIES = "Tries",
+	COL_OWNED = "Owned",
+	YES = "yes",
+	NO = "no",
 	SORT_HINT = "Click a column header to sort it",
 
 	-- Tableau de bord
@@ -85,8 +88,15 @@ local L = {
 	PREVIEW_HINT = "Drag to rotate · wheel to zoom",
 	PREVIEW_NONE = "No model available for this mount.",
 	HINT_PREVIEW = "Left-click: preview the mount",
-	HINT_EXCLUDE = "Right-click: exclude from the list",
-	HINT_INCLUDE = "Right-click: put back in the list",
+	HINT_MENU = "Right-click: more actions",
+
+	-- Actions du menu contextuel
+	ACTION_PREVIEW = "Preview the mount",
+	ACTION_COPY_NAME = "Copy the name",
+	ACTION_ROUTE = "Route to it",
+	ACTION_ROUTE_IMPOSSIBLE = "No mapped entrance for this mount yet.",
+	ACTION_EXCLUDE = "Exclude from the list",
+	ACTION_INCLUDE = "Put back in the list",
 	TAG_EXCLUDED = "excluded",
 	TOOLTIP_BOSS = "Boss",
 	TOOLTIP_MOVEMENT = "Mount type",
@@ -147,6 +157,25 @@ local L = {
 	-- Voyage
 	NODE_PLAYER = "Your position",
 
+	-- Onglet Route
+	ROUTE_MISSION = "Next target",
+	ROUTE_WHERE = "Where it is",
+	ROUTE_TARGET = "Target",
+	ROUTE_ZONE = "Zone",
+	ROUTE_COORDS = "Coordinates",
+	ROUTE_START = "Start",
+	ROUTE_UNPIN = "Let go",
+	ROUTE_PINNED = "pinned by you",
+	ROUTE_VIA_CLIENT = "Start plants the game's own waypoint and tracks it.",
+	ROUTE_VIA_TOMTOM = "TomTom detected: Start hands it the waypoint.",
+	ROUTE_STARTED = "waypoint set: %s. Follow the arrow.",
+	ROUTE_FAILED = "could not set the waypoint (%s).",
+	ROUTE_NONE = "No routable mount: none of the missing ones has a mapped entrance.",
+	ROUTE_NEEDS_SCAN = "The mapping has not run yet — it is what ties a mount to an instance entrance.",
+	ROUTE_NO_MAP = "No map art for this place.",
+	TYPE_OUTDOOR_LABEL = "Out in the world",
+	COL_STATUS_SHORT = "Status",
+
 	-- Divers
 	RESET_CONFIRM = "Type |cffff5555/of reset confirm|r to wipe OnlyFarm's database.",
 	RESET_DONE = "Database wiped. Reload the interface (/reload).",
@@ -168,6 +197,9 @@ if GetLocale and GetLocale() == "frFR" then
 	L.COL_CATEGORY = "Catégorie"
 	L.COL_TYPE = "Type"
 	L.COL_TRIES = "Essais"
+	L.COL_OWNED = "Possédée"
+	L.YES = "oui"
+	L.NO = "non"
 	L.SORT_HINT = "Clique un titre de colonne pour trier dessus"
 
 	L.KPI_OWNED = "possédées"
@@ -218,8 +250,14 @@ if GetLocale and GetLocale() == "frFR" then
 	L.PREVIEW_HINT = "Glisser pour tourner · molette pour zoomer"
 	L.PREVIEW_NONE = "Aucun modèle disponible pour cette monture."
 	L.HINT_PREVIEW = "Clic gauche : aperçu de la monture"
-	L.HINT_EXCLUDE = "Clic droit : exclure de la liste"
-	L.HINT_INCLUDE = "Clic droit : remettre dans la liste"
+	L.HINT_MENU = "Clic droit : plus d'actions"
+
+	L.ACTION_PREVIEW = "Aperçu de la monture"
+	L.ACTION_COPY_NAME = "Copier le nom"
+	L.ACTION_ROUTE = "Tracer la route"
+	L.ACTION_ROUTE_IMPOSSIBLE = "Aucune entrée cartographiée pour cette monture."
+	L.ACTION_EXCLUDE = "Exclure de la liste"
+	L.ACTION_INCLUDE = "Remettre dans la liste"
 	L.TAG_EXCLUDED = "exclue"
 	L.TOOLTIP_BOSS = "Boss"
 	L.TOOLTIP_MOVEMENT = "Type de monture"
@@ -273,6 +311,24 @@ if GetLocale and GetLocale() == "frFR" then
 	L.EXPORT_DONE = "%d montures exportées. Ctrl+C pour copier."
 
 	L.NODE_PLAYER = "Ta position"
+
+	L.ROUTE_MISSION = "Prochaine cible"
+	L.ROUTE_WHERE = "Où c'est"
+	L.ROUTE_TARGET = "Objectif"
+	L.ROUTE_ZONE = "Zone"
+	L.ROUTE_COORDS = "Coordonnées"
+	L.ROUTE_START = "Start"
+	L.ROUTE_UNPIN = "Laisser choisir"
+	L.ROUTE_PINNED = "épinglée par toi"
+	L.ROUTE_VIA_CLIENT = "Start pose le point de passage du jeu et le suit."
+	L.ROUTE_VIA_TOMTOM = "TomTom détecté : Start lui confie le point de passage."
+	L.ROUTE_STARTED = "point de passage posé : %s. Suis la flèche."
+	L.ROUTE_FAILED = "impossible de poser le point de passage (%s)."
+	L.ROUTE_NONE = "Aucune monture routable : aucune des manquantes n'a d'entrée cartographiée."
+	L.ROUTE_NEEDS_SCAN = "La cartographie n'a pas encore tourné — c'est elle qui relie une monture à une entrée d'instance."
+	L.ROUTE_NO_MAP = "Pas d'art de carte pour ce lieu."
+	L.TYPE_OUTDOOR_LABEL = "En extérieur"
+	L.COL_STATUS_SHORT = "Statut"
 
 	L.RESET_CONFIRM = "Tape |cffff5555/of reset confirm|r pour effacer la base d'OnlyFarm."
 	L.RESET_DONE = "Base effacée. Recharge l'interface (/reload)."

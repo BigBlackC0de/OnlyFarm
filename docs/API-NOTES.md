@@ -265,6 +265,77 @@ main (« proto-drake » et « drake » sont-ils la même race ?) là où l'exten
 elle, avait au moins une réponse canonique. Le rapport travail/valeur n'y est
 pas.
 
+## Guider le joueur : trois briques, aucune dépendance
+
+Vérifié sur le dump officiel avant d'écrire la moindre ligne de l'onglet Route.
+
+### 1. Où est l'entrée — `C_EncounterJournal.GetDungeonEntrancesForMap(uiMapID)`
+
+Renvoie la liste des `DungeonEntranceMapInfo` d'une carte :
+
+| Champ | Contenu |
+|---|---|
+| `areaPoiID` | identifiant du point d'intérêt |
+| `position` | `vector2` normalisé (0-1) |
+| `name` | nom localisé de l'instance |
+| `description` | texte du survol |
+| `atlasName` | icône |
+| `journalInstanceID` | **la jointure** vers le Journal des rencontres |
+
+C'est la source qu'utilise la carte du monde pour poser ses icônes d'entrée de
+donjon : juste par construction, et elle suit les patchs sans intervention.
+`journalInstanceID` la relie à ce que la cartographie sait déjà d'une monture —
+d'où une position exacte sans aucune coordonnée écrite à la main.
+
+Le moissonnage tourne dans `Modules/Mapping.lua`, les nœuds vivent dans
+`db.global.nodeCache`, et `Nodes:GetForSource` fait la jointure.
+
+### 2. Comment y aller — le point de passage du client
+
+```lua
+C_Map.CanSetUserWaypointOnMap(uiMapID)   -- À DEMANDER D'ABORD
+C_Map.SetUserWaypoint(point)             -- point = UiMapPoint
+C_SuperTrack.SetSuperTrackedUserWaypoint(true)
+```
+
+`CanSetUserWaypointOnMap` n'est pas une politesse : les cartes d'intérieur
+d'instance et les cartes cosmiques refusent le point, et poser sans demander
+lève une erreur au lieu de ne rien faire.
+
+`UiMapPoint.CreateFromCoordinates(uiMapID, x, y)` est un **utilitaire de
+l'interface**, pas une API documentée dans le dump. `Modules/Route.lua` s'en sert
+s'il est là et construit sinon la table à la main (`{ uiMapID, position }`) — ce
+que `SetUserWaypoint` accepte, puisque c'est sa structure d'entrée.
+
+**TomTom n'est pas une dépendance.** S'il est chargé, `Route:Start` lui confie le
+point (`TomTom:AddWaypoint(uiMapID, x, y, opts)`, coordonnées normalisées comme
+celles du client) parce que sa flèche est meilleure et que le joueur l'a installée
+pour ça. Sinon le point du client fait le travail. L'addon ne réclame jamais son
+installation : renvoyer quelqu'un vers un autre addon pour une fonction que le
+client assure depuis Shadowlands serait un aveu, pas un conseil.
+
+### 3. À quoi ça ressemble — l'art de carte
+
+```lua
+local layers   = C_Map.GetMapArtLayers(uiMapID)       -- liste de UiMapLayerInfo
+local textures = C_Map.GetMapArtLayerTextures(uiMapID, 1)  -- liste de fileID
+```
+
+`UiMapLayerInfo` porte `layerWidth`, `layerHeight`, `tileWidth`, `tileHeight`,
+`minScale`, `maxScale`, `additionalZoomSteps`. Les pavés se posent en grille de
+`ceil(layerWidth / tileWidth)` colonnes, remplie ligne par ligne.
+
+**Le piège est le pavé de bord.** La couche ne fait presque jamais un multiple
+entier de la taille de pavé : le dernier de chaque ligne et de chaque colonne est
+rogné, et il faut le dire à la fois par `SetSize` et par `SetTexCoord`. Sans le
+`SetTexCoord`, la dernière colonne écrase toute son image dans un espace plus
+étroit qu'elle, et la carte paraît compressée d'un côté. `UI/MapPreview.lua`
+calcule les deux depuis le reste de la division.
+
+Les deux fonctions sont marquées `MayReturnNothing` : une carte sans art n'est pas
+une erreur (les intérieurs d'instance n'en ont pas), et l'aperçu affiche alors le
+nom du lieu.
+
 ## Points à vérifier au prochain patch
 
 * `GetSavedInstanceEncounterInfo` existe-t-elle encore ?

@@ -7,8 +7,10 @@
 Addon World of Warcraft (Retail) qui répond à une question : **qu'est-ce que je
 fais cette semaine pour choper des montures, et dans quel ordre ?**
 
-État : **phase 1 (socle)**. Diff de collection, verrous et disponibilité
-multi-personnage fonctionnent. Les routes arrivent en phase 3.
+État : **phase 1 (socle)**, plus le premier étage de la route. Diff de
+collection, verrous et disponibilité multi-personnage fonctionnent ; l'onglet
+Route propose une cible et pose son point de passage. L'enchaînement à plusieurs
+étapes (téléport puis vol) reste à faire.
 
 ## Ce que ça fait aujourd'hui
 
@@ -28,8 +30,9 @@ multi-personnage fonctionnent. Les routes arrivent en phase 3.
   (le détail est dans `docs/API-NOTES.md`).
 * Liste des montures qui te manquent **et que ce personnage peut obtenir** —
   les montures d'une autre faction ou d'une autre classe sont écartées, pas
-  comptées comme « manquantes ». Cinq colonnes — monture, source, catégorie,
-  type, essais — **triables au clic sur leur titre**, comme dans un tableur.
+  comptées comme « manquantes ». Six colonnes — monture, source, catégorie,
+  type, essais, possédée — **triables au clic sur leur titre**, comme dans un
+  tableur.
   Aucune n'est jamais vide : catégorie et type viennent du client, donc elles
   répondent même sans cartographie.
 * **Compteur de tentatives** par monture : tuer un boss incrémente les montures
@@ -40,6 +43,16 @@ multi-personnage fonctionnent. Les routes arrivent en phase 3.
   marqué incertain plutôt que présenté comme fiable. Le bloc n'apparaît que
   lorsqu'au moins un personnage a un verrou mesuré : une colonne d'« incertain »
   n'aide personne.
+* **Onglet Route** : une cible à la fois — raid en priorité — avec son instance,
+  son boss, sa zone, et la carte de la zone avec une épingle sur l'entrée. Le
+  bouton `Start` pose le point de passage : celui du jeu, avec sa flèche et sa
+  distance dans le suivi de quêtes. **TomTom n'est pas requis** ; s'il est
+  installé, l'addon lui confie le point plutôt que de doubler sa flèche.
+  Les coordonnées viennent de `C_EncounterJournal.GetDungeonEntrancesForMap`,
+  c'est-à-dire de la source qu'utilise la carte du monde du jeu — aucune
+  coordonnée n'est écrite à la main.
+* Clic droit sur une ligne : copier le nom, tracer la route, exclure. Et un
+  bouton d'exclusion sur chaque ligne, pour que l'action se voie.
 * Suivi des entrées d'instance, avec le compteur du cap 10/heure — 30/jour.
 
 ## Installation

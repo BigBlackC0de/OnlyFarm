@@ -28,10 +28,13 @@ Modules\Teleports.lua
 Modules\Attempts.lua
 Modules\Eligibility.lua
 Modules\Stats.lua
+Modules\Route.lua
 Modules\Mapping.lua
 
 UI\Theme.lua
+UI\MapPreview.lua
 UI\Dashboard.lua
+UI\RoutePage.lua
 UI\MainFrame.lua
 UI\CopyFrame.lua
 UI\MinimapButton.lua

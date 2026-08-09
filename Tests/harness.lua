@@ -30,6 +30,7 @@ harness.FILES = {
 	"Modules/Attempts.lua",
 	"Modules/Eligibility.lua",
 	"Modules/Stats.lua",
+	"Modules/Route.lua",
 	"Modules/Mapping.lua",
 	"Core/Commands.lua",
 }

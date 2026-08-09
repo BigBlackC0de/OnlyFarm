@@ -69,12 +69,12 @@ vérifient à chaque fois qu'on touche au tableau de bord.
       de répartition est rempli dès l'ouverture. C'est le point le plus
       important : aucun de ses deux axes ne dépend de la cartographie. S'il est
       vide, c'est une régression, pas une attente.
-- [ ] **Bascule d'axe** : « Par source » ↔ « Par déplacement ». Le bouton actif
+- [ ] **Bascule d'axe** : « Par source » ↔ « Par type ». Le bouton actif
       se voit, le graphe change, et le choix survit à un `/reload`.
 - [ ] **Somme par source** = nombre de montures obtenables (tuile « possédées » +
       tuile « manquantes »). Les montures d'une autre faction ou classe ne
       doivent apparaître dans aucune barre.
-- [ ] **Somme par déplacement** = la même. Une barre « Autre » non vide n'est pas
+- [ ] **Somme par type** = la même. Une barre « Autre » non vide n'est pas
       un bug : c'est un `mountTypeID` que `Data/MountTypes.lua` ne classe pas
       encore. Relever la valeur — infobulle de la monture, ou `/of debug` — et
       compléter la table.
@@ -119,6 +119,31 @@ vérifient à chaque fois qu'on touche au tableau de bord.
 - [ ] **Infobulle multi-perso** : le bloc « N perso(s) disponible(s) » n'apparaît
       que si au moins un personnage a un état mesuré. Sur une monture non
       cartographiée, pas de tableau d'« incertain ».
+- [ ] **Clic droit** : le menu s'ouvre, « Copier le nom » remplit la fenêtre de
+      copie, « Tracer la route » basculent sur l'onglet Route avec la bonne
+      monture. L'item est grisé — et explique pourquoi — si la monture n'a pas
+      d'entrée cartographiée.
+- [ ] **Bouton exclure** (la croix en fin de ligne) : exclut, et devient un `+`
+      qui réintègre. Il ne doit pas déclencher l'aperçu du clic gauche.
+
+### Recette de l'onglet Route
+
+- [ ] **Sans cartographie** : la page dit que le scan n'a pas tourné, elle ne
+      reste pas vide.
+- [ ] **Après cartographie** : une mission apparaît, raid en priorité, avec
+      instance, boss, zone et coordonnées.
+- [ ] **La carte s'affiche** et l'épingle tombe au bon endroit — comparer avec la
+      carte du monde du jeu, l'icône d'entrée de donjon doit être au même point.
+- [ ] **Pavé de bord** : la carte n'est ni compressée ni étirée sur son bord
+      droit ou bas. C'est le symptôme d'un `SetTexCoord` manquant.
+- [ ] **Bouton Start sans TomTom** : le point de passage du jeu apparaît sur la
+      carte, la flèche et la distance s'affichent dans le suivi de quêtes.
+- [ ] **Bouton Start avec TomTom** : c'est la flèche de TomTom qui apparaît, et le
+      pied de carte l'annonçait avant le clic.
+- [ ] **Épinglage** : après Start, la mission est marquée « épinglée par toi » et
+      ne change plus. « Laisser choisir » rend la main à l'addon.
+- [ ] **Monture obtenue** : la cible épinglée obtenue laisse la place à une autre
+      mission au lieu de rester affichée.
 
 ## Conventions
 
@@ -235,7 +260,7 @@ SavedVariables. Ordre non négociable.
 |---|---|---|
 | 1 — Socle | collection, verrous, éligibilité, tableau de bord, tentatives | **fait** |
 | 2 — Données | `Build/generate_data.py`, taux de drop, coordonnées | cartographie en jeu prête et persistée, pipeline à écrire |
-| 3 — Route auto | NodeDB, TravelDB, Dijkstra, TSP | à faire |
+| 3 — Route auto | NodeDB, TravelDB, Dijkstra, TSP | géographie moissonnée, onglet Route à une cible en place ; enchaînement multi-étapes à faire |
 | 4 — En jeu | HUD, auto-avance, waypoints, bouton de téléport | à faire |
 | 5 — Routes maison | éditeur, épinglage, import/export | à faire |
 | 6 — Élargissement | rares, world bosses, réputations, métiers, PvP | à faire |

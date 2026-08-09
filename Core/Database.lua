@@ -75,6 +75,8 @@ local PROFILE_DEFAULTS = {
 		sortDesc = false,
 	},
 	routing = {
+		-- Monture épinglée comme cible de route. nil = l'addon choisit.
+		target = nil,
 		flySpeed = 75,          -- yd/s, calibré par le joueur (phase 3)
 		budgetMinutes = 0,      -- 0 = pas de budget
 		respectInstanceCap = true,
