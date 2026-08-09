@@ -1261,6 +1261,52 @@ test("Stats — répartition par mode de déplacement", function()
 	eq(breakdown[3].label, ns.L.MOVE_OTHER, "et il est étiqueté comme tel")
 end)
 
+test("Stats — montures obtenues depuis l'installation", function()
+	stub.Reset()
+	stub.mounts = StandardMounts()
+	local ns = harness.Load(stub)
+
+	-- Le repère est posé au premier scan : rien n'a encore été obtenu DEPUIS.
+	eq(ns.db.global.baseline.owned, 1, "repère posé sur le total du compte")
+	eq(ns.Stats:Get().obtained.count, 0, "aucune acquisition au départ")
+
+	stub.mounts[3].isCollected = true
+	stub.Fire("NEW_MOUNT_ADDED", 202)
+	stub.AdvanceFrames(2)
+	stub.FlushTimers()
+
+	eq(ns.db.global.baseline.owned, 1, "le repère ne bouge plus")
+	eq(ns.Stats:Get().obtained.count, 1, "une monture obtenue depuis")
+end)
+
+test("Stats — les montures hors de portée comptent dans le repère", function()
+	stub.Reset()
+	stub.mounts = StandardMounts()
+	-- La monture 203 est masquée sur ce personnage (faction adverse), mais la
+	-- collection est liée au COMPTE : la posséder compte. Sinon changer de perso
+	-- ferait varier « obtenues depuis l'installation », qui n'a rien à voir avec
+	-- le personnage connecté.
+	stub.mounts[4].isCollected = true
+	local ns = harness.Load(stub)
+
+	eq(ns.Collection.counts.ownedAll, 2, "les deux possédées comptent")
+	eq(ns.Collection.counts.owned, 1, "une seule est obtenable ici")
+	eq(ns.Stats:Get().obtained.count, 0, "et le compteur part bien de zéro")
+end)
+
+test("Stats — un retrait de monture ne rend pas le compteur négatif", function()
+	stub.Reset()
+	stub.mounts = StandardMounts()
+	local ns = harness.Load(stub)
+
+	-- Blizzard retire ou fusionne parfois une monture : le total passe alors
+	-- sous le repère. « -1 obtenue » serait un non-sens à l'écran.
+	ns.db.global.baseline.owned = 5
+	ns.Collection:Scan()
+	ns.Stats:Invalidate()
+	eq(ns.Stats:Get().obtained.count, 0, "borné à zéro")
+end)
+
 test("Stats — un axe inconnu retombe sur celui par défaut", function()
 	stub.Reset()
 	stub.mounts = StandardMounts()

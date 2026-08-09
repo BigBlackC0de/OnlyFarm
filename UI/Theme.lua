@@ -46,7 +46,36 @@ Theme.colors = {
 	red     = { 0.949, 0.329, 0.357 },
 	amber   = { 1.000, 0.706, 0.329 },
 	purple  = { 0.706, 0.612, 0.902 },
+	gold    = { 1.000, 0.827, 0.145 },  -- le palier terminal : 100 %
 }
+
+--- Palier d'avancement d'une catégorie -> couleur.
+--
+-- L'échelle reprend celle des qualités d'objet du jeu — gris, vert, violet,
+-- orange, doré — parce que c'est le seul barème de progression qu'un joueur de
+-- WoW lit sans légende. Le bleu manque à l'appel exprès : c'est la couleur
+-- d'accent de l'addon, elle ne doit pas vouloir dire « 40 % » en plus de « ceci
+-- est cliquable ».
+--
+-- Le vert ne récompense donc plus l'avancement (il valait « complet » avant) :
+-- il est devenu le second palier. C'est voulu — l'important est que l'ordre des
+-- couleurs soit celui d'une montée en grade.
+Theme.PROGRESS_TIERS = {
+	{ min = 0.999, color = Theme.colors.gold },
+	{ min = 0.70, color = Theme.colors.amber },
+	{ min = 0.50, color = Theme.colors.purple },
+	{ min = 0.30, color = Theme.colors.green },
+	{ min = 0.00, color = Theme.colors.faint },
+}
+
+--- Couleur d'un ratio d'avancement, du gris (à peine entamé) au doré (complet).
+function Theme.ProgressColor(ratio)
+	ratio = tonumber(ratio) or 0
+	for _, tier in ipairs(Theme.PROGRESS_TIERS) do
+		if ratio >= tier.min then return tier.color end
+	end
+	return Theme.colors.faint
+end
 
 --- Couleur d'un statut d'éligibilité. Un seul endroit décide, pour que la
 --  pastille d'une ligne, la barre du tableau de bord et la légende disent
@@ -373,7 +402,10 @@ function Theme.ShareRow(parent, labelWidth, valueWidth)
 		local span = math.max(2, (total / max) * width)
 		local ratio = total > 0 and (owned / total) or 0
 
-		local c = ratio >= 0.999 and Theme.colors.green or Theme.colors.accent
+		-- La couleur porte le palier d'avancement, du gris au doré. Elle rend la
+		-- lecture immédiate : sans elle, comparer deux barres partiellement
+		-- remplies demande de lire les deux compteurs.
+		local c = Theme.ProgressColor(ratio)
 		self.Track:SetWidth(span)
 		self.Track:SetColorTexture(c[1], c[2], c[3], 0.22)
 		self.Track:Show()

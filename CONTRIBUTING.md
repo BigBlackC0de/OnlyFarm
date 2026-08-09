@@ -86,11 +86,17 @@ vérifient à chaque fois qu'on touche au tableau de bord.
       comptées en pied (« +N autres »).
 - [ ] **Acquisition** : apprendre une monture (ou `/of scan`) met à jour la barre
       de sa catégorie sans réordonner les lignes.
-- [ ] **Bouton Rescanner** (carte de disponibilité) : lance la cartographie, le
-      bouton se coupe pendant, le libellé affiche l'avancement, puis le résumé.
-- [ ] **Segment « non cartographié »** de la barre de disponibilité : présent
-      tant que la cartographie n'a pas rattaché la monture à une instance, et
-      compté dans la légende. Il doit reculer après un `/of deepscan`.
+- [ ] **Échelle de couleur** : elle suit les qualités d'objet du jeu, et les
+      bornes sont exactes — gris sous 30 %, vert de 30 à 50, violet de 50 à 70,
+      orange de 70 à 99, doré à 100. Une catégorie à 29 % ne doit pas être verte.
+- [ ] **Bouton Rescanner** (pied du graphe) : lance la cartographie, le bouton se
+      coupe pendant, le libellé affiche l'avancement, puis le résumé.
+- [ ] **Tuile « obtenues »** : à 0 sur une base neuve, même avec 400 montures
+      déjà possédées — elle compte ce qui arrive APRÈS l'installation. Elle passe
+      à 1 à la première monture apprise, et le détail dit depuis quand.
+- [ ] **Tuile « obtenues », changement de personnage** : le chiffre ne bouge pas
+      d'un perso à l'autre, y compris entre factions. Le repère porte sur le
+      compte, pas sur le personnage.
 - [ ] **Journal lent** : sur un `/reload` en zone chargée, la carte affiche
       « Journal des montures pas encore peuplé » au lieu de rester vide.
 

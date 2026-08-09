@@ -27,6 +27,9 @@ local GLOBAL_DEFAULTS = {
 	customNodes = {},        -- [nodeID] = point posé par le joueur (éditeur de route)
 	instanceIDsByName = {},  -- [nom normalisé] = instanceID moteur (pont EJ <-> verrous)
 	scanMeta = {},           -- horodatage et build du dernier scan
+	-- Repère posé au premier scan : { owned, at }. Sert au compteur « obtenues
+	-- depuis l'installation ». Cf. Collection:StampBaseline.
+	baseline = {},
 }
 
 local PROFILE_DEFAULTS = {

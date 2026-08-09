@@ -3,22 +3,34 @@
 
 	Le tableau de bord : ce qu'on voit en ouvrant l'addon.
 
-	Il répond à quatre questions, dans cet ordre, parce que c'est l'ordre dans
+	Il répond à trois questions, dans cet ordre, parce que c'est l'ordre dans
 	lequel elles se posent :
 
-	  1. où j'en suis  — tuiles de compteurs et barre de progression globale ;
-	  2. qu'est-ce qui est ouvert maintenant — barre empilée par statut ;
-	  3. comment se répartit ma collection — graphe de répartition, par nature
-	     de source ou par mode de déplacement ;
-	  4. par quoi je commence — les cibles disponibles, les plus attendues
-	     d'abord.
+	  1. où j'en suis — quatre compteurs : possédées, manquantes, obtenues
+	     depuis l'installation, verrous actifs ;
+	  2. comment se répartit ma collection — graphe de répartition, par nature
+	     de source ou par type de monture ;
+	  3. par quoi je commence — les cibles disponibles, les plus attendues
+	     d'abord, et ce que la semaine a déjà consommé.
 
-	La question 3 était « où il me reste du travail », répondue par une frise des
-	extensions. Elle est retirée : le client n'expose pas l'extension d'une
-	monture, la frise dépendait donc d'un scan qui n'en rattachait qu'une
-	fraction, et l'essentiel de la collection s'entassait dans une barre
-	« inconnue ». Les deux axes qui la remplacent viennent du client pour toutes
-	les montures, sans scan (cf. Modules/Stats.lua).
+	CE QUI A ÉTÉ RETIRÉ, ET POURQUOI
+
+	Une frise des extensions occupait la question 2. Le client n'expose pas
+	l'extension d'une monture : elle dépendait d'un scan qui n'en rattachait
+	qu'une fraction, et l'essentiel de la collection s'entassait dans une barre
+	« inconnue ».
+
+	Une barre empilée « disponible / verrouillé / incertain » occupait le haut.
+	Sur une collection réelle elle affichait « 65 disponible, 679 incertain » :
+	elle décrivait l'état du scan, pas celui de la collection.
+
+	Deux tuiles enfin — « dispo maintenant », qui comptait la même chose que
+	cette barre, et « essais comptés », un total d'essais toutes montures
+	confondues, qui additionne ce qui n'est pas additionnable.
+
+	Le fil commun : ces quatre éléments répondaient à des questions que l'addon
+	se pose, pas à des questions qu'un joueur se pose. Ce qu'il reste vient du
+	client pour toutes les montures, sans scan.
 
 	Aucun chiffre n'est calculé ici : tout vient de Modules/Stats.lua, qui se
 	teste hors du jeu. Ce fichier ne fait que poser des frames.
@@ -39,6 +51,9 @@ local TARGET_ROW_HEIGHT = 22
 -- dépend en plus de la hauteur de la fenêtre, cf. BreakdownRowBudget.
 local MAX_BREAKDOWN_ROWS = 14
 
+-- Verrous de la semaine : autant que la carte peut en montrer.
+local MAX_LOCKOUT_ROWS = 12
+
 function Dashboard:OnEnable()
 	-- Le rafraîchissement général est piloté par UI:Refresh : un seul chef
 	-- d'orchestre, sinon deux abonnements recalculent la même chose sur le
@@ -53,7 +68,7 @@ end
 function Dashboard:OnScanProgress()
 	local page = self.page
 	if not page or not page:IsShown() then return end
-	page.AvailabilityCard.ScanInfo:SetText(self:ScanProgressText())
+	page.BreakdownCard.ScanInfo:SetText(self:ScanProgressText())
 end
 
 --------------------------------------------------------------------------------
@@ -69,7 +84,6 @@ function Dashboard:Create(parent)
 	self.page = page
 
 	self:CreateTiles(page)
-	self:CreateAvailability(page)
 	self:CreateBreakdown(page)
 	self:CreateTargets(page)
 
@@ -81,11 +95,21 @@ function Dashboard:CreateTiles(page)
 	local Theme = ns.Theme
 	local L = ns.L
 
+	-- Quatre chiffres, et chacun répond à une question qu'un joueur se pose
+	-- vraiment : ce que j'ai, ce qu'il me reste, ce que j'ai décroché depuis que
+	-- l'addon tourne, et ce que cette semaine a déjà consommé.
+	--
+	-- Deux tuiles ont été retirées. « Dispo maintenant » comptait ce que la
+	-- cartographie savait ouvrir, soit un chiffre qui dit surtout où en est le
+	-- scan. « Essais comptés » additionnait des tentatives sur des montures sans
+	-- rapport entre elles : cinquante essais répartis sur trente montures et
+	-- cinquante sur une seule donnaient le même nombre, alors que ce ne sont pas
+	-- les mêmes situations. Le compte par monture, lui, reste dans l'infobulle,
+	-- où il porte du sens parce qu'il porte sur UNE monture.
 	local definitions = {
 		{ key = "owned", label = L.KPI_OWNED, color = Theme.colors.accent },
 		{ key = "missing", label = L.KPI_MISSING, color = Theme.colors.text },
-		{ key = "available", label = L.KPI_AVAILABLE, color = Theme.colors.green },
-		{ key = "attempts", label = L.KPI_ATTEMPTS, color = Theme.colors.purple },
+		{ key = "obtained", label = L.KPI_OBTAINED, color = Theme.colors.gold },
 		{ key = "locks", label = L.KPI_LOCKS, color = Theme.colors.red },
 	}
 
@@ -128,62 +152,6 @@ function Dashboard:LayoutTiles()
 	end
 end
 
---- Barre empilée « disponible / verrouillé / incertain / non cartographié »,
---  avec sa légende. Une barre empilée plutôt qu'un camembert : le client n'a
---  pas de primitive circulaire, et une barre se lit mieux de toute façon.
---
---  Le pied de carte porte l'état de la cartographie et sa relance. C'est ici
---  qu'elle a sa place : le scan sert à rattacher une monture à une instance,
---  donc à un verrou — c'est-à-dire exactement à ce que cette carte affiche.
---  « Non cartographié » est un segment de cette barre ; le remède est sous le
---  symptôme.
-function Dashboard:CreateAvailability(page)
-	local Theme = ns.Theme
-	local L = ns.L
-
-	local card = Theme.Card(page)
-	card:SetPoint("TOPLEFT", page.TileRow, "BOTTOMLEFT", 0, -TILE_GAP)
-	card:SetPoint("TOPRIGHT", page.TileRow, "BOTTOMRIGHT", 0, -TILE_GAP)
-	card:SetHeight(110)
-	page.AvailabilityCard = card
-
-	local title = Theme.Text(card, "GameFontNormal", Theme.colors.text)
-	title:SetPoint("TOPLEFT", 10, -8)
-	title:SetText(L.DASH_AVAILABILITY)
-
-	local progress = Theme.Text(card, "GameFontHighlightSmall", Theme.colors.muted, "RIGHT")
-	progress:SetPoint("TOPRIGHT", -10, -9)
-	card.Progress = progress
-
-	local bar = Theme.StackedBar(card)
-	bar:SetPoint("TOPLEFT", 10, -30)
-	bar:SetPoint("TOPRIGHT", -10, -30)
-	bar:SetHeight(14)
-	card.Bar = bar
-
-	local legend = Theme.Text(card, "GameFontHighlightSmall", Theme.colors.muted)
-	legend:SetPoint("TOPLEFT", bar, "BOTTOMLEFT", 0, -8)
-	legend:SetPoint("TOPRIGHT", bar, "BOTTOMRIGHT", 0, -8)
-	card.Legend = legend
-
-	local rule = Theme.Separator(card)
-	rule:SetPoint("BOTTOMLEFT", 1, 30)
-	rule:SetPoint("BOTTOMRIGHT", -1, 30)
-
-	-- UN seul bouton. « Scan » et « Scan approfondi » demandaient au joueur de
-	-- trancher une question technique — faut-il parcourir le butin ? — dont il
-	-- n'a pas les éléments. L'addon sait y répondre : il le fait.
-	local rescan = Theme.Button(card, L.SCAN_BUTTON, 130, 20)
-	rescan:SetPoint("BOTTOMRIGHT", -10, 6)
-	rescan:SetScript("OnClick", function() ns.Mapping:Run() end)
-	card.RescanButton = rescan
-
-	card.ScanInfo = Theme.Text(card, "GameFontHighlightSmall", Theme.colors.faint)
-	card.ScanInfo:SetPoint("BOTTOMLEFT", 10, 10)
-	card.ScanInfo:SetPoint("BOTTOMRIGHT", rescan, "BOTTOMLEFT", -10, 10)
-	card.ScanInfo:SetWordWrap(false)
-end
-
 --- Graphe de répartition de la collection, avec son sélecteur d'axe.
 --
 --  Les barres sont à l'échelle des effectifs (cf. Theme.ShareRow) : la plus
@@ -194,7 +162,7 @@ function Dashboard:CreateBreakdown(page)
 	local L = ns.L
 
 	local card = Theme.Card(page)
-	card:SetPoint("TOPLEFT", page.AvailabilityCard, "BOTTOMLEFT", 0, -TILE_GAP)
+	card:SetPoint("TOPLEFT", page.TileRow, "BOTTOMLEFT", 0, -TILE_GAP)
 	card:SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT", -260, 0)
 	page.BreakdownCard = card
 
@@ -218,12 +186,36 @@ function Dashboard:CreateBreakdown(page)
 	selector:SetValue(self:GetAxis())
 	card.Selector = selector
 
-	-- La légende va EN PIED, pas sous le sélecteur : là-haut elle recouvrait la
-	-- première ligne du graphe, dont le compteur est aussi cadré à droite.
+	-- La légende partage la ligne du titre, bornée entre lui et le sélecteur :
+	-- sous le sélecteur elle recouvrait la première barre, et en pied elle est
+	-- désormais à la place de l'état de la cartographie.
 	local hint = Theme.Text(card, "GameFontHighlightSmall", Theme.colors.faint, "RIGHT")
-	hint:SetPoint("BOTTOMRIGHT", -10, 6)
+	hint:SetPoint("LEFT", title, "RIGHT", 12, 0)
+	hint:SetPoint("RIGHT", selector, "LEFT", -12, 0)
 	hint:SetText(L.DASH_BREAKDOWN_HINT)
+	hint:SetWordWrap(false)
 	card.Hint = hint
+
+	-- Pied de carte : état de la cartographie et relance manuelle. Elle a perdu
+	-- son ancien logement avec la barre de disponibilité, mais elle a toujours
+	-- sa raison d'être — c'est elle qui rattache une monture à une instance,
+	-- donc qui alimente les cibles du moment et les verrous.
+	local rule = Theme.Separator(card)
+	rule:SetPoint("BOTTOMLEFT", 1, 30)
+	rule:SetPoint("BOTTOMRIGHT", -1, 30)
+
+	-- UN seul bouton. « Scan » et « Scan approfondi » demandaient au joueur de
+	-- trancher une question technique — faut-il parcourir le butin ? — dont il
+	-- n'a pas les éléments. L'addon sait y répondre : il le fait.
+	local rescan = Theme.Button(card, L.SCAN_BUTTON, 130, 20)
+	rescan:SetPoint("BOTTOMRIGHT", -10, 6)
+	rescan:SetScript("OnClick", function() ns.Mapping:Run() end)
+	card.RescanButton = rescan
+
+	card.ScanInfo = Theme.Text(card, "GameFontHighlightSmall", Theme.colors.faint)
+	card.ScanInfo:SetPoint("BOTTOMLEFT", 10, 10)
+	card.ScanInfo:SetPoint("BOTTOMRIGHT", rescan, "BOTTOMLEFT", -10, 10)
+	card.ScanInfo:SetWordWrap(false)
 
 	card.Rows = {}
 	for index = 1, MAX_BREAKDOWN_ROWS do
@@ -244,19 +236,27 @@ function Dashboard:CreateBreakdown(page)
 	card.Empty:Hide()
 end
 
---- Nombre de lignes que la carte peut afficher sans déborder de sa bordure.
+--- Nombre de lignes qu'une carte peut afficher sans déborder de sa bordure.
 --
 --  La fenêtre est redimensionnable : à la hauteur minimale, une carte de 140
 --  pixels ne peut pas montrer douze barres de dix-neuf. Les dessiner quand même
 --  les faisait sortir de la carte et de la fenêtre.
-function Dashboard:BreakdownRowBudget()
-	local card = self.page and self.page.BreakdownCard
-	if not card then return MAX_BREAKDOWN_ROWS end
+--
+--  @param header  hauteur du titre et de ce qui l'accompagne
+--  @param footer  hauteur du pied, zéro s'il n'y en a pas
+function Dashboard:RowBudget(card, header, footer, rowHeight, maximum)
+	if not card then return maximum end
 	local height = card:GetHeight() or 0
-	-- 32 pixels d'en-tête (titre et sélecteur), 20 de pied (la légende).
-	local budget = math.floor((height - 52) / BAR_ROW_HEIGHT)
+	local budget = math.floor((height - header - footer) / rowHeight)
 	if budget < 1 then return 1 end
-	return math.min(budget, MAX_BREAKDOWN_ROWS)
+	return math.min(budget, maximum)
+end
+
+function Dashboard:BreakdownRowBudget()
+	-- 32 pixels d'en-tête (titre et sélecteur), 34 de pied (le trait, l'état de
+	-- la cartographie et son bouton).
+	return self:RowBudget(self.page and self.page.BreakdownCard, 32, 34,
+		BAR_ROW_HEIGHT, MAX_BREAKDOWN_ROWS)
 end
 
 --- Axe de répartition retenu, ramené à un axe valide.
@@ -350,8 +350,12 @@ function Dashboard:CreateLockouts(page)
 	title:SetPoint("TOPLEFT", 10, -8)
 	title:SetText(L.DASH_LOCKOUTS)
 
+	-- Douze lignes, contre six auparavant : cette carte a hérité de la place
+	-- libérée par la barre de disponibilité, et un raideur qui enchaîne les
+	-- verrous legacy en a facilement plus de six sur la semaine. Le nombre
+	-- réellement affiché suit la hauteur de la carte.
 	card.Rows = {}
-	for index = 1, 6 do
+	for index = 1, MAX_LOCKOUT_ROWS do
 		local row = CreateFrame("Frame", nil, card)
 		row:SetHeight(TARGET_ROW_HEIGHT)
 		row:SetPoint("LEFT", 8, 0)
@@ -433,43 +437,18 @@ function Dashboard:Refresh()
 	-- pas du travail restant, c'est du bruit. Elles sont déjà absentes de la
 	-- liste et du total ; ne pas les compter non plus en marge.
 	self.tiles.missing:Set(string.format("%d", stats.missing), "")
-	self.tiles.available:Set(string.format("%d", stats.availableCount or 0), "")
-	self.tiles.attempts:Set(string.format("%d", stats.attempts.total),
-		stats.attempts.mounts > 0 and L.KPI_ATTEMPTS_DETAIL:format(stats.attempts.mounts) or "")
+
+	-- Obtenues depuis l'installation. Le détail dit DEPUIS QUAND, sinon « 3 »
+	-- ne veut rien dire — trois en une semaine et trois en deux ans ne racontent
+	-- pas la même histoire.
+	local obtained = stats.obtained or { count = 0 }
+	self.tiles.obtained:Set(string.format("%d", obtained.count),
+		obtained.since and L.KPI_OBTAINED_DETAIL:format(ns.Util.FormatAge(obtained.since)) or "")
+
 	self.tiles.locks:Set(string.format("%d", stats.lockCount),
 		L.KPI_INSTANCES:format(stats.instances.hour, stats.instances.day))
 
-	-- 2. Barre empilée de disponibilité.
-	local card = page.AvailabilityCard
-	local parts = ns.Stats:GetAvailabilityParts()
-	card.Bar:SetParts(parts)
-	card.Progress:SetText(L.DASH_PROGRESS:format(stats.owned, stats.total))
-
-	local STATE = ns.Eligibility.STATE
-	local labels = {
-		[STATE.AVAILABLE] = L.STATUS_AVAILABLE,
-		[STATE.LOCKED] = L.STATUS_LOCKED,
-		[STATE.UNKNOWN] = L.STATUS_UNKNOWN,
-		[STATE.UNMAPPED] = L.STATUS_NO_SOURCE,
-	}
-	local legend = {}
-	for _, part in ipairs(parts) do
-		if part.value > 0 then
-			legend[#legend + 1] = Theme.Colorize(part.color,
-				string.format("■ %d %s", part.value, labels[part.state] or ""))
-		end
-	end
-	card.Legend:SetText(table.concat(legend, "   "))
-
-	-- État de la cartographie, et bouton coupé pendant qu'elle tourne.
-	if ns.Mapping.running then
-		card.ScanInfo:SetText(self:ScanProgressText())
-	else
-		card.ScanInfo:SetText(ns.Mapping:GetSummary() or L.SCAN_NEVER)
-	end
-	card.RescanButton:SetEnabled(not ns.Mapping.running)
-
-	-- 3. Répartition de la collection, selon l'axe choisi.
+	-- 2. Répartition de la collection, selon l'axe choisi.
 	--
 	-- Aucun scan là-dedans : les deux axes viennent du client, monture par
 	-- monture. La carte a donc quelque chose à montrer dès la première
@@ -503,7 +482,15 @@ function Dashboard:Refresh()
 	end
 	breakdownCard.Hint:SetShown(#breakdown > 0)
 
-	-- 4. Cibles du moment.
+	-- État de la cartographie, et bouton coupé pendant qu'elle tourne.
+	if ns.Mapping.running then
+		breakdownCard.ScanInfo:SetText(self:ScanProgressText())
+	else
+		breakdownCard.ScanInfo:SetText(ns.Mapping:GetSummary() or L.SCAN_NEVER)
+	end
+	breakdownCard.RescanButton:SetEnabled(not ns.Mapping.running)
+
+	-- 3. Cibles du moment.
 	local targetCard = page.TargetCard
 	for index, row in ipairs(targetCard.Rows) do
 		local target = stats.topTargets[index]
@@ -520,11 +507,12 @@ function Dashboard:Refresh()
 	end
 	targetCard.Empty:SetShown(#stats.topTargets == 0)
 
-	-- 5. Verrous de la semaine.
+	-- 4. Verrous de la semaine.
 	local lockCard = page.LockoutCard
 	local locks = ns.Lockouts:GetActiveLocks()
+	local lockBudget = self:RowBudget(lockCard, 28, 8, TARGET_ROW_HEIGHT, MAX_LOCKOUT_ROWS)
 	for index, row in ipairs(lockCard.Rows) do
-		local lock = locks[index]
+		local lock = index <= lockBudget and locks[index] or nil
 		if lock then
 			local name = lock.name or "?"
 			if lock.difficultyName and lock.difficultyName ~= "" then

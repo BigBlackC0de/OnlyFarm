@@ -93,6 +93,12 @@ function Stats:Compute()
 	local attemptTotal, attemptMounts = ns.Attempts:GetTotals()
 	result.attempts = { total = attemptTotal, mounts = attemptMounts }
 
+	-- Ce que l'addon t'a vu obtenir. Un compteur d'essais global additionne des
+	-- montures qui n'ont rien à voir entre elles et ne dit rien ; un compteur
+	-- d'acquisitions dit quelque chose, parce que chaque unité est un résultat.
+	local obtained, obtainedSince = ns.Collection:GetObtainedSinceInstall()
+	result.obtained = { count = obtained, since = obtainedSince }
+
 	local hour, day = ns.Lockouts:GetInstanceCounts()
 	result.instances = { hour = hour, day = day }
 
@@ -220,21 +226,15 @@ function Stats:ComputeBreakdown(axis)
 	return list
 end
 
---------------------------------------------------------------------------------
--- Mise en forme
---------------------------------------------------------------------------------
-
---- Segments de la barre empilée de disponibilité, dans un ordre stable.
-function Stats:GetAvailabilityParts()
-	local STATE = ns.Eligibility.STATE
-	local stats = self:Get()
-	local colors = ns.Theme and ns.Theme.STATE_COLORS
-	if not colors then return {} end
-
-	return {
-		{ state = STATE.AVAILABLE, value = stats.byState[STATE.AVAILABLE] or 0, color = colors.available },
-		{ state = STATE.LOCKED, value = stats.byState[STATE.LOCKED] or 0, color = colors.locked },
-		{ state = STATE.UNKNOWN, value = stats.byState[STATE.UNKNOWN] or 0, color = colors.unknown },
-		{ state = STATE.UNMAPPED, value = stats.byState[STATE.UNMAPPED] or 0, color = colors.unmapped },
-	}
-end
+-- La barre empilée « disponible / verrouillé / incertain / non cartographié » a
+-- été retirée du tableau de bord, et avec elle GetAvailabilityParts.
+--
+-- Elle décrivait honnêtement l'état de la cartographie, et c'était le problème :
+-- sur une collection réelle elle affichait « 65 disponible, 679 incertain », donc
+-- une barre presque entièrement ambre. « Incertain » n'est pas une information
+-- sur laquelle un joueur agit, et occuper le haut du tableau de bord avec elle
+-- revenait à mettre en avant ce que l'addon ne sait pas.
+--
+-- `byState` reste calculé : c'est lui qui désigne les cibles du moment, et
+-- l'infobulle de chaque monture porte son statut, là où il est utile — au moment
+-- de choisir cette monture-là.

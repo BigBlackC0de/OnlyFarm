@@ -33,18 +33,15 @@ local L = {
 	-- Tableau de bord
 	KPI_OWNED = "collected",
 	KPI_MISSING = "missing",
-	KPI_AVAILABLE = "available now",
-	KPI_ATTEMPTS = "tries logged",
-	KPI_ATTEMPTS_DETAIL = "on %d mounts",
+	KPI_OBTAINED = "obtained",
+	KPI_OBTAINED_DETAIL = "in the last %s",
 	KPI_LOCKS = "active lockouts",
 	KPI_INSTANCES = "%d/h · %d/day",
-	DASH_AVAILABILITY = "What is open right now",
-	DASH_PROGRESS = "%d of %d collected",
 	DASH_BREAKDOWN = "How your collection breaks down",
 	DASH_BREAKDOWN_HINT = "bar length = how many exist · filled = collected",
 	DASH_BREAKDOWN_MORE = "+%d more — enlarge the window",
 	DASH_AXIS_SOURCE = "By source",
-	DASH_AXIS_MOVEMENT = "By movement",
+	DASH_AXIS_MOVEMENT = "By type",
 	DASH_TARGETS = "Start with these",
 	DASH_NO_TARGET = "Nothing available right now — everything is locked or unmapped.",
 	DASH_LOCKOUTS = "Done this week",
@@ -111,7 +108,7 @@ local L = {
 	HINT_INCLUDE = "Right-click: put back in the list",
 	TAG_EXCLUDED = "excluded",
 	TOOLTIP_BOSS = "Boss",
-	TOOLTIP_MOVEMENT = "Movement",
+	TOOLTIP_MOVEMENT = "Mount type",
 	TOOLTIP_DIFFICULTY = "Locked in",
 	MINIMAP_LEFT = "Left-click: open OnlyFarm",
 	MINIMAP_RIGHT = "Right-click: rescan collection and lockouts",
@@ -193,18 +190,15 @@ if GetLocale and GetLocale() == "frFR" then
 
 	L.KPI_OWNED = "possédées"
 	L.KPI_MISSING = "manquantes"
-	L.KPI_AVAILABLE = "dispo maintenant"
-	L.KPI_ATTEMPTS = "essais comptés"
-	L.KPI_ATTEMPTS_DETAIL = "sur %d montures"
+	L.KPI_OBTAINED = "obtenues"
+	L.KPI_OBTAINED_DETAIL = "en %s"
 	L.KPI_LOCKS = "verrous actifs"
 	L.KPI_INSTANCES = "%d/h · %d/jour"
-	L.DASH_AVAILABILITY = "Ce qui est ouvert maintenant"
-	L.DASH_PROGRESS = "%d sur %d possédées"
 	L.DASH_BREAKDOWN = "Comment se répartit ta collection"
 	L.DASH_BREAKDOWN_HINT = "longueur = effectif · rempli = possédées"
 	L.DASH_BREAKDOWN_MORE = "+%d autres — agrandis la fenêtre"
 	L.DASH_AXIS_SOURCE = "Par source"
-	L.DASH_AXIS_MOVEMENT = "Par déplacement"
+	L.DASH_AXIS_MOVEMENT = "Par type"
 	L.DASH_TARGETS = "Commence par là"
 	L.DASH_NO_TARGET = "Rien de disponible maintenant — tout est verrouillé ou non cartographié."
 	L.DASH_LOCKOUTS = "Déjà fait cette semaine"
@@ -266,7 +260,7 @@ if GetLocale and GetLocale() == "frFR" then
 	L.HINT_INCLUDE = "Clic droit : remettre dans la liste"
 	L.TAG_EXCLUDED = "exclue"
 	L.TOOLTIP_BOSS = "Boss"
-	L.TOOLTIP_MOVEMENT = "Déplacement"
+	L.TOOLTIP_MOVEMENT = "Type de monture"
 	L.TOOLTIP_DIFFICULTY = "Verrou posé en"
 	L.MINIMAP_LEFT = "Clic gauche : ouvrir OnlyFarm"
 	L.MINIMAP_RIGHT = "Clic droit : rescanner collection et verrous"

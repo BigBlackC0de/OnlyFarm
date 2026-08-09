@@ -71,7 +71,7 @@ function Collection:Scan()
 	end
 
 	local owned, missing, byID, allIDs, collected = {}, {}, {}, {}, {}
-	local counts = { total = 0, owned = 0, missing = 0, hidden = 0 }
+	local counts = { total = 0, owned = 0, missing = 0, hidden = 0, ownedAll = 0 }
 	local excluded = (ns.db and ns.db.global.excluded) or {}
 
 	for i = 1, #mountIDs do
@@ -80,6 +80,14 @@ function Collection:Scan()
 			faction, shouldHideOnChar, isCollected = C_MountJournal.GetMountInfoByID(mountID)
 
 		if name then
+			-- Compté AVANT le tri par personnage : la collection est liée au
+			-- compte, pas au personnage. Une monture de la faction adverse est
+			-- possédée sur tous les persos à la fois, même sur ceux qui ne
+			-- peuvent pas l'invoquer. C'est ce total-là qui sert de repère
+			-- « depuis l'installation » : sinon changer de perso ferait bouger un
+			-- compteur qui n'a rien à voir avec le personnage.
+			if isCollected then counts.ownedAll = counts.ownedAll + 1 end
+
 			if shouldHideOnChar then
 				-- Monture d'une autre faction ou d'une autre classe : elle ne
 				-- tombera JAMAIS sur ce personnage. Elle sort du total, et le
@@ -142,10 +150,45 @@ function Collection:Scan()
 	self.retries = 0
 	self.lastScan = time()
 
+	self:StampBaseline(counts.ownedAll)
+
 	self:Debug("collection : %d possédées / %d obtenables, %d masquées sur ce perso",
 		counts.owned, counts.total, counts.hidden)
 	self:SendMessage("OF_COLLECTION_UPDATED")
 	return true
+end
+
+--- Repère de départ : combien de montures étaient déjà possédées au premier scan.
+--
+--  C'est ce qui permet de dire « 7 montures obtenues depuis que tu as installé
+--  l'addon » sans tenir un journal d'événements. Une monture ne se désapprend
+--  pas : la différence entre le total du moment et ce repère EST le nombre
+--  d'acquisitions, et elle reste juste même si l'addon était désactivé au
+--  moment de l'acquisition, ou si NEW_MOUNT_ADDED n'a pas été reçu.
+--
+--  Le repère ne se pose qu'une fois. Un `/of reset` le remet à zéro, et c'est
+--  cohérent : la base est neuve, donc le compteur repart de l'installation.
+function Collection:StampBaseline(ownedAll)
+	if not ns.db then return end
+	local baseline = ns.db.global.baseline
+	if type(baseline.owned) == "number" then return end
+	baseline.owned = ownedAll
+	baseline.at = time()
+	self:Debug("repère de départ posé à %d montures possédées", ownedAll)
+end
+
+--- Montures obtenues depuis la pose du repère.
+--  @return nombre, horodatage du repère
+function Collection:GetObtainedSinceInstall()
+	local baseline = ns.db and ns.db.global.baseline
+	if type(baseline) ~= "table" or type(baseline.owned) ~= "number" then
+		return 0, nil
+	end
+	-- Borné à zéro : Blizzard retire ou fusionne parfois une monture, ce qui
+	-- ferait passer la différence sous zéro. « -1 monture obtenue » serait un
+	-- non-sens à l'écran.
+	local obtained = (self.counts.ownedAll or 0) - baseline.owned
+	return math.max(0, obtained), baseline.at
 end
 
 function Collection:Retry()
