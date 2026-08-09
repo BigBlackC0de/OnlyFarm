@@ -139,6 +139,11 @@ vérifient à chaque fois qu'on touche au tableau de bord.
       reste pas vide.
 - [ ] **Après cartographie** : une mission apparaît, raid en priorité, avec
       instance, boss, zone et coordonnées.
+- [ ] **La cible est bien du BUTIN d'instance.** Ouvrir l'aperçu de la monture et
+      lire son texte de source : s'il dit « Vendeur », « Métier » ou « Haut
+      fait », c'est une régression de la règle n°5 du domaine — la cible ne
+      devrait pas avoir d'instance du tout. C'est ce qui proposait un raid de
+      Cataclysm pour une monture achetée chez les Kyrians.
 - [ ] **La carte s'affiche** et l'épingle tombe au bon endroit — comparer avec la
       carte du monde du jeu, l'icône d'entrée de donjon doit être au même point.
 - [ ] **Pavé de bord** : la carte n'est ni compressée ni étirée sur son bord
@@ -193,7 +198,7 @@ vérifient à chaque fois qu'on touche au tableau de bord.
 
 ## Règles du domaine à ne pas casser
 
-Ces quatre points sont la raison d'être de l'addon. Une régression dessus est
+Ces cinq points sont la raison d'être de l'addon. Une régression dessus est
 un bug grave même si rien ne plante :
 
 1. **L'absence de verrou vaut disponibilité.** Une instance jamais entrée cette
@@ -206,6 +211,15 @@ un bug grave même si rien ne plante :
 4. **On n'invente jamais une donnée.** Pas d'identifiant écrit au jugé, pas de
    taux de drop présenté comme exact. Un statut inconnu s'affiche « incertain »
    avec sa raison.
+5. **Seul un BUTIN peut être rattaché à une instance.** Le `sourceType` du
+   client tranche, et il ne se trompe pas : une monture de vendeur se tient là
+   où se tient son PNJ — une zone, jamais une instance verrouillée. Rapprocher
+   le lieu d'une monture de vendeur, de métier ou de haut fait d'un nom
+   d'instance a déjà envoyé un vendeur de Bastion (Shadowlands) vers le bastion
+   du Crépuscule (Cataclysm), avec le verrou hebdomadaire qui va avec.
+   Corollaire : **un fragment de nom ne désigne pas ce nom.** Un rapprochement
+   partiel ne va que dans un sens — le texte de lieu contient le nom
+   d'instance — et refuse l'ambiguïté au lieu de trancher au hasard.
 
 ## Ce que l'addon ne fera jamais
 

@@ -120,7 +120,15 @@ end
 --   8 — le pilote rend enfin la main au client entre deux lectures de butin :
 --       les yields étaient consommés dans la même frame, donc la passe de
 --       butin lisait avant que le client ait chargé quoi que ce soit
-local MAPPING_VERSION = 9
+--   9 — le lieu n'est pas la dernière ligne du texte de source : toutes les
+--       lignes candidates sont essayées, le rapprochement tranche
+--  10 — deux barrières contre les faux rapprochements de lieu : plus de
+--       correspondance partielle dans le sens « nom d'instance qui CONTIENT le
+--       lieu », et plus de recherche d'instance du tout pour une monture qui ne
+--       tombe pas d'un butin. Les caches précédents contiennent des raids
+--       attribués à des montures de vendeur — « Le Bastion » (Shadowlands)
+--       rapproché de « Le bastion du Crépuscule » (Cataclysm).
+local MAPPING_VERSION = 10
 
 -- Une cartographie qui ne rattache rien est ratée, pas fraîche : on la
 -- retente. Mais pas indéfiniment — sur un client où rien ne répondrait, on
@@ -617,19 +625,43 @@ local function MatchPlace(index, place)
 		return index[before], "prefix"
 	end
 
-	-- 4. Correspondance partielle, dans un sens ou dans l'autre. Bornée en
-	--    longueur : « Karazhan » ne doit pas attraper autre chose au hasard.
+	-- 4. Correspondance partielle, dans UN SEUL SENS : le texte de lieu contient
+	--    le nom d'instance.
+	--
+	--    L'autre sens — un nom d'instance qui contient le lieu — est retiré, et
+	--    c'est un bug réel qui l'a fait retirer : « Le Bastion », la zone de
+	--    Shadowlands où se tient un vendeur de montures, est un sous-mot de
+	--    « Le bastion du Crépuscule », un raid de Cataclysm. L'addon envoyait
+	--    donc chercher en raid, dans Loch Modan, une monture qui s'achète chez un
+	--    PNJ des Kyrians. Un FRAGMENT de nom ne désigne pas ce nom : le lieu
+	--    « Le Bastion » n'est pas plus le bastion du Crépuscule que « Orgrimmar »
+	--    ne serait « Portes d'Orgrimmar ».
+	--
+	--    Le sens conservé, lui, est légitime : le Recherche de groupe nomme ses
+	--    ailes « Citadelle de la Couronne de glace : Le Bastion inférieur », et
+	--    ce texte-là CONTIENT bien le nom de l'instance.
+	--
+	--    On retient le nom d'instance le PLUS LONG parmi les candidats — le plus
+	--    spécifique — et on refuse en cas d'égalité entre deux instances
+	--    différentes. L'ordre de parcours d'une table Lua n'est pas défini :
+	--    « la première trouvée » donnerait deux réponses différentes à deux
+	--    joueurs, ce qui est pire qu'une absence de réponse.
 	for _, candidateKey in ipairs({ key, after, before }) do
 		if candidateKey and #candidateKey >= MIN_PARTIAL_LENGTH then
+			local best, bestKey, ambiguous = nil, nil, false
 			for indexKey, entry in pairs(index) do
-				if #indexKey >= MIN_PARTIAL_LENGTH then
-					if indexKey:find(candidateKey, 1, true)
-						or candidateKey:find(indexKey, 1, true)
-					then
-						return entry, "partial"
+				if #indexKey >= MIN_PARTIAL_LENGTH
+					and candidateKey:find(indexKey, 1, true)
+				then
+					if not bestKey or #indexKey > #bestKey then
+						best, bestKey, ambiguous = entry, indexKey, false
+					elseif #indexKey == #bestKey and entry ~= best then
+						ambiguous = true
 					end
 				end
 			end
+			if best and not ambiguous then return best, "partial" end
+			if ambiguous then return nil, nil end
 		end
 	end
 
@@ -694,10 +726,27 @@ local function MapFromSourceText(index, achievements, previous)
 			-- on garde le texte sans prétendre que c'est un raid.
 			-- Chaque ligne candidate est essayée, la première qui correspond
 			-- gagne. Une ligne de coût ou de faction ne correspondra à rien.
+			--
+			-- MAIS on ne cherche même pas d'instance si le client dit que la
+			-- monture ne tombe pas d'un butin.
+			--
+			-- C'est la barrière la plus solide contre les faux rapprochements, et
+			-- elle ne coûte rien : `sourceType` vient du client, il ne se trompe
+			-- pas. Une monture de VENDEUR se tient là où se tient son PNJ — une
+			-- zone, jamais une instance verrouillée. Rapprocher sa zone d'un nom
+			-- d'instance n'a aucun sens, et c'est ce qui a envoyé un vendeur de
+			-- Bastion vers un raid de Cataclysm.
+			--
+			-- Conséquence assumée : la poignée de montures vendues par un PNJ
+			-- posté DANS une instance n'aura pas d'instance rattachée. Elles
+			-- gardent leur nom de lieu, et l'addon ne prétend pas qu'un verrou
+			-- hebdomadaire les gouverne.
 			local match, strategy = nil, nil
-			for _, candidate in ipairs(places or {}) do
-				match, strategy = MatchPlace(index, candidate)
-				if match then break end
+			if entry.kind == ns.Data.SOURCE_KINDS.BOSS then
+				for _, candidate in ipairs(places or {}) do
+					match, strategy = MatchPlace(index, candidate)
+					if match then break end
+				end
 			end
 
 			if match then

@@ -822,11 +822,17 @@ end)
 test("Mapping — le lieu est trouvé au milieu des lignes", function()
 	stub.Reset()
 	stub.lfgDungeons = {
-		[100] = { name = "Wetlands", subtypeID = 1, expansionLevel = 0 },
+		[100] = { name = "Gnomeregan", subtypeID = 1, expansionLevel = 0 },
 	}
+	-- Trois lignes, et le lieu est celle du MILIEU : prendre la dernière donnait
+	-- la ligne de coût, prendre la première donnait le nom du boss.
+	--
+	-- La monture est un BUTIN (sourceType 1). C'était un vendeur avant, et le
+	-- test passait parce que l'addon rattachait alors n'importe quel lieu à
+	-- n'importe quelle instance — c'est précisément ce qui est corrigé.
 	stub.mounts = {
-		{ mountID = 6, spellID = 458, name = "Cheval bai", sourceType = 3,
-		  source = "Vendeur : Unger Statforth|nZone : Wetlands|nCoût : 1 or" },
+		{ mountID = 6, spellID = 458, name = "Cheval bai", sourceType = 1,
+		  source = "Butin : Mekgineer Thermaplugg|nZone : Gnomeregan|nHéroïque" },
 	}
 	local ns = harness.Load(stub)
 
@@ -834,8 +840,8 @@ test("Mapping — le lieu est trouvé au milieu des lignes", function()
 	stub.RunFrames(80)
 
 	local entry = ns.db.global.sourceCache[6]
-	eq(entry.tierName, "Vanilla", "extension trouvée malgré la ligne de coût")
-	eq(entry.instanceName, "Wetlands", "lieu rapproché sur la bonne ligne")
+	eq(entry.tierName, "Vanilla", "extension trouvée malgré la troisième ligne")
+	eq(entry.instanceName, "Gnomeregan", "lieu rapproché sur la bonne ligne")
 end)
 
 test("Mapping — replis de rapprochement des noms d'instance", function()
@@ -869,6 +875,81 @@ test("Mapping — replis de rapprochement des noms d'instance", function()
 	-- Un nom trop court ne doit rien attraper au hasard.
 	eq(ns.Mapping.MatchPlace(index, "Kara"), nil, "nom trop court, aucun rapprochement")
 	eq(ns.Mapping.MatchPlace(index, "Uldaman"), nil, "instance absente de l'index")
+end)
+
+test("Mapping — un fragment de nom ne désigne pas une instance", function()
+	stub.Reset()
+	local ns = harness.Load(stub)
+
+	-- Le bug réel : « Le Bastion », la zone de Shadowlands où se tient un vendeur
+	-- de montures, est un sous-mot de « Le bastion du Crépuscule », un raid de
+	-- Cataclysm. L'addon envoyait chercher en raid une monture qui s'achète chez
+	-- un PNJ.
+	local index = {
+		["le bastion du crépuscule"] = { name = "Le bastion du Crépuscule", isRaid = true },
+	}
+	eq(ns.Mapping.MatchPlace(index, "Le Bastion"), nil,
+		"une zone dont le nom est un fragment d'instance ne se rattache pas")
+	eq(ns.Mapping.MatchPlace(index, "Région : Le Bastion"), nil,
+		"même étiquetée")
+
+	-- Le sens inverse reste légitime : le texte de lieu CONTIENT le nom exact de
+	-- l'instance. C'est le cas des ailes du Recherche de groupe.
+	local match, how = ns.Mapping.MatchPlace(index,
+		"Le bastion du Crépuscule — aile supérieure")
+	eq(match and match.name, "Le bastion du Crépuscule", "le sens utile est conservé")
+	eq(how, "partial", "par correspondance partielle")
+end)
+
+test("Mapping — deux instances également plausibles : on refuse", function()
+	stub.Reset()
+	local ns = harness.Load(stub)
+	-- Deux noms de même longueur contenus dans le même texte. L'ordre de parcours
+	-- d'une table Lua n'étant pas défini, « la première trouvée » donnerait deux
+	-- réponses différentes à deux joueurs.
+	local index = {
+		["donjon de gauche"] = { name = "Donjon de gauche" },
+		["donjon de droite"] = { name = "Donjon de droite" },
+	}
+	eq(ns.Mapping.MatchPlace(index, "Donjon de gauche et Donjon de droite"), nil,
+		"ambiguïté : aucune réponse plutôt qu'une réponse au hasard")
+end)
+
+test("Mapping — une monture de vendeur ne se rattache à aucune instance", function()
+	stub.Reset()
+	-- Le nom de la zone du vendeur est volontairement un fragment du nom du raid,
+	-- comme dans le cas réel. Même si le rapprochement de texte laissait passer
+	-- quelque chose, le sourceType du client interdit la recherche.
+	stub.tiers = {
+		{ name = "Cataclysm", instances = {
+			{ id = 73, name = "Le bastion du Crépuscule", isRaid = true },
+		} },
+	}
+	stub.mounts = {
+		-- sourceType 3 = Vendeur.
+		{ mountID = 401, name = "Aquilon", sourceType = 3,
+		  source = "Vendeur : Adjudant Galos|nRégion : Le Bastion|nCoût : 7500" },
+		-- sourceType 1 = Butin : celle-là a le droit de se rattacher.
+		{ mountID = 402, name = "Drake", sourceType = 1,
+		  source = "Butin : Cho'gall|nLe bastion du Crépuscule" },
+	}
+	local ns = harness.Load(stub)
+
+	ns.Mapping:Run(false)
+	stub.RunFrames(400)
+	stub.FlushTimers()
+
+	local cache = ns.db.global.sourceCache
+	eq(cache[401] ~= nil, true, "la monture de vendeur est bien dans le cache")
+	eq(cache[401].instanceName, nil, "mais sans instance")
+	eq(cache[401].isRaid, nil, "et sans verrou de raid")
+	-- Le lieu est conservé BRUT, étiquette comprise. La découper demanderait de
+	-- reconnaître « Région : » dans treize langues, et le texte du client reste
+	-- la donnée la plus sûre qu'on ait.
+	eq(cache[401].placeName, "Région : Le Bastion", "son lieu est conservé tel quel")
+
+	eq(cache[402].instanceName, "Le bastion du Crépuscule", "le butin, lui, se rattache")
+	eq(cache[402].isRaid, true, "et c'est bien un raid")
 end)
 
 test("Mapping — l'extension originale s'appelle Vanilla", function()
