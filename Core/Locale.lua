@@ -111,6 +111,7 @@ local L = {
 	HINT_INCLUDE = "Right-click: put back in the list",
 	TAG_EXCLUDED = "excluded",
 	TOOLTIP_BOSS = "Boss",
+	TOOLTIP_MOVEMENT = "Movement",
 	TOOLTIP_DIFFICULTY = "Locked in",
 	MINIMAP_LEFT = "Left-click: open OnlyFarm",
 	MINIMAP_RIGHT = "Right-click: rescan collection and lockouts",
@@ -265,6 +266,7 @@ if GetLocale and GetLocale() == "frFR" then
 	L.HINT_INCLUDE = "Clic droit : remettre dans la liste"
 	L.TAG_EXCLUDED = "exclue"
 	L.TOOLTIP_BOSS = "Boss"
+	L.TOOLTIP_MOVEMENT = "Déplacement"
 	L.TOOLTIP_DIFFICULTY = "Verrou posé en"
 	L.MINIMAP_LEFT = "Clic gauche : ouvrir OnlyFarm"
 	L.MINIMAP_RIGHT = "Clic droit : rescanner collection et verrous"

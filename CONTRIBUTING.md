@@ -60,6 +60,40 @@ Rien ici ne remplace un chargement en jeu :
 
 Un module « écrit et syntaxiquement valide » n'est pas un module qui marche.
 
+### Recette du tableau de bord
+
+Le harnais ne charge pas `UI/` : ces points ne se vérifient qu'en jeu, et ils se
+vérifient à chaque fois qu'on touche au tableau de bord.
+
+- [ ] **Sans aucun scan** (base neuve, ou `/of reset` puis `/reload`) : le graphe
+      de répartition est rempli dès l'ouverture. C'est le point le plus
+      important : aucun de ses deux axes ne dépend de la cartographie. S'il est
+      vide, c'est une régression, pas une attente.
+- [ ] **Bascule d'axe** : « Par source » ↔ « Par déplacement ». Le bouton actif
+      se voit, le graphe change, et le choix survit à un `/reload`.
+- [ ] **Somme par source** = nombre de montures obtenables (tuile « possédées » +
+      tuile « manquantes »). Les montures d'une autre faction ou classe ne
+      doivent apparaître dans aucune barre.
+- [ ] **Somme par déplacement** = la même. Une barre « Autre » non vide n'est pas
+      un bug : c'est un `mountTypeID` que `Data/MountTypes.lua` ne classe pas
+      encore. Relever la valeur — infobulle de la monture, ou `/of debug` — et
+      compléter la table.
+- [ ] **Échelle des barres** : la catégorie la plus fournie occupe toute la
+      largeur, les autres sont proportionnelles. Une catégorie complétée est
+      verte, pleine.
+- [ ] **Redimensionnement** : rétrécir la fenêtre jusqu'à la hauteur minimale.
+      Aucune barre ne doit déborder de la carte ; les catégories retirées sont
+      comptées en pied (« +N autres »).
+- [ ] **Acquisition** : apprendre une monture (ou `/of scan`) met à jour la barre
+      de sa catégorie sans réordonner les lignes.
+- [ ] **Bouton Rescanner** (carte de disponibilité) : lance la cartographie, le
+      bouton se coupe pendant, le libellé affiche l'avancement, puis le résumé.
+- [ ] **Segment « non cartographié »** de la barre de disponibilité : présent
+      tant que la cartographie n'a pas rattaché la monture à une instance, et
+      compté dans la légende. Il doit reculer après un `/of deepscan`.
+- [ ] **Journal lent** : sur un `/reload` en zone chargée, la carte affiche
+      « Journal des montures pas encore peuplé » au lieu de rester vide.
+
 ## Conventions
 
 * **Langue** : commentaires et messages de commit en français, comme la

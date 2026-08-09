@@ -705,6 +705,18 @@ function UI:ShowRowTooltip(row)
 		GameTooltip:AddLine(sourceText, 0.8, 0.8, 0.8, true)
 	end
 
+	-- Mode de déplacement. Le graphe du tableau de bord compte les montures
+	-- volantes ; l'infobulle dit lesquelles, sinon le chiffre n'est vérifiable
+	-- nulle part.
+	--
+	-- Gratuit : GetSourceText vient de résoudre le même appel, et les deux
+	-- données en sortent ensemble (cf. Collection:ResolveExtra).
+	local movement = ns.Collection:GetMovement(row.mountID)
+	if movement ~= ns.Data.MOVEMENT.OTHER then
+		GameTooltip:AddDoubleLine(L.TOOLTIP_MOVEMENT,
+			ns.Data.GetMovementLabel(movement), 0.6, 0.6, 0.6, 0.9, 0.9, 0.9)
+	end
+
 	-- Où et sous quelle forme. La difficulté EXACTE d'une monture (« 25
 	-- héroïque ») n'est exposée par aucune API : on affiche donc ce que le
 	-- client sait vraiment — le type d'instance, et la difficulté du verrou
