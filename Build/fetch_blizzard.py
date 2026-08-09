@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Interroge l'API officielle Blizzard et produit le CSV de curation.
 
-    export BLIZZARD_CLIENT_ID=...
-    export BLIZZARD_CLIENT_SECRET=...
-    Build/fetch_blizzard.py --region eu --locale fr_FR -o Build/overlay/mounts.csv
+    python3 Build/fetch_blizzard.py --region eu --locale fr_FR --raw 3
+
+Les identifiants sont lus dans Build/blizzard-credentials.txt (deux lignes
+CLÉ=VALEUR), ou dans les variables d'environnement BLIZZARD_CLIENT_ID et
+BLIZZARD_CLIENT_SECRET si elles sont définies.
 
 CE QUE L'API OFFICIELLE DONNE — ET CE QU'ELLE NE DONNE PAS
 ----------------------------------------------------------
@@ -68,6 +70,13 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_OUTPUT = REPO_ROOT / "Build" / "overlay" / "mounts.csv"
+
+# Fichier d'identifiants, cherché quand les variables d'environnement sont
+# absentes. Les définir demande une syntaxe différente selon le système
+# (« export » sur Linux et macOS, « $env: » sous PowerShell), ce qui est une
+# source d'erreur inutile pour une opération qu'on fait une fois. Un fichier
+# texte de deux lignes marche partout, et .gitignore le couvre.
+CREDENTIALS_FILE = REPO_ROOT / "Build" / "blizzard-credentials.txt"
 
 OAUTH_URL = "https://oauth.battle.net/token"
 USER_AGENT = "OnlyFarm-build/1.0 (+https://github.com/BigBlackC0de/OnlyFarm)"
@@ -160,6 +169,32 @@ class BlizzardAPI:
                     continue
                 raise SystemExit(f"{url} : {error.reason}") from error
         return None
+
+
+def read_credentials() -> tuple[str | None, str | None]:
+    """Identifiants, depuis l'environnement ou le fichier local."""
+    client_id = os.environ.get("BLIZZARD_CLIENT_ID")
+    client_secret = os.environ.get("BLIZZARD_CLIENT_SECRET")
+    if client_id and client_secret:
+        return client_id, client_secret
+
+    if not CREDENTIALS_FILE.is_file():
+        return client_id, client_secret
+
+    for line in CREDENTIALS_FILE.read_text(encoding="utf-8-sig").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip().upper()
+        # Les guillemets copiés depuis une page web sont fréquents.
+        value = value.strip().strip("\"'")
+        if key == "BLIZZARD_CLIENT_ID" and not client_id:
+            client_id = value
+        elif key == "BLIZZARD_CLIENT_SECRET" and not client_secret:
+            client_secret = value
+
+    return client_id, client_secret
 
 
 def dump_raw(api: BlizzardAPI, count: int) -> None:
@@ -255,11 +290,18 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    client_id = os.environ.get("BLIZZARD_CLIENT_ID")
-    client_secret = os.environ.get("BLIZZARD_CLIENT_SECRET")
+    client_id, client_secret = read_credentials()
     if not client_id or not client_secret:
         raise SystemExit(
-            "BLIZZARD_CLIENT_ID et BLIZZARD_CLIENT_SECRET doivent être définis.\n"
+            "Identifiants Blizzard introuvables.\n"
+            "\n"
+            f"Le plus simple : créer le fichier {CREDENTIALS_FILE}\n"
+            "avec ces deux lignes (en remplaçant par tes valeurs) :\n"
+            "\n"
+            "    BLIZZARD_CLIENT_ID=ton_client_id\n"
+            "    BLIZZARD_CLIENT_SECRET=ton_client_secret\n"
+            "\n"
+            "Ce fichier est ignoré par git, il ne partira jamais sur GitHub.\n"
             "Client gratuit à créer sur https://develop.battle.net/access/clients"
         )
 

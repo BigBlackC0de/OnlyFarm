@@ -144,21 +144,36 @@ Texte proposé pour *Intended Use* :
 > reference table that ships inside the addon. No player or account data is
 > accessed, nothing is hosted, and no end user interacts with this client.
 
-Le **secret** ne se committe jamais et ne se partage pas : il donne accès à
-l'API au nom de son propriétaire. Il se passe par variable d'environnement, et
-`.gitignore` couvre les fichiers d'identifiants usuels.
+Après **Save**, Battle.net affiche un **Client ID** et un **Client Secret**.
+Le secret ne se committe jamais et ne se partage pas : il donne accès à l'API au
+nom de son propriétaire.
+
+Créer `Build/blizzard-credentials.txt` avec ces deux lignes — le fichier est
+ignoré par git :
+
+```
+BLIZZARD_CLIENT_ID=ton_client_id
+BLIZZARD_CLIENT_SECRET=ton_client_secret
+```
+
+Il faut **Python 3** (`python3 --version` ; sous Windows, `py --version`). Puis,
+depuis la racine du dépôt :
 
 ```bash
-# 1. identité canonique des montures, depuis l'API officielle Blizzard
-export BLIZZARD_CLIENT_ID=... BLIZZARD_CLIENT_SECRET=...
-Build/fetch_blizzard.py --region eu --locale fr_FR --raw 3     # réponses brutes
-Build/fetch_blizzard.py --region eu --locale fr_FR
+# 1. vérifier ce que l'API renvoie réellement, sans rien écrire
+python3 Build/fetch_blizzard.py --region eu --locale fr_FR --raw 3
 
-# 2. compléter la colonne « expansion » du CSV (voir ci-dessous)
+# 2. récupérer toutes les montures dans Build/overlay/mounts.csv
+python3 Build/fetch_blizzard.py --region eu --locale fr_FR
 
-# 3. compiler la table livrée avec l'addon
-Build/generate_data.py Build/overlay/mounts.csv
+# 3. compléter la colonne « expansion » du CSV (voir ci-dessous)
+
+# 4. compiler la table livrée avec l'addon
+python3 Build/generate_data.py Build/overlay/mounts.csv
 ```
+
+Les variables d'environnement `BLIZZARD_CLIENT_ID` / `BLIZZARD_CLIENT_SECRET`
+restent acceptées et priment sur le fichier.
 
 La clé de jointure est le **mountID** — celui qu'utilisent à la fois
 `C_MountJournal` et `/data/wow/mount/{id}`. Jamais le nom : les noms sont
