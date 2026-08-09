@@ -48,7 +48,6 @@ l'addon.
 | `/of` | ouvrir la fenêtre |
 | `/of scan` | forcer un rescan : collection, verrous et cartographie |
 | `/of chars` | lister les personnages connus et leurs verrous |
-| `/of deepscan` | passe approfondie : butin boss par boss (lent, facultatif) |
 | `/of diag` | dire pourquoi la cartographie est revenue vide |
 | `/of export` | CSV des montures sans extension (outil de mainteneur) |
 | `/of debug` | activer les traces |
@@ -66,6 +65,12 @@ Elle ne se refait que dans deux cas : le build du client a changé (un patch), o
 le client expose plus de montures qu'au dernier passage. Le bouton
 « Rescanner » du tableau de bord la force à la main.
 
+Le premier passage est le plus long — il parcourt le butin boss par boss pour
+récolter les identifiants d'objet, quelques minutes. **Il ne se refait pas** :
+ces identifiants sont mémorisés, et c'est d'eux que l'addon tire ensuite
+l'extension exacte de chaque monture (`C_Item.GetItemInfo` expose un
+`expansionID`, la seule donnée d'extension que le client fournisse).
+
 Elle se fait en deux temps :
 
 1. **l'index des instances** — construit à partir de *deux* sources : la liste
@@ -80,11 +85,6 @@ Elle se fait en deux temps :
 Si la cartographie revient vide, **`/of diag`** dit lequel des quatre maillons
 a cédé : les paliers, la liste du Recherche de groupe, le découpage du texte,
 ou le rapprochement des noms.
-
-Une troisième passe, **`/of deepscan`** (bouton « Scan approfondi »), parcourt
-le butin boss par boss pour affiner les cas que le texte de source décrit mal.
-Elle est lente et facultative : la version 0.1.0 en dépendait entièrement, et
-c'est ce qui laissait l'addon muet quand l'API de butin ne répondait pas.
 
 Le résultat brut part aussi dans `OnlyFarmScanDB`, qui alimentera le générateur
 de données de la phase 2.

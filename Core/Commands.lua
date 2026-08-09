@@ -36,7 +36,7 @@ function handlers.help()
 	ns:Print(L.CMD_HELP_HEADER)
 	for _, line in ipairs({
 		L.CMD_HELP_SHOW, L.CMD_HELP_SCAN, L.CMD_HELP_CHARS,
-		L.CMD_HELP_DEEPSCAN, L.CMD_HELP_DIAG, L.CMD_HELP_EXPORT,
+		L.CMD_HELP_DIAG, L.CMD_HELP_EXPORT,
 		L.CMD_HELP_DEBUG, L.CMD_HELP_RESET,
 	}) do
 		DEFAULT_CHAT_FRAME:AddMessage(line)
@@ -55,12 +55,13 @@ function handlers.scan()
 	ns.Lockouts:PurgeExpired()
 	ns.Lockouts.lastRequest = 0   -- on force, la commande est explicite
 	ns.Lockouts:RequestScan()
-	ns.Mapping:Run(false)
+	-- Sans argument : l'addon décide seul s'il doit parcourir le butin.
+	ns.Mapping:Run()
 end
 
---- Passe approfondie : le parcours boss par boss du Journal des rencontres.
---  Lente et facultative — elle ne fait qu'affiner ce que le texte de source a
---  déjà donné.
+--- Force le parcours du butin, même si l'addon le juge inutile. Gardé pour le
+--  développement et le dépannage ; le joueur n'a pas à connaître cette
+--  distinction, c'est pourquoi elle ne figure plus dans l'aide.
 function handlers.deepscan()
 	ns.Mapping:Run(true)
 end

@@ -140,8 +140,21 @@ zéro monture en jeu : le butin n'est pas prêt à la frame suivante, il dépend
 la difficulté sélectionnée, et une liste vide est indiscernable d'une fin de
 liste. `Modules/Mapping.lua` part maintenant du texte de source déjà exposé par
 `C_MountJournal.GetMountInfoExtraByID`, rapproché d'un index des instances
-construit sans toucher au butin. La passe de butin subsiste en `/of deepscan`,
-hors du chemin critique.
+construit sans toucher au butin.
+
+**Une coroutine à budget de frame ne rend PAS la main au client.** Le pilote
+enchaîne plusieurs reprises tant qu'il lui reste du budget : un
+`coroutine.yield()` nu revient au pilote, pas au jeu. La passe de butin
+sélectionnait donc un boss et lisait son butin dans la même frame, avant que le
+client ait pu charger quoi que ce soit — d'où une récolte quasi nulle.
+`coroutine.yield(WAIT_FRAME)` termine la frame pour de bon. À utiliser partout
+où l'on attend une réponse asynchrone du client.
+
+**Un seul bouton de scan, et c'est délibéré.** « Scan » et « scan approfondi »
+demandaient au joueur de trancher une question technique — faut-il parcourir le
+butin ? — dont il n'a pas les éléments. L'addon sait y répondre
+(`Mapping:NeedsDeepPass`), donc il y répond. `/of deepscan` subsiste pour
+forcer, sans figurer dans l'aide.
 
 **Les outils de `Build/` ne concernent JAMAIS le joueur.** Un addon WoW ne peut
 émettre aucune requête réseau : toute donnée extérieure est compilée en `.lua`

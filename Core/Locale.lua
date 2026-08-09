@@ -134,15 +134,14 @@ local L = {
 	CMD_HELP_RESET = "  /of reset     — wipe the saved database (asks twice)",
 
 	-- Cartographie
-	SCAN_START = "Mapping mounts…",
+	SCAN_START = "Mapping your mounts…",
 	SCAN_AUTO_START = "First-run mapping of your mounts — expansions, instances and bosses.",
-	SCAN_DEEP_START = "Deep pass started: walking every boss's loot table. Slower, the UI may stutter.",
+	SCAN_DEEP_START = "Full mapping: walking every boss's loot table. A few minutes, once. The UI may stutter.",
 	SCAN_DONE = "Mapping done: %d of %d mounts tied to an instance, across %d instances.",
 	SCAN_AUTO_DONE = "Kept on disc — it only runs again after a patch or when new mounts appear.",
 	SCAN_SUMMARY = "%d/%d mapped · %s ago",
 	SCAN_RUNNING = "mapping…",
-	SCAN_BUTTON = "Rescan",
-	SCAN_BUTTON_DEEP = "Deep scan",
+	SCAN_BUTTON = "Rescan mounts",
 	SCAN_NEVER = "never mapped",
 	SCAN_BREAKDOWN = "detail: %d by place, %d by achievement (%d achievements indexed, %d/%d categories tied to an expansion).",
 	SCAN_EMPTY_DETAIL = "nothing tied: %d mounts had source text, %d yielded a place, index holds %d instances. |cff7ac1ff/of diag|r for the detail.",
@@ -277,15 +276,14 @@ if GetLocale and GetLocale() == "frFR" then
 	L.CMD_HELP_DEBUG = "  /of debug     — activer/couper les traces"
 	L.CMD_HELP_RESET = "  /of reset     — effacer la base sauvegardée (demande confirmation)"
 
-	L.SCAN_START = "Cartographie des montures en cours…"
+	L.SCAN_START = "Cartographie de tes montures en cours…"
 	L.SCAN_AUTO_START = "Première cartographie de tes montures — extensions, instances et boss."
-	L.SCAN_DEEP_START = "Passe approfondie lancée : butin boss par boss. Plus lent, l'interface peut saccader."
+	L.SCAN_DEEP_START = "Cartographie complète : butin boss par boss. Quelques minutes, une seule fois. L'interface peut saccader."
 	L.SCAN_DONE = "Cartographie terminée : %d montures sur %d rattachées à une instance, sur %d instances."
 	L.SCAN_AUTO_DONE = "C'est gardé sur le disque — ça ne se refait qu'après un patch ou à l'arrivée de nouvelles montures."
 	L.SCAN_SUMMARY = "%d/%d cartographiées · il y a %s"
 	L.SCAN_RUNNING = "cartographie…"
 	L.SCAN_BUTTON = "Rescanner"
-	L.SCAN_BUTTON_DEEP = "Scan approfondi"
 	L.SCAN_NEVER = "jamais cartographié"
 	L.SCAN_BREAKDOWN = "détail : %d par le lieu, %d par haut fait (%d hauts faits indexés, %d/%d catégories rattachées à une extension)."
 	L.SCAN_EMPTY_DETAIL = "rien de rattaché : %d montures avec un texte de source, %d avec un lieu extrait, %d instances dans l'index. |cff7ac1ff/of diag|r pour le détail."

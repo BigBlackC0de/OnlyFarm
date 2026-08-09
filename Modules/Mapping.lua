@@ -49,6 +49,24 @@ local MAX_LOOT_PER_ENCOUNTER = 200
 local AUTO_DELAY = 6
 local AUTO_RETRY = 20
 
+-- Valeur rendue par coroutine.yield pour exiger une VRAIE frame.
+--
+-- Le pilote enchaîne plusieurs reprises par frame tant qu'il lui reste du
+-- budget : un `coroutine.yield()` nu ne rend donc PAS la main au client, il
+-- rend seulement la main au pilote. C'est ce qui rendait la passe de butin
+-- quasi muette — on sélectionnait un boss puis on lisait son butin dans la
+-- même frame, avant que le client ait eu la moindre chance de le charger.
+--
+-- `coroutine.yield(WAIT_FRAME)` termine la frame en cours, pour de bon.
+local WAIT_FRAME = "frame"
+
+--- Cède la main pour `count` frames réelles.
+local function WaitFrames(count)
+	for _ = 1, (count or 1) do
+		coroutine.yield(WAIT_FRAME)
+	end
+end
+
 function Mapping:OnInitialize()
 	self.running = false
 	self.autoTried = false
@@ -99,7 +117,10 @@ end
 --   6 — extension des montures de haut fait, via l'arbre des catégories
 --   7 — extension EXACTE par l'objet (C_Item.GetItemInfo.expansionID), avec
 --       mémorisation de l'itemID pour ne pas refaire la passe approfondie
-local MAPPING_VERSION = 7
+--   8 — le pilote rend enfin la main au client entre deux lectures de butin :
+--       les yields étaient consommés dans la même frame, donc la passe de
+--       butin lisait avant que le client ait chargé quoi que ce soit
+local MAPPING_VERSION = 8
 
 -- Une cartographie qui ne rattache rien est ratée, pas fraîche : on la
 -- retente. Mais pas indéfiniment — sur un client où rien ne répondrait, on
@@ -473,7 +494,7 @@ local function ApplyItemExpansions(results)
 
 	-- Le client répond de façon asynchrone : quelques frames de battement
 	-- valent mieux qu'une lecture immédiate qui rendrait nil partout.
-	for _ = 1, 5 do coroutine.yield() end
+	WaitFrames(5)
 
 	local applied = 0
 	for index, entry in ipairs(pending) do
@@ -484,7 +505,7 @@ local function ApplyItemExpansions(results)
 			entry.matchedBy = "item"
 			applied = applied + 1
 		end
-		if index % 100 == 0 then coroutine.yield() end
+		if index % 100 == 0 then WaitFrames(1) end
 	end
 	return applied
 end
@@ -761,14 +782,29 @@ local function CollectMountLoot()
 end
 
 --- Enrichit `results` avec le boss exact de chaque monture d'instance.
-local function DeepScan(index, results)
+local function DeepScan(self, index, results)
 	if not LootReady() then return 0 end
 	ClearLootFilters()
 
 	local refined = 0
+	local total, done = ns.Util.Count(index), 0
+
 	for _, instance in pairs(index) do
+		done = done + 1
+		self.progress = { done = done, total = total }
+		-- Throttlé au pourcent : l'interface n'a pas besoin de plus, et un
+		-- message par instance ferait plus de travail que le scan.
+		local percent = math.floor(done / math.max(1, total) * 100)
+		if percent ~= self.lastPercent then
+			self.lastPercent = percent
+			self:SendMessage("OF_SCAN_PROGRESS")
+		end
+
+		-- Une instance sans identifiant de Journal (venue du Recherche de
+		-- groupe) n'a pas de butin à parcourir : on ne perd pas de frames dessus.
+		if instance.journalInstanceID then
 		pcall(EJ_SelectInstance, instance.journalInstanceID)
-		coroutine.yield()
+		WaitFrames(2)
 
 		local encounterIndex = 1
 		while true do
@@ -777,9 +813,18 @@ local function DeepScan(index, results)
 			if not ok or not journalEncounterID then break end
 
 			pcall(EJ_SelectEncounter, journalEncounterID)
-			coroutine.yield()
+			WaitFrames(2)
 
-			for _, loot in ipairs(CollectMountLoot()) do
+			-- Le butin arrive de façon asynchrone. Une liste vide à la première
+			-- lecture ne veut pas dire « ce boss ne lâche rien » : on laisse
+			-- une seconde chance avant de conclure.
+			local loots = CollectMountLoot()
+			if #loots == 0 then
+				WaitFrames(3)
+				loots = CollectMountLoot()
+			end
+
+			for _, loot in ipairs(loots) do
 				local entry = results[loot.mountID] or { mountID = loot.mountID }
 				entry.kind = ns.Data.SOURCE_KINDS.BOSS
 				entry.itemID = loot.itemID
@@ -798,8 +843,10 @@ local function DeepScan(index, results)
 
 			encounterIndex = encounterIndex + 1
 		end
+		end
 	end
 
+	self.progress = nil
 	return refined
 end
 
@@ -899,7 +946,7 @@ local function ScanRoutine(self, deep)
 
 	local refined = 0
 	if deep then
-		refined = DeepScan(index, results)
+		refined = DeepScan(self, index, results)
 	end
 
 	-- L'extension par l'objet passe en DERNIER et écrase les heuristiques :
@@ -939,10 +986,30 @@ local function ScanRoutine(self, deep)
 	}
 end
 
+--- La passe de butin est-elle encore nécessaire ?
+--
+--  Elle ne sert qu'à récolter les itemID, et ceux-ci sont mémorisés. Une fois
+--  qu'elle a tourné pour un build donné, les scans suivants s'en passent : ils
+--  retrouvent l'extension exacte depuis les itemID du cache.
+function Mapping:NeedsDeepPass()
+	if not ns.db then return true end
+	local meta = ns.db.global.scanMeta
+	if type(meta) ~= "table" then return true end
+	if not meta.deep then return true end
+	if (meta.mappingVersion or 0) ~= MAPPING_VERSION then return true end
+	return meta.build ~= select(2, GetBuildInfo())
+end
+
 --- Lance la cartographie.
---  @param deep true pour ajouter la passe de butin (lente)
+--
+--  @param deep true pour forcer la passe de butin, false pour l'interdire,
+--         nil pour laisser l'addon décider — et c'est le cas normal. Deux
+--         boutons « scan » et « scan approfondi » demandaient au joueur de
+--         trancher une question technique dont il n'a pas les éléments ; la
+--         réponse est déductible, donc c'est à l'addon de la déduire.
 function Mapping:Run(deep)
 	local L = ns.L
+	if deep == nil then deep = self:NeedsDeepPass() end
 	if self.running then
 		ns:Print(L.SCAN_BUSY)
 		return false
@@ -955,6 +1022,8 @@ function Mapping:Run(deep)
 	ns:Print(deep and L.SCAN_DEEP_START or (self.silent and L.SCAN_AUTO_START or L.SCAN_START))
 	self.running = true
 	self.startedAt = time()
+	self.progress = nil
+	self.lastPercent = nil
 	self:SendMessage("OF_SCAN_STARTED")
 
 	local thread = coroutine.create(ScanRoutine)
@@ -965,6 +1034,11 @@ function Mapping:Run(deep)
 		local deadline = debugprofilestop() + (FRAME_BUDGET * 1000)
 		repeat
 			local ok, payload = coroutine.resume(thread, self, deep)
+			if ok and payload == WAIT_FRAME and coroutine.status(thread) ~= "dead" then
+				-- La coroutine réclame une frame entière : on sort de la boucle
+				-- de budget au lieu de la relancer aussitôt.
+				return
+			end
 			if not ok then
 				driver:SetScript("OnUpdate", nil)
 				self.running = false

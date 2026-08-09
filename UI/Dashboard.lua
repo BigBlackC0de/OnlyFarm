@@ -27,8 +27,20 @@ local BAR_ROW_HEIGHT = 19
 local TARGET_ROW_HEIGHT = 22
 
 function Dashboard:OnEnable()
-	-- Le rafraîchissement est piloté par UI:Refresh : un seul chef d'orchestre,
-	-- sinon deux abonnements recalculent la même chose sur le même événement.
+	-- Le rafraîchissement général est piloté par UI:Refresh : un seul chef
+	-- d'orchestre, sinon deux abonnements recalculent la même chose sur le
+	-- même événement.
+	--
+	-- L'avancement du scan fait exception : il change des dizaines de fois par
+	-- seconde, et déclencher un recalcul complet à chaque fois coûterait plus
+	-- cher que le scan lui-même. On ne touche donc QUE le libellé.
+	self:RegisterMessage("OF_SCAN_PROGRESS", "OnScanProgress")
+end
+
+function Dashboard:OnScanProgress()
+	local page = self.page
+	if not page or not page:IsShown() then return end
+	page.ExpansionCard.ScanInfo:SetText(self:ScanProgressText())
 end
 
 --------------------------------------------------------------------------------
@@ -181,14 +193,12 @@ function Dashboard:CreateExpansions(page)
 	rule:SetPoint("BOTTOMLEFT", 1, 30)
 	rule:SetPoint("BOTTOMRIGHT", -1, 30)
 
-	local deep = Theme.Button(card, L.SCAN_BUTTON_DEEP, 120, 20)
-	deep:SetPoint("BOTTOMRIGHT", -10, 6)
-	deep:SetScript("OnClick", function() ns.Mapping:Run(true) end)
-	card.DeepButton = deep
-
-	local rescan = Theme.Button(card, L.SCAN_BUTTON, 96, 20)
-	rescan:SetPoint("BOTTOMRIGHT", deep, "BOTTOMLEFT", -6, 0)
-	rescan:SetScript("OnClick", function() ns.Mapping:Run(false) end)
+	-- UN seul bouton. « Scan » et « Scan approfondi » demandaient au joueur de
+	-- trancher une question technique — faut-il parcourir le butin ? — dont il
+	-- n'a pas les éléments. L'addon sait y répondre : il le fait.
+	local rescan = Theme.Button(card, L.SCAN_BUTTON, 130, 20)
+	rescan:SetPoint("BOTTOMRIGHT", -10, 6)
+	rescan:SetScript("OnClick", function() ns.Mapping:Run() end)
 	card.RescanButton = rescan
 
 	card.ScanInfo = Theme.Text(card, "GameFontHighlightSmall", Theme.colors.faint)
@@ -319,6 +329,16 @@ function Dashboard:SetShown(shown)
 	if shown then self:LayoutTiles() end
 end
 
+--- Avancement de la cartographie en cours, en pourcentage quand il est connu.
+function Dashboard:ScanProgressText()
+	local progress = ns.Mapping.progress
+	if type(progress) == "table" and (progress.total or 0) > 0 then
+		return string.format("%s %d %%", ns.L.SCAN_RUNNING,
+			math.floor(progress.done / progress.total * 100))
+	end
+	return ns.L.SCAN_RUNNING
+end
+
 function Dashboard:Refresh()
 	local page = self.page
 	if not page or not page:IsShown() then return end
@@ -398,12 +418,11 @@ function Dashboard:Refresh()
 
 	-- État de la cartographie, et boutons coupés pendant qu'elle tourne.
 	if ns.Mapping.running then
-		expansionCard.ScanInfo:SetText(L.SCAN_RUNNING)
+		expansionCard.ScanInfo:SetText(self:ScanProgressText())
 	else
 		expansionCard.ScanInfo:SetText(ns.Mapping:GetSummary() or L.SCAN_NEVER)
 	end
 	expansionCard.RescanButton:SetEnabled(not ns.Mapping.running)
-	expansionCard.DeepButton:SetEnabled(not ns.Mapping.running)
 
 	-- 4. Cibles du moment.
 	local targetCard = page.TargetCard
