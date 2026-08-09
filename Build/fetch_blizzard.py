@@ -162,6 +162,31 @@ class BlizzardAPI:
         return None
 
 
+def dump_raw(api: BlizzardAPI, count: int) -> None:
+    """Affiche les réponses BRUTES de l'API pour quelques montures.
+
+    C'est le premier geste à faire, avant toute planification : ce script est
+    écrit d'après la documentation, sans avoir jamais été confronté à l'API
+    réelle. Voir les champs effectivement renvoyés répond en une fois à des
+    questions qu'on ne peut que supposer autrement — à commencer par « existe-t-il
+    un champ d'extension quelque part ? »."""
+    index = api.get("/data/wow/mount/index")
+    if not index or "mounts" not in index:
+        raise SystemExit("index des montures illisible")
+
+    print(f"index : {len(index['mounts'])} montures")
+    print(json.dumps(index["mounts"][:3], ensure_ascii=False, indent=2))
+    print()
+
+    for item in index["mounts"][:count]:
+        mount_id = item.get("id")
+        detail = api.get(f"/data/wow/mount/{mount_id}")
+        time.sleep(REQUEST_DELAY)
+        print(f"--- /data/wow/mount/{mount_id} ---")
+        print(json.dumps(detail, ensure_ascii=False, indent=2))
+        print()
+
+
 def fetch_mounts(api: BlizzardAPI, limit: int | None) -> list[dict]:
     index = api.get("/data/wow/mount/index")
     if not index or "mounts" not in index:
@@ -222,6 +247,12 @@ def main() -> int:
     )
     parser.add_argument("-o", "--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--limit", type=int, help="s'arrêter après N montures (essai)")
+    parser.add_argument(
+        "--raw",
+        type=int,
+        metavar="N",
+        help="afficher la réponse BRUTE de l'API pour N montures, sans rien écrire",
+    )
     args = parser.parse_args()
 
     client_id = os.environ.get("BLIZZARD_CLIENT_ID")
@@ -233,6 +264,11 @@ def main() -> int:
         )
 
     api = BlizzardAPI(client_id, client_secret, args.region, args.locale)
+
+    if args.raw:
+        dump_raw(api, args.raw)
+        return 0
+
     rows = fetch_mounts(api, args.limit)
 
     args.output.parent.mkdir(parents=True, exist_ok=True)

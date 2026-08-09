@@ -131,7 +131,7 @@ et lire les erreurs.
 # 1. identité canonique des montures, depuis l'API officielle Blizzard
 #    (client OAuth gratuit : https://develop.battle.net/access/clients)
 export BLIZZARD_CLIENT_ID=... BLIZZARD_CLIENT_SECRET=...
-Build/fetch_blizzard.py --region eu --locale fr_FR --limit 5   # essai
+Build/fetch_blizzard.py --region eu --locale fr_FR --raw 3     # réponses brutes
 Build/fetch_blizzard.py --region eu --locale fr_FR
 
 # 2. compléter la colonne « expansion » du CSV (voir ci-dessous)
