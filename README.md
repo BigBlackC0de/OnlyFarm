@@ -160,11 +160,12 @@ Il faut **Python 3** (`python3 --version` ; sous Windows, `py --version`). Puis,
 depuis la racine du dépôt :
 
 ```bash
-# 1. vérifier ce que l'API renvoie réellement, sans rien écrire
-python3 Build/fetch_blizzard.py --region eu --locale fr_FR --raw 3
+# 1. extension de chaque monture, via les tables DB2 (aucun identifiant requis)
+python3 Build/fetch_db2.py --inspect      # voir les colonnes réelles du build
+python3 Build/fetch_db2.py                # -> Build/overlay/mounts.csv
 
-# 2. récupérer toutes les montures dans Build/overlay/mounts.csv
-python3 Build/fetch_blizzard.py --region eu --locale fr_FR
+# 1 bis. identité canonique et noms localisés, via l'API officielle (facultatif)
+python3 Build/fetch_blizzard.py --region eu --locale fr_FR --raw 3
 
 # 3. compléter la colonne « expansion » du CSV (voir ci-dessous)
 
@@ -196,6 +197,7 @@ manque réellement.
 La table curée ne prime jamais sur ce que le client sait : elle ne s'applique
 qu'aux montures pour lesquelles aucune source dérivée n'a répondu.
 
-Les valeurs communautaires (Wowhead, warcraftmounts.com et équivalents) sont
-des estimations maintenues par des joueurs. Si tu en importes, crédite-les ici
-et présente les taux de drop comme des estimations.
+Les extensions viennent des tables DB2 publiées par
+[wago.tools](https://wago.tools) — les données du client, pas une estimation.
+Les taux de drop, eux, restent des estimations communautaires (Wowhead et
+équivalents) et doivent être présentés comme telles. Créditer les sources ici.

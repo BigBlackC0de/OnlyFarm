@@ -705,20 +705,28 @@ local function MapFromSourceText(index, achievements, previous)
 				end
 			end
 
-			-- Dernier recours : la table curée, générée au build et indexée par
-			-- spellID. Elle ne s'applique QUE si rien de dérivé du client n'a
-			-- répondu — une donnée mesurée sur le client courant vaut toujours
-			-- mieux qu'une donnée figée au moment du build.
-			if not entry.tierName then
-				local curated = ns.Data.GetCuratedMount(mountID, spellID)
-				if curated then
+			-- La table curée passe DEVANT les heuristiques, et non derrière.
+			--
+			-- Elle vient de ItemSparse.ExpansionID, c'est-à-dire exactement le
+			-- champ que le client expose sous le nom `expansionID` : une donnée
+			-- d'autorité, pas une déduction. Un rapprochement de noms de lieux
+			-- ne doit jamais la contredire. Seule l'extension mesurée en direct
+			-- sur l'objet (passe suivante) fait aussi bien — et pour cause,
+			-- c'est la même donnée.
+			--
+			-- L'instance, elle, reste celle du lieu : la table curée ne la
+			-- donne pas dans la langue du client, et c'est le nom localisé qui
+			-- sert au rapprochement des verrous.
+			local curated = ns.Data.GetCuratedMount(mountID, spellID)
+			if curated then
+				if curated.expansion ~= nil then
 					entry.tier = curated.expansion
 					entry.tierName = ns.Data.ExpansionName(curated.expansion)
-					entry.dropRate = entry.dropRate or curated.dropRate
-					entry.kind = curated.kind or entry.kind
 					entry.matchedBy = "curated"
 					stats.byCurated = (stats.byCurated or 0) + 1
 				end
+				entry.dropRate = entry.dropRate or curated.dropRate
+				if not entry.instanceName then entry.kind = curated.kind or entry.kind end
 			end
 
 			results[mountID] = entry
@@ -1302,7 +1310,27 @@ function Mapping:BuildReport()
 	end
 
 	Line("")
-	Line("[7] Collection")
+	Line("[7] Niveau de confiance de l'extension")
+	local byConfidence, order, resolved, total = {}, {}, 0, 0
+	for _, source in pairs((ns.db and ns.db.global.sourceCache) or {}) do
+		total = total + 1
+		local how = source.tierName and (source.matchedBy or "?") or "aucune"
+		if not byConfidence[how] then
+			byConfidence[how] = 0
+			order[#order + 1] = how
+		end
+		byConfidence[how] = byConfidence[how] + 1
+		if source.tierName then resolved = resolved + 1 end
+	end
+	table.sort(order, function(a, b) return byConfidence[a] > byConfidence[b] end)
+	Line("    %d/%d montures datées", resolved, total)
+	for _, how in ipairs(order) do
+		Line("    %-14s %d", how, byConfidence[how])
+	end
+	Line("    table curée embarquée : %d entrée(s)", ns.Data.CountCuratedMounts())
+
+	Line("")
+	Line("[8] Collection")
 	local counts = ns.Collection.counts or {}
 	Line("    %s possédées / %s obtenables / %s masquées · journal prêt : %s",
 		tostring(counts.owned), tostring(counts.total), tostring(counts.hidden),

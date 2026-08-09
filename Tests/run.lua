@@ -1072,24 +1072,25 @@ test("Mapping — l'extension de l'objet prime sur les heuristiques", function()
 	eq(entry.instanceName, "Ulduar", "l'instance du lieu est conservée")
 end)
 
-test("Mapping — la table curée comble, mais ne prime pas", function()
+-- La table curée vient de ItemSparse.ExpansionID, c'est-à-dire du même champ
+-- que le client expose sous le nom `expansionID`. C'est une donnée d'autorité,
+-- pas une déduction : elle doit passer DEVANT le rapprochement de noms de
+-- lieux, qui n'est qu'une heuristique.
+test("Mapping — la table curée prime sur le rapprochement de lieu", function()
 	stub.Reset()
 	stub.lfgDungeons = {
-		[100] = { name = "Ulduar", subtypeID = 3, expansionLevel = 2 },
+		-- Le lieu rattacherait la monture à Legion. Il a tort.
+		[100] = { name = "Ulduar", subtypeID = 3, expansionLevel = 6 },
 	}
 	stub.mounts = {
-		-- Situable par le client : la table curée ne doit pas s'appliquer.
 		{ mountID = 201, spellID = 1001, name = "Fumeronde", sourceType = 1,
 		  source = "Butin : Yogg-Saron\nUlduar" },
-		-- Insituable : un vendeur, sans lieu exploitable.
 		{ mountID = 202, spellID = 1002, name = "Brutosaure", sourceType = 3,
 		  source = "Vendeur : Talutu" },
 	}
 	local ns = harness.Load(stub)
-
-	-- Table curée keyée par mountID, comme l'API officielle et le client.
 	ns.Data.Mounts = {
-		[201] = { expansion = 9, kind = "vendor" },   -- volontairement faux
+		[201] = { expansion = 2 },
 		[202] = { expansion = 7, kind = "vendor", dropRate = 1 },
 	}
 
@@ -1097,18 +1098,42 @@ test("Mapping — la table curée comble, mais ne prime pas", function()
 	stub.RunFrames(80)
 
 	local cache = ns.db.global.sourceCache
-	eq(cache[201].tierName, "Wrath of the Lich King",
-		"le client garde la main sur la table curée")
-	eq(cache[201].matchedBy ~= "curated", true, "et ce n'est pas la curation qui a répondu")
+	eq(cache[201].tierName, "Wrath of the Lich King", "la curation corrige le lieu")
+	eq(cache[201].matchedBy, "curated", "et le dit")
+	-- L'instance reste celle du lieu : la curation ne la donne pas dans la
+	-- langue du client, et c'est ce nom-là qui sert aux verrous.
+	eq(cache[201].instanceName, "Ulduar", "l'instance du lieu est conservée")
 
+	-- Et elle comble ce qu'aucune heuristique n'atteint : un vendeur.
 	eq(cache[202].tierName, "Battle for Azeroth", "la curation comble le trou")
-	eq(cache[202].matchedBy, "curated", "et le dit")
 	eq(cache[202].dropRate, 1, "taux de drop repris")
 
 	-- Une source qui ne connaît que le spellID doit rester exploitable.
 	ns.Data.Mounts = { [9999] = { spellID = 1002, expansion = 3 } }
 	eq(ns.Data.GetCuratedMount(202, 1002).expansion, 3, "repli par spellID")
 	eq(ns.Data.GetCuratedMount(202, nil), nil, "sans clé utilisable, rien")
+end)
+
+-- Une curation sans extension ne doit PAS masquer ce que le client sait : une
+-- entrée qui n'apporte rien vaut mieux ignorée qu'appliquée.
+test("Mapping — une curation muette laisse la main aux heuristiques", function()
+	stub.Reset()
+	stub.lfgDungeons = {
+		[100] = { name = "Ulduar", subtypeID = 3, expansionLevel = 2 },
+	}
+	stub.mounts = {
+		{ mountID = 201, spellID = 1001, name = "Fumeronde", sourceType = 1,
+		  source = "Butin : Yogg-Saron\nUlduar" },
+	}
+	local ns = harness.Load(stub)
+	ns.Data.Mounts = { [201] = { dropRate = 0.01 } }   -- pas d'extension
+
+	ns.Mapping:Run(false)
+	stub.RunFrames(80)
+
+	local entry = ns.db.global.sourceCache[201]
+	eq(entry.tierName, "Wrath of the Lich King", "le lieu garde la main")
+	eq(entry.dropRate, 0.01, "mais le taux de drop curé est repris")
 end)
 
 test("Mapping — sans palier lisible, le scan n'invente rien", function()

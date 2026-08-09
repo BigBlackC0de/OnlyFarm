@@ -226,6 +226,9 @@ def parse_rows(path: Path) -> tuple[list[dict], list[str]]:
             entries[mount_id] = {
                 "mountID": mount_id,
                 "spellID": spell_id,
+                # Nom en commentaire de relecture : une table de 1600 lignes
+                # d'identifiants nus est impossible à vérifier à l'œil.
+                "name": (row.get("name") or "").strip(),
                 "expansion": expansion,
                 "kind": kind,
                 "instance": instance,
@@ -258,7 +261,8 @@ def render(entries: list[dict], source: str, digest: str) -> str:
             fields.append(f'instance = {lua_string(entry["instance"])}')
         if entry["dropRate"] is not None:
             fields.append(f'dropRate = {entry["dropRate"]:g}')
-        out.append(f'\t[{entry["mountID"]}] = {{ {", ".join(fields)} }},\n')
+        comment = f'  -- {entry["name"]}' if entry.get("name") else ""
+        out.append(f'\t[{entry["mountID"]}] = {{ {", ".join(fields)} }},{comment}\n')
 
     out.append(FOOTER)
     return "".join(out)

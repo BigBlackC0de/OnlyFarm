@@ -164,9 +164,44 @@ ultérieur en tire l'extension exacte sans avoir à la refaire. L'objet écrase
 toutes les heuristiques ; l'instance, elle, reste celle du rapprochement de
 lieu, puisque c'est elle qui sert aux verrous et que l'objet ne la donne pas.
 
-Restent hors d'atteinte les montures qui ne viennent d'aucune table de butin
-d'instance : vendeurs, métiers, événements, PvP. Pour celles-là, seule une
-table curée peut répondre (`Data/Mounts.lua`).
+Restent hors d'atteinte, EN JEU, les montures qui ne viennent d'aucune table de
+butin d'instance : vendeurs, métiers, événements, PvP.
+
+### La chaîne DB2, qui ferme le trou
+
+Hors du jeu, les tables DB2 publiées sur wago.tools contiennent le maillon que
+le client refuse :
+
+    Mount.SourceSpellID
+      -> ItemEffect.SpellID / ItemEffect.ID
+        -> ItemXItemEffect.ItemEffectID / ItemXItemEffect.ItemID
+          -> ItemSparse.ExpansionID
+
+`ItemSparse.ExpansionID` est exactement le champ que le client renvoie sous le
+nom `expansionID` : même donnée, même autorité. La différence est qu'on peut
+remonter la chaîne dans le bon sens, pour TOUTES les montures.
+
+`Build/fetch_db2.py` la parcourt et produit le CSV que `generate_data.py`
+compile en `Data/Mounts.lua`. Les noms de colonnes DB2 bougent d'un build à
+l'autre : le script échoue bruyamment plutôt que de produire une table vide, et
+`--inspect` affiche les colonnes réelles.
+
+### Pas de repli par intervalle de mountID
+
+Une approche répandue (MountJournalEnhanced, entre autres) déduit l'extension
+d'un intervalle `minID`/`maxID` de mountID, les identifiants étant à peu près
+séquentiels par patch. **On ne le fait pas, et c'est un refus délibéré.**
+
+« À peu près séquentiels » n'est pas « séquentiels » : les montures
+saisonnières, les rééditions et les ajouts rétroactifs tombent hors de leur
+intervalle. Un intervalle produit donc des réponses FAUSSES, indiscernables des
+bonnes, là où l'absence de réponse produit un « inconnue » que l'interface
+affiche honnêtement.
+
+Ce repli n'a de sens que pour un addon qui n'a pas la chaîne DB2. Nous l'avons.
+L'ajouter par-dessus ne comblerait que les montures dont la chaîne casse — les
+cas les plus atypiques, donc précisément ceux où un intervalle se trompe le
+plus.
 
 ### `C_MountJournal.SetSourceFilter` : à ne pas utiliser
 
