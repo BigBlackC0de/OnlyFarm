@@ -77,9 +77,13 @@ function Theme.ProgressColor(ratio)
 	return Theme.colors.faint
 end
 
---- Couleur d'un statut d'éligibilité. Un seul endroit décide, pour que la
---  pastille d'une ligne, la barre du tableau de bord et la légende disent
---  toutes la même chose.
+--- Couleur d'un statut d'éligibilité, pour que deux écrans qui parlent du même
+--  statut le peignent pareil.
+--
+--  Plus grand-chose n'affiche de statut : ni la liste, ni le tableau de bord.
+--  Il reste l'infobulle multi-personnage, et elle passe par Util.Colorize, qui a
+--  sa propre table de noms. Cette table-ci sert de référence commune aux deux, et
+--  au HUD de la phase 4.
 Theme.STATE_COLORS = {
 	available   = Theme.colors.green,
 	locked      = Theme.colors.red,
@@ -288,51 +292,12 @@ function Theme.StackedBar(parent)
 end
 
 --------------------------------------------------------------------------------
--- Ligne de graphe en barres horizontales
---
---   Ulduar          ████████░░░░░░  12/31
---------------------------------------------------------------------------------
-
-function Theme.BarRow(parent, labelWidth, valueWidth)
-	local row = CreateFrame("Frame", nil, parent)
-
-	row.Label = Theme.Text(row, "GameFontHighlightSmall", Theme.colors.text)
-	row.Label:SetPoint("LEFT", 0, 0)
-	row.Label:SetWidth(labelWidth or 130)
-	row.Label:SetWordWrap(false)
-
-	row.Value = Theme.Text(row, "GameFontHighlightSmall", Theme.colors.muted, "RIGHT")
-	row.Value:SetPoint("RIGHT", 0, 0)
-	row.Value:SetWidth(valueWidth or 64)
-
-	row.Bar = Theme.Bar(row, Theme.colors.accent)
-	row.Bar:SetPoint("LEFT", row.Label, "RIGHT", 8, 0)
-	row.Bar:SetPoint("RIGHT", row.Value, "LEFT", -8, 0)
-	row.Bar:SetHeight(10)
-
-	function row:Set(label, value, total, color)
-		self.Label:SetText(label)
-		self.Value:SetText(string.format("%d/%d", value, total))
-		local ratio = self.Bar:SetRatio(value, total)
-		local c = color
-		if not c then
-			-- Le vert n'est pas gratuit : il récompense une collection bien
-			-- avancée. Une extension à peine entamée reste bleue, neutre.
-			c = ratio >= 0.999 and Theme.colors.green or Theme.colors.accent
-		end
-		self.Bar:SetStatusBarColor(c[1], c[2], c[3])
-	end
-
-	return row
-end
-
---------------------------------------------------------------------------------
 -- Ligne de répartition
 --
--- Une BarRow classique dessine un pourcentage : toutes les barres ont la même
--- longueur, seule la part remplie change. C'est ce qu'il faut pour comparer des
--- avancements, et c'est exactement ce qu'il ne faut pas pour montrer une
--- répartition — trois montures possédées sur trois y font une barre pleine, plus
+-- Une barre de progression classique dessine un pourcentage : toutes les barres
+-- ont la même longueur, seule la part remplie change. C'est ce qu'il faut pour
+-- comparer des avancements, et c'est exactement ce qu'il ne faut pas pour montrer
+-- une répartition — trois montures possédées sur trois y font une barre pleine, plus
 -- longue que cent-vingt sur deux-cents.
 --
 -- Ici la longueur dessinée porte l'EFFECTIF de la catégorie (rapporté à la plus
@@ -488,33 +453,6 @@ function Theme.Segmented(parent, choices, onSelect)
 	end
 
 	return frame
-end
-
---------------------------------------------------------------------------------
--- Pastille de statut
---
--- Un aplat translucide de la couleur du statut, avec le texte dedans. C'est ce
--- qui remplace la colonne « disponible / verrouillé » en texte coloré.
---------------------------------------------------------------------------------
-
-function Theme.Pill(parent)
-	local pill = CreateFrame("Frame", nil, parent)
-	pill:SetHeight(16)
-
-	pill.Background = pill:CreateTexture(nil, "BACKGROUND")
-	pill.Background:SetAllPoints()
-
-	pill.Text = Theme.Text(pill, "GameFontHighlightSmall", Theme.colors.text, "CENTER")
-	pill.Text:SetPoint("CENTER")
-
-	function pill:Set(text, color)
-		self.Text:SetText(text)
-		self.Text:SetTextColor(color[1], color[2], color[3])
-		self.Background:SetColorTexture(color[1], color[2], color[3], 0.16)
-		self:SetWidth(math.max(48, self.Text:GetStringWidth() + 16))
-	end
-
-	return pill
 end
 
 --------------------------------------------------------------------------------

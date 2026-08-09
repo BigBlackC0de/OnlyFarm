@@ -927,9 +927,10 @@ test("Mapping — extension et instance déduites du texte de source", function(
 	eq(cache[203].placeName, "Déserts de Vashj'ir", "le lieu est conservé tel quel")
 	eq(cache[203].encounterName, "Aeonaxx", "le rare est retenu comme rencontre")
 
-	-- Et c'est bien ça qui alimente le filtre par extension.
-	local expansions = ns.Eligibility:GetKnownExpansions()
-	eq(expansions[1].name, "Wrath of the Lich King", "l'extension apparaît dans le filtre")
+	-- L'extension reste dans le cache : elle n'alimente plus de filtre, mais
+	-- c'est elle que `/of export` met dans le fichier de curation.
+	eq(ns.Eligibility:GetExpansion(201), "Wrath of the Lich King",
+		"l'extension reste lisible monture par monture")
 end)
 
 test("Mapping — la cartographie survit et ne se refait pas pour rien", function()

@@ -101,27 +101,16 @@ function Eligibility:GetExpansion(mountID)
 	return self.UNKNOWN_EXPANSION
 end
 
---- Extensions réellement présentes dans les données, dans l'ordre du Journal
---  des rencontres (Classic d'abord). Le panier « inconnue » ferme la marche.
---  @return liste de { name, tier }
-function Eligibility:GetKnownExpansions()
-	local seen, list = {}, {}
-	if ns.db then
-		for _, source in pairs(ns.db.global.sourceCache) do
-			local name = source.tierName
-			if type(name) == "string" and name ~= "" and not seen[name] then
-				seen[name] = true
-				list[#list + 1] = { name = name, tier = tonumber(source.tier) or 99 }
-			end
-		end
-	end
-	table.sort(list, function(a, b)
-		if a.tier ~= b.tier then return a.tier < b.tier end
-		return a.name < b.name
-	end)
-	list[#list + 1] = { name = self.UNKNOWN_EXPANSION, tier = math.huge }
-	return list
-end
+-- GetKnownExpansions a été retiré avec le filtre par extension de l'onglet
+-- Collection. Il listait les paliers présents dans le cache de cartographie,
+-- donc uniquement les montures qu'un scan avait rattachées à un boss : le menu
+-- proposait trois ou quatre extensions sur douze, et « inconnue » ramassait tout
+-- le reste. Un filtre qui ne connaît pas la majorité de ses valeurs n'est pas un
+-- filtre.
+--
+-- GetExpansion reste, lui : `/of export` s'en sert pour produire le fichier de
+-- curation, et c'est là que la donnée a un sens — un outil de mainteneur qui
+-- travaille précisément sur ce qui manque.
 
 --------------------------------------------------------------------------------
 -- Statut par personnage

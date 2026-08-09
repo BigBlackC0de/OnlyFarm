@@ -62,21 +62,17 @@ local PROFILE_DEFAULTS = {
 		-- Les possédées sont masquées par défaut : l'addon répond d'abord à
 		-- « qu'est-ce qu'il me manque ». Les revoir reste à un clic.
 		showOwned = false,
-		availableOnly = false,
-		hideUnmapped = false,
 		-- Une monture exclue reste visible, grisée. La faire disparaître d'un
 		-- clic droit donnait l'impression d'avoir cassé quelque chose.
 		hideExcluded = false,
-		-- Extensions décochées dans le menu. Vide = tout est affiché : on ne
-		-- veut pas qu'un nouveau palier ajouté par un patch soit masqué par
-		-- défaut parce qu'il n'était pas dans la liste au moment du réglage.
-		expansionsHidden = {},
-		-- Même règle pour les natures de source (butin, haut fait, vendeur…).
+		-- Natures de source décochées dans le menu. Vide = tout est affiché : on
+		-- ne veut pas qu'une nature ajoutée par un patch soit masquée par défaut
+		-- parce qu'elle n'était pas dans la liste au moment du réglage.
 		kindsHidden = {},
-		-- "all" | "raid" | "dungeon" | "outdoor"
-		instanceType = "all",
-		-- "name" | "source" | "expansion" | "status" | "attempts"
+		-- Colonne de tri et sens, pilotés par les titres de colonnes.
+		-- "name" | "source" | "category" | "type" | "tries"
 		sort = "name",
+		sortDesc = false,
 	},
 	routing = {
 		flySpeed = 75,          -- yd/s, calibré par le joueur (phase 3)

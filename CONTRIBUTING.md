@@ -100,6 +100,26 @@ vérifient à chaque fois qu'on touche au tableau de bord.
 - [ ] **Journal lent** : sur un `/reload` en zone chargée, la carte affiche
       « Journal des montures pas encore peuplé » au lieu de rester vide.
 
+### Recette de l'onglet Collection
+
+- [ ] **Aucune cellule vide**, sur aucune ligne, filtres au maximum. « Catégorie »
+      et « Type » viennent du client : elles répondent même sans cartographie.
+      Une cellule vide est un bug, pas une donnée manquante.
+- [ ] **Tri par colonne** : un clic sur un titre trie dessus, un second inverse.
+      Le titre actif est en bleu, avec la flèche dans le bon sens.
+- [ ] **Tri stable** : sur une colonne où beaucoup de lignes sont à égalité
+      (« Type », par exemple), l'ordre des ex æquo ne bouge pas d'un
+      rafraîchissement à l'autre — le départage se fait toujours par le nom.
+- [ ] **Réglage hérité** : un profil qui triait par « extension », « statut » ou
+      « possédée » retombe sur le nom sans erreur au premier affichage.
+- [ ] **Possédées** : cocher « Afficher les possédées » les fait apparaître, nom
+      en doré. Le reste de leur ligne reste lisible.
+- [ ] **Infobulle** : « Boss » n'apparaît QUE sur une monture de butin. Sur un
+      vendeur, la ligne ne doit pas exister — c'était le nom du vendeur.
+- [ ] **Infobulle multi-perso** : le bloc « N perso(s) disponible(s) » n'apparaît
+      que si au moins un personnage a un état mesuré. Sur une monture non
+      cartographiée, pas de tableau d'« incertain ».
+
 ## Conventions
 
 * **Langue** : commentaires et messages de commit en français, comme la

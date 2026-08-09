@@ -26,9 +26,10 @@ local L = {
 	-- Colonnes
 	COL_MOUNT = "Mount",
 	COL_SOURCE = "Source",
+	COL_CATEGORY = "Category",
 	COL_TYPE = "Type",
 	COL_TRIES = "Tries",
-	COL_STATUS = "Availability",
+	SORT_HINT = "Click a column header to sort it",
 
 	-- Tableau de bord
 	KPI_OWNED = "collected",
@@ -53,7 +54,7 @@ local L = {
 	MOVE_SKYRIDING = "Skyriding",
 	MOVE_AQUATIC = "Aquatic",
 	MOVE_OTHER = "Other",
-	SOURCE_UNKNOWN = "Unknown source",
+	SOURCE_UNKNOWN = "Other",
 
 	-- Statuts
 	STATUS_AVAILABLE = "available",
@@ -62,7 +63,6 @@ local L = {
 	STATUS_NO_SOURCE = "source not mapped",
 	STATUS_NO_SOURCE_SHORT = "unmapped",
 	STATUS_INELIGIBLE = "not eligible",
-	STATUS_OWNED = "collected",
 
 	-- Résumés
 	SUMMARY = "%d/%d collected — %d missing",
@@ -74,31 +74,12 @@ local L = {
 	-- Filtres
 	FILTER_SEARCH = "Search",
 	FILTER_SHOW_OWNED = "Show collected",
-	FILTER_AVAILABLE_ONLY = "Available now only",
-	FILTER_HIDE_UNMAPPED = "Hide unmapped sources",
 	FILTER_HIDE_EXCLUDED = "Hide excluded",
 	FILTER_SOURCE = "Source",
-	FILTER_TYPE = "Type",
-	FILTER_TYPE_ALL = "Everywhere",
-	FILTER_TYPE_RAID = "Raids only",
-	FILTER_TYPE_DUNGEON = "Dungeons only",
-	FILTER_TYPE_OUTDOOR = "Outside instances",
+	FILTER_ALL = "All",
+	FILTER_NONE = "None",
 	TYPE_RAID = "Raid",
 	TYPE_DUNGEON = "Dungeon",
-	TYPE_OUTDOOR = "—",
-	SORT_BY = "Sort",
-	SORT_NAME = "Name",
-	SORT_SOURCE = "Source",
-	SORT_EXPANSION = "Expansion",
-	SORT_STATUS = "Availability",
-	SORT_ATTEMPTS = "Tries",
-	SORT_OWNED = "Collected or not",
-	FILTER_EXPANSION = "Expansion",
-	FILTER_EXPANSION_ALL = "All",
-	FILTER_EXPANSION_NONE = "None",
-	EXPANSION_UNKNOWN = "Unknown (unmapped source)",
-	EXPANSION_NEEDS_SCAN = "Run /of scan to fill this list.",
-	EXPANSION_SCANNING = "Scan in progress — the list fills itself.",
 
 	-- Aperçu
 	PREVIEW_HINT = "Drag to rotate · wheel to zoom",
@@ -184,9 +165,10 @@ if GetLocale and GetLocale() == "frFR" then
 
 	L.COL_MOUNT = "Monture"
 	L.COL_SOURCE = "Source"
+	L.COL_CATEGORY = "Catégorie"
 	L.COL_TYPE = "Type"
 	L.COL_TRIES = "Essais"
-	L.COL_STATUS = "Disponibilité"
+	L.SORT_HINT = "Clique un titre de colonne pour trier dessus"
 
 	L.KPI_OWNED = "possédées"
 	L.KPI_MISSING = "manquantes"
@@ -209,7 +191,7 @@ if GetLocale and GetLocale() == "frFR" then
 	L.MOVE_SKYRIDING = "Skyriding"
 	L.MOVE_AQUATIC = "Aquatique"
 	L.MOVE_OTHER = "Autre"
-	L.SOURCE_UNKNOWN = "Source inconnue"
+	L.SOURCE_UNKNOWN = "Autres"
 
 	L.STATUS_AVAILABLE = "disponible"
 	L.STATUS_LOCKED = "verrouillé"
@@ -217,7 +199,6 @@ if GetLocale and GetLocale() == "frFR" then
 	L.STATUS_NO_SOURCE = "source non cartographiée"
 	L.STATUS_NO_SOURCE_SHORT = "non cartographiée"
 	L.STATUS_INELIGIBLE = "non éligible"
-	L.STATUS_OWNED = "possédée"
 
 	L.SUMMARY = "%d/%d possédées — %d manquantes"
 	L.INSTANCE_COUNTER = "Instances : %d/%d cette heure · %d/%d aujourd'hui"
@@ -227,31 +208,12 @@ if GetLocale and GetLocale() == "frFR" then
 
 	L.FILTER_SEARCH = "Rechercher"
 	L.FILTER_SHOW_OWNED = "Afficher les possédées"
-	L.FILTER_AVAILABLE_ONLY = "Dispo maintenant uniquement"
-	L.FILTER_HIDE_UNMAPPED = "Masquer les sources non cartographiées"
 	L.FILTER_HIDE_EXCLUDED = "Masquer les exclues"
 	L.FILTER_SOURCE = "Source"
-	L.FILTER_TYPE = "Type"
-	L.FILTER_TYPE_ALL = "Partout"
-	L.FILTER_TYPE_RAID = "Raids uniquement"
-	L.FILTER_TYPE_DUNGEON = "Donjons uniquement"
-	L.FILTER_TYPE_OUTDOOR = "Hors instance"
+	L.FILTER_ALL = "Tout"
+	L.FILTER_NONE = "Rien"
 	L.TYPE_RAID = "Raid"
 	L.TYPE_DUNGEON = "Donjon"
-	L.TYPE_OUTDOOR = "—"
-	L.SORT_BY = "Trier"
-	L.SORT_NAME = "Nom"
-	L.SORT_SOURCE = "Source"
-	L.SORT_EXPANSION = "Extension"
-	L.SORT_STATUS = "Disponibilité"
-	L.SORT_ATTEMPTS = "Essais"
-	L.SORT_OWNED = "Possédée ou non"
-	L.FILTER_EXPANSION = "Extension"
-	L.FILTER_EXPANSION_ALL = "Tout"
-	L.FILTER_EXPANSION_NONE = "Rien"
-	L.EXPANSION_UNKNOWN = "Inconnue (source non cartographiée)"
-	L.EXPANSION_NEEDS_SCAN = "Lance /of scan pour remplir cette liste."
-	L.EXPANSION_SCANNING = "Scan en cours — la liste se remplit toute seule."
 
 	L.PREVIEW_HINT = "Glisser pour tourner · molette pour zoomer"
 	L.PREVIEW_NONE = "Aucun modèle disponible pour cette monture."

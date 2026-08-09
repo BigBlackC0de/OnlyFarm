@@ -29,6 +29,46 @@ local CONTENT_PADDING = 12
 
 UI.TAB_DASHBOARD, UI.TAB_COLLECTION, UI.TAB_ROUTE, UI.TAB_EDITOR = 1, 2, 3, 4
 
+--------------------------------------------------------------------------------
+-- Colonnes de la liste
+--
+-- UN seul endroit décide des largeurs et de l'ordre : l'en-tête cliquable et les
+-- lignes s'en servent tous les deux, donc ils ne peuvent pas se désaligner. Des
+-- abscisses recopiées à la main de part et d'autre, c'était la garantie qu'un
+-- ajout de colonne décale l'un sans l'autre.
+--
+-- AUCUNE colonne ne peut être vide, et c'est un critère de conception, pas un
+-- détail : une cellule vide se lit comme une donnée manquante, alors qu'elle
+-- signifiait le plus souvent « l'addon n'a pas rattaché cette monture à une
+-- instance » — ce dont le joueur n'a rien à faire.
+--
+--   Monture   nom, toujours fourni par le client
+--   Source    texte de source du Journal, avec repli sur la catégorie
+--   Catégorie sourceType (Butin, Vendeur, Quête…), affiné en Raid / Donjon
+--             quand la cartographie le sait. Toujours fourni.
+--   Type      mode de déplacement (mountTypeID). Toujours fourni.
+--   Essais    compteur de tentatives, zéro compris.
+--------------------------------------------------------------------------------
+
+UI.COLUMNS = {
+	{ key = "name", label = "COL_MOUNT", width = 210, justify = "LEFT" },
+	{ key = "source", label = "COL_SOURCE", width = 216, justify = "LEFT" },
+	{ key = "category", label = "COL_CATEGORY", width = 80, justify = "LEFT" },
+	{ key = "type", label = "COL_TYPE", width = 80, justify = "LEFT" },
+	{ key = "tries", label = "COL_TRIES", width = 46, justify = "RIGHT", numeric = true },
+}
+
+UI.COLUMNS_BY_KEY = {}
+for _, column in ipairs(UI.COLUMNS) do
+	UI.COLUMNS_BY_KEY[column.key] = column
+end
+
+local COLUMN_GAP = 6
+-- Marge (6) + icône (18) + écart (8).
+local ICON_SPAN = 32
+-- Encastrement du ScrollBox dans la carte de liste.
+local LIST_INSET = 4
+
 function UI:OnEnable()
 	self:RegisterMessage("OF_COLLECTION_UPDATED", "Refresh")
 	self:RegisterMessage("OF_LOCKOUTS_UPDATED", "Refresh")
@@ -291,16 +331,18 @@ function UI:CreateCollectionTab(frame)
 	end)
 	page.SearchBox = search
 
-	-- Les quatre menus se suivent, chacun ancré au précédent : ajouter ou
-	-- retirer un filtre ne demande pas de recalculer des abscisses.
-	local anchor = search
-	page.ExpansionDropdown = self:CreateExpansionDropdown(filters, anchor)
-	anchor = page.ExpansionDropdown or anchor
-	page.SourceDropdown = self:CreateSourceDropdown(filters, anchor)
-	anchor = page.SourceDropdown or anchor
-	page.TypeDropdown = self:CreateTypeDropdown(filters, anchor)
-	anchor = page.TypeDropdown or anchor
-	page.SortDropdown = self:CreateSortDropdown(filters, anchor)
+	-- UN seul menu reste, et c'est le seul qui portait sur une donnée fiable.
+	--
+	-- « Extension » est parti avec la frise du tableau de bord : le client ne
+	-- donne pas l'extension d'une monture, le menu ne listait donc que les
+	-- paliers qu'un scan avait rattachés.
+	--
+	-- « Type » (raid / donjon / hors instance) faisait doublon avec « Source »,
+	-- en moins fiable : il classait « hors instance » tout ce que la
+	-- cartographie n'avait pas rattaché, c'est-à-dire aussi des raids.
+	--
+	-- « Trier » est devenu inutile : les titres de colonnes se cliquent.
+	page.SourceDropdown = self:CreateSourceDropdown(filters, search)
 
 	local function MakeFilter(label, key)
 		local check = CreateFrame("CheckButton", nil, filters, "UICheckButtonTemplate")
@@ -337,9 +379,12 @@ function UI:CreateCollectionTab(frame)
 		return check
 	end
 
+	-- Deux cases, et elles portent toutes les deux sur un fait : cette monture
+	-- est possédée, cette monture a été mise de côté. Les deux autres filtraient
+	-- sur la disponibilité (« dispo maintenant », « masquer les sources non
+	-- cartographiées ») : elles trient sur un état que l'addon déduit, et que la
+	-- liste ne montre plus.
 	page.ShowOwned = PlaceFilter(L.FILTER_SHOW_OWNED, "showOwned")
-	page.AvailableOnly = PlaceFilter(L.FILTER_AVAILABLE_ONLY, "availableOnly")
-	page.HideUnmapped = PlaceFilter(L.FILTER_HIDE_UNMAPPED, "hideUnmapped")
 	page.HideExcluded = PlaceFilter(L.FILTER_HIDE_EXCLUDED, "hideExcluded")
 
 	-- Le résumé occupe la fin de la seconde ligne : la première est pleine de
@@ -357,30 +402,14 @@ function UI:CreateCollectionTab(frame)
 	list:SetPoint("BOTTOMRIGHT")
 	page.List = list
 
-	local header = Theme.Text(list, "GameFontHighlightSmall", Theme.colors.faint)
-	header:SetPoint("TOPLEFT", 34, -8)
-	header:SetText(L.COL_MOUNT)
-	-- Les abscisses suivent celles des colonnes d'une ligne : icône (6+18+8),
-	-- nom (216+4), source (212+4), type (62+4), essais (46+16).
-	local headerSource = Theme.Text(list, "GameFontHighlightSmall", Theme.colors.faint)
-	headerSource:SetPoint("LEFT", header, "LEFT", 220, 0)
-	headerSource:SetText(L.COL_SOURCE)
-	local headerType = Theme.Text(list, "GameFontHighlightSmall", Theme.colors.faint)
-	headerType:SetPoint("LEFT", header, "LEFT", 436, 0)
-	headerType:SetText(L.COL_TYPE)
-	local headerTries = Theme.Text(list, "GameFontHighlightSmall", Theme.colors.faint)
-	headerTries:SetPoint("LEFT", header, "LEFT", 502, 0)
-	headerTries:SetText(L.COL_TRIES)
-	local headerStatus = Theme.Text(list, "GameFontHighlightSmall", Theme.colors.faint)
-	headerStatus:SetPoint("LEFT", header, "LEFT", 570, 0)
-	headerStatus:SetText(L.COL_STATUS)
+	self:CreateListHeader(list)
 
 	local rule = Theme.Separator(list)
 	rule:SetPoint("TOPLEFT", 1, -24)
 	rule:SetPoint("TOPRIGHT", -1, -24)
 
 	local scrollBox = CreateFrame("Frame", nil, list, "WowScrollBoxList")
-	scrollBox:SetPoint("TOPLEFT", 4, -28)
+	scrollBox:SetPoint("TOPLEFT", LIST_INSET, -28)
 	scrollBox:SetPoint("BOTTOMRIGHT", -22, 4)
 	page.ScrollBox = scrollBox
 
@@ -401,6 +430,120 @@ function UI:CreateCollectionTab(frame)
 	empty:SetText(L.NO_RESULT)
 	empty:Hide()
 	page.EmptyLabel = empty
+end
+
+--------------------------------------------------------------------------------
+-- En-tête de liste, triable à la souris
+--
+-- Un menu « Trier » demandait deux clics et cachait le critère actif derrière
+-- son libellé. Des titres de colonnes cliquables mettent le critère là où il
+-- porte — sur la colonne — et c'est le geste qu'attend n'importe qui ayant déjà
+-- ouvert un tableur.
+--------------------------------------------------------------------------------
+
+--- Un clic sur un titre trie dessus ; un second inverse le sens.
+function UI:ToggleSort(key)
+	local filters = ns.db.profile.filters
+	if filters.sort == key then
+		filters.sortDesc = not filters.sortDesc
+	else
+		filters.sort = key
+		-- Premier clic : le sens le plus utile pour la colonne. Sur un nombre
+		-- d'essais, c'est le plus gros d'abord ; sur du texte, l'ordre
+		-- alphabétique.
+		filters.sortDesc = UI.COLUMNS_BY_KEY[key] and UI.COLUMNS_BY_KEY[key].numeric or false
+	end
+	self:Refresh()
+end
+
+function UI:CreateListHeader(list)
+	local Theme = ns.Theme
+	local L = ns.L
+
+	list.Headers = {}
+	-- Le ScrollBox est encastré de LIST_INSET dans la carte : sans ce décalage,
+	-- l'en-tête serait décalé de quatre pixels par rapport aux cellules qu'il
+	-- coiffe, ce qui se voit dès qu'une colonne est étroite.
+	local offset = LIST_INSET + ICON_SPAN
+
+	for _, column in ipairs(UI.COLUMNS) do
+		local button = CreateFrame("Button", nil, list)
+		button:SetPoint("TOPLEFT", offset, -6)
+		button:SetSize(column.width, 18)
+		button.sortKey = column.key
+
+		button.Text = Theme.Text(button, "GameFontHighlightSmall", Theme.colors.faint,
+			column.justify)
+		button.Text:SetPoint("LEFT")
+		button.Text:SetPoint("RIGHT")
+		button.Text:SetText(L[column.label] or column.key)
+		button.Text:SetWordWrap(false)
+
+		-- La flèche de tri de Blizzard. Si la texture venait à disparaître, elle
+		-- ne dessine rien et ne lève pas d'erreur : la couleur du titre suffit
+		-- alors à désigner la colonne active, d'où les deux repères.
+		button.Arrow = button:CreateTexture(nil, "OVERLAY")
+		button.Arrow:SetSize(10, 10)
+		button.Arrow:SetTexture("Interface\\Buttons\\UI-SortArrow")
+		button.Arrow:Hide()
+		if column.justify == "RIGHT" then
+			button.Arrow:SetPoint("RIGHT", button.Text, "LEFT", -2, 0)
+		else
+			button.Arrow:SetPoint("LEFT", button.Text, "LEFT",
+				button.Text:GetStringWidth() + 3, 0)
+		end
+
+		button:SetScript("OnClick", function(self_) UI:ToggleSort(self_.sortKey) end)
+		button:SetScript("OnEnter", function(self_)
+			if not self_.active then
+				local c = Theme.colors.text
+				self_.Text:SetTextColor(c[1], c[2], c[3])
+			end
+			GameTooltip:SetOwner(self_, "ANCHOR_TOP")
+			GameTooltip:AddLine(L[column.label] or column.key, 1, 1, 1)
+			GameTooltip:AddLine(L.SORT_HINT, 0.6, 0.6, 0.6)
+			GameTooltip:Show()
+		end)
+		button:SetScript("OnLeave", function(self_)
+			if not self_.active then
+				local c = Theme.colors.faint
+				self_.Text:SetTextColor(c[1], c[2], c[3])
+			end
+			GameTooltip:Hide()
+		end)
+
+		list.Headers[#list.Headers + 1] = button
+		offset = offset + column.width + COLUMN_GAP
+	end
+end
+
+--- Met l'en-tête au diapason du tri courant : titre en accent et flèche sur la
+--  colonne active, titres discrets partout ailleurs.
+function UI:UpdateListHeader()
+	local page = self.frame and self.frame.CollectionPage
+	local list = page and page.List
+	if not list or not list.Headers then return end
+
+	local Theme = ns.Theme
+	local filters = ns.db.profile.filters
+	local active = self:ResolveSort(filters.sort)
+
+	for _, button in ipairs(list.Headers) do
+		local isActive = button.sortKey == active
+		button.active = isActive
+		local c = isActive and Theme.colors.accent or Theme.colors.faint
+		button.Text:SetTextColor(c[1], c[2], c[3])
+		button.Arrow:SetShown(isActive)
+		if isActive then
+			-- La texture pointe vers le haut ; on la retourne pour le sens
+			-- descendant plutôt que d'embarquer une seconde image.
+			if filters.sortDesc then
+				button.Arrow:SetTexCoord(0, 1, 1, 0)
+			else
+				button.Arrow:SetTexCoord(0, 1, 0, 1)
+			end
+		end
+	end
 end
 
 --- Fabrique un menu déroulant de filtre, ancré au widget précédent.
@@ -448,11 +591,11 @@ function UI:CreateSourceDropdown(parent, anchor)
 
 		local kinds = ns.Collection:GetSourceKinds()
 
-		rootDescription:CreateButton(L.FILTER_EXPANSION_ALL, function()
+		rootDescription:CreateButton(L.FILTER_ALL, function()
 			wipe(ns.db.profile.filters.kindsHidden)
 			self:Refresh()
 		end)
-		rootDescription:CreateButton(L.FILTER_EXPANSION_NONE, function()
+		rootDescription:CreateButton(L.FILTER_NONE, function()
 			local hidden = ns.db.profile.filters.kindsHidden
 			for _, entry in ipairs(kinds) do hidden[entry.kind] = true end
 			self:Refresh()
@@ -472,121 +615,11 @@ function UI:CreateSourceDropdown(parent, anchor)
 	return dropdown
 end
 
---- Menu raid / donjon. Une monture de raid et une monture de donjon ne se
---  farment pas de la même façon : l'une est hebdomadaire et se fait sur tous
---  les alts, l'autre est quotidienne. Les séparer est le tri le plus utile
---  après l'extension.
-function UI:CreateTypeDropdown(parent, anchor)
-	local L = ns.L
-	local dropdown = self:CreateDropdown(parent, "OnlyFarmTypeDropdown", anchor, L.FILTER_TYPE, 118)
-	if not dropdown then return nil end
-
-	local choices = {
-		{ value = "all", label = L.FILTER_TYPE_ALL },
-		{ value = "raid", label = L.FILTER_TYPE_RAID },
-		{ value = "dungeon", label = L.FILTER_TYPE_DUNGEON },
-		{ value = "outdoor", label = L.FILTER_TYPE_OUTDOOR },
-	}
-
-	dropdown:SetupMenu(function(_, rootDescription)
-		rootDescription:CreateTitle(L.FILTER_TYPE)
-		for _, choice in ipairs(choices) do
-			rootDescription:CreateRadio(choice.label,
-				function() return ns.db.profile.filters.instanceType == choice.value end,
-				function()
-					ns.db.profile.filters.instanceType = choice.value
-					self:Refresh()
-					return MenuResponse.Close
-				end)
-		end
-	end)
-
-	return dropdown
-end
-
---- Menu de tri.
-function UI:CreateSortDropdown(parent, anchor)
-	local L = ns.L
-	local dropdown = self:CreateDropdown(parent, "OnlyFarmSortDropdown", anchor, L.SORT_BY, 126)
-	if not dropdown then return nil end
-
-	dropdown:SetupMenu(function(_, rootDescription)
-		rootDescription:CreateTitle(L.SORT_BY)
-		for _, choice in ipairs(UI.SORTS) do
-			rootDescription:CreateRadio(L[choice.label],
-				function() return ns.db.profile.filters.sort == choice.value end,
-				function()
-					ns.db.profile.filters.sort = choice.value
-					self:Refresh()
-					return MenuResponse.Close
-				end)
-		end
-	end)
-
-	return dropdown
-end
-
---- Menu des extensions.
-function UI:CreateExpansionDropdown(parent, anchor)
-	local L = ns.L
-	local dropdown = self:CreateDropdown(parent, "OnlyFarmExpansionDropdown", anchor,
-		L.FILTER_EXPANSION)
-	if not dropdown then return nil end
-
-	local function IsShown(name)
-		return not ns.db.profile.filters.expansionsHidden[name]
-	end
-	local function SetShown(name, shown)
-		ns.db.profile.filters.expansionsHidden[name] = (not shown) or nil
-		self:Refresh()
-	end
-
-	dropdown:SetupMenu(function(_, rootDescription)
-		rootDescription:CreateTitle(L.FILTER_EXPANSION)
-
-		local expansions = ns.Eligibility:GetKnownExpansions()
-
-		rootDescription:CreateButton(L.FILTER_EXPANSION_ALL, function()
-			wipe(ns.db.profile.filters.expansionsHidden)
-			self:Refresh()
-		end)
-		rootDescription:CreateButton(L.FILTER_EXPANSION_NONE, function()
-			local hidden = ns.db.profile.filters.expansionsHidden
-			for _, expansion in ipairs(expansions) do hidden[expansion.name] = true end
-			self:Refresh()
-		end)
-
-		for _, expansion in ipairs(expansions) do
-			local label = expansion.name
-			if label == ns.Eligibility.UNKNOWN_EXPANSION then
-				label = L.EXPANSION_UNKNOWN
-			end
-			rootDescription:CreateCheckbox(label,
-				function() return IsShown(expansion.name) end,
-				function()
-					SetShown(expansion.name, not IsShown(expansion.name))
-					return MenuResponse.Refresh
-				end)
-		end
-
-		-- Sans scan, la seule entrée est « inconnue ». On dit pourquoi plutôt
-		-- que de laisser croire à un menu cassé — et si le scan automatique
-		-- est justement en train de tourner, on le dit aussi : « lance une
-		-- commande » serait un mauvais conseil pendant qu'elle s'exécute.
-		if #expansions <= 1 then
-			rootDescription:CreateTitle(ns.Mapping.running
-				and L.EXPANSION_SCANNING or L.EXPANSION_NEEDS_SCAN)
-		end
-	end)
-
-	return dropdown
-end
-
 --------------------------------------------------------------------------------
 -- Lignes
 --------------------------------------------------------------------------------
 
-local TYPE_LABELS = { raid = "TYPE_RAID", dungeon = "TYPE_DUNGEON", outdoor = "TYPE_OUTDOOR" }
+local TYPE_LABELS = { raid = "TYPE_RAID", dungeon = "TYPE_DUNGEON" }
 
 --- Construit les widgets d'une ligne la première fois qu'elle est acquise,
 --  puis se contente de les remplir. Le pool de ScrollBox recycle les frames.
@@ -606,27 +639,29 @@ function UI:InitRow(button, elementData)
 		button.Icon:SetSize(18, 18)
 		button.Icon:SetPoint("LEFT", 6, 0)
 
-		button.Name = Theme.Text(button, "GameFontHighlightSmall", Theme.colors.text)
-		button.Name:SetPoint("LEFT", button.Icon, "RIGHT", 8, 0)
-		button.Name:SetWidth(216)
-		button.Name:SetWordWrap(false)
+		-- Les cellules sont posées dans l'ordre de UI.COLUMNS et à ses largeurs :
+		-- l'en-tête lit la même table, donc les deux restent alignés.
+		button.Cells = {}
+		local previous
+		for _, column in ipairs(UI.COLUMNS) do
+			local cell = Theme.Text(button, "GameFontHighlightSmall", Theme.colors.muted,
+				column.justify)
+			if previous then
+				cell:SetPoint("LEFT", previous, "RIGHT", COLUMN_GAP, 0)
+			else
+				cell:SetPoint("LEFT", button.Icon, "RIGHT", 8, 0)
+			end
+			cell:SetWidth(column.width)
+			cell:SetWordWrap(false)
+			button.Cells[column.key] = cell
+			previous = cell
+		end
 
-		button.Source = Theme.Text(button, "GameFontHighlightSmall", Theme.colors.muted)
-		button.Source:SetPoint("LEFT", button.Name, "RIGHT", 4, 0)
-		button.Source:SetWidth(212)
-		button.Source:SetWordWrap(false)
-
-		button.Type = Theme.Text(button, "GameFontHighlightSmall", Theme.colors.faint)
-		button.Type:SetPoint("LEFT", button.Source, "RIGHT", 4, 0)
-		button.Type:SetWidth(62)
-		button.Type:SetWordWrap(false)
-
-		button.Tries = Theme.Text(button, "GameFontHighlightSmall", Theme.colors.faint, "RIGHT")
-		button.Tries:SetPoint("LEFT", button.Type, "RIGHT", 4, 0)
-		button.Tries:SetWidth(46)
-
-		button.Pill = Theme.Pill(button)
-		button.Pill:SetPoint("LEFT", button.Tries, "RIGHT", 16, 0)
+		button.Name = button.Cells.name
+		button.Source = button.Cells.source
+		button.Category = button.Cells.category
+		button.Type = button.Cells.type
+		button.Tries = button.Cells.tries
 
 		button.Highlight = button:CreateTexture(nil, "HIGHLIGHT")
 		button.Highlight:SetAllPoints()
@@ -670,22 +705,39 @@ function UI:InitRow(button, elementData)
 		button.Name:SetText(elementData.name)
 		button.Name:SetTextColor(faint[1], faint[2], faint[3])
 		button.Source:SetText(ns.L.TAG_EXCLUDED)
-		button.Type:SetText("")
-		button.Tries:SetText("")
-		button.Pill:Hide()
+		button.Source:SetTextColor(faint[1], faint[2], faint[3])
+		button.Category:SetText(elementData.categoryLabel or "")
+		button.Category:SetTextColor(faint[1], faint[2], faint[3])
+		button.Type:SetText(elementData.movementLabel or "")
+		button.Type:SetTextColor(faint[1], faint[2], faint[3])
+		button.Tries:SetText(elementData.triesText or "")
+		button.Tries:SetTextColor(faint[1], faint[2], faint[3])
 		button.Icon:SetDesaturated(true)
 		button.Icon:SetAlpha(0.4)
 	else
-		local text = Theme.colors.text
+		-- Possédée : le nom passe au doré. C'est tout ce que remplaçait la
+		-- pastille de disponibilité — « je l'ai ou je l'ai pas ». Le reste de la
+		-- ligne garde ses couleurs, parce que d'où venait une monture qu'on
+		-- possède reste une information qu'on va chercher.
+		local nameColor = elementData.owned and Theme.colors.gold or Theme.colors.text
 		button.Name:SetText(elementData.name)
-		button.Name:SetTextColor(text[1], text[2], text[3])
+		button.Name:SetTextColor(nameColor[1], nameColor[2], nameColor[3])
+
+		local muted = Theme.colors.muted
 		button.Source:SetText(elementData.sourceSummary or "")
-		button.Type:SetText(elementData.typeLabel or "")
-		local tc = elementData.typeColor or Theme.colors.faint
-		button.Type:SetTextColor(tc[1], tc[2], tc[3])
+		button.Source:SetTextColor(muted[1], muted[2], muted[3])
+
+		button.Category:SetText(elementData.categoryLabel or "")
+		local cc = elementData.categoryColor or Theme.colors.muted
+		button.Category:SetTextColor(cc[1], cc[2], cc[3])
+
+		local faint = Theme.colors.faint
+		button.Type:SetText(elementData.movementLabel or "")
+		button.Type:SetTextColor(faint[1], faint[2], faint[3])
+
 		button.Tries:SetText(elementData.triesText or "")
-		button.Pill:Set(elementData.statusLabel, elementData.statusColor)
-		button.Pill:Show()
+		button.Tries:SetTextColor(faint[1], faint[2], faint[3])
+
 		button.Icon:SetDesaturated(false)
 		button.Icon:SetAlpha(1)
 	end
@@ -728,7 +780,13 @@ function UI:ShowRowTooltip(row)
 			GameTooltip:AddDoubleLine(source.instanceName,
 				ns.L[TYPE_LABELS[instanceType]] or "", 1, 0.82, 0, 0.7, 0.7, 0.7)
 		end
-		if source.encounterName and source.encounterName ~= "" then
+		-- « Boss » seulement si c'en est un. `encounterName` porte le sujet
+		-- extrait du texte de source, quel qu'il soit : sur « Vendeur : Gottum »
+		-- c'est le nom du VENDEUR, et l'annoncer comme un boss est faux. Le
+		-- sourceType du client tranche, lui ne se trompe pas.
+		if source.encounterName and source.encounterName ~= ""
+			and source.kind == ns.Data.SOURCE_KINDS.BOSS
+		then
 			GameTooltip:AddDoubleLine(L.TOOLTIP_BOSS, source.encounterName,
 				0.6, 0.6, 0.6, 0.9, 0.9, 0.9)
 		end
@@ -740,8 +798,24 @@ function UI:ShowRowTooltip(row)
 			0.6, 0.6, 0.6, 0.9, 0.9, 0.9)
 	end
 
+	-- Vue multi-personnage, mais SEULEMENT quand elle dit quelque chose.
+	--
+	-- Sans source cartographiée, chaque ligne valait « incertain » et l'en-tête
+	-- annonçait « 0 perso disponible » : un tableau de non-réponses, coiffé d'un
+	-- zéro qui se lit comme un « non » alors qu'il veut dire « on ne sait pas ».
+	-- Le bloc n'apparaît donc que si au moins un personnage a un état mesuré —
+	-- disponible parce que le verrou est tombé, ou verrouillé parce qu'il est là.
 	local rows, availableCount = ns.Eligibility:GetCharacterAvailability(row.mountID)
-	if #rows > 0 then
+	local STATE = ns.Eligibility.STATE
+	local hasVerdict = false
+	for _, charRow in ipairs(rows) do
+		if charRow.state == STATE.AVAILABLE or charRow.state == STATE.LOCKED then
+			hasVerdict = true
+			break
+		end
+	end
+
+	if hasVerdict then
 		GameTooltip:AddLine(" ")
 		GameTooltip:AddLine(L.LOCK_CHARS:format(availableCount), 1, 0.82, 0)
 		for _, charRow in ipairs(rows) do
@@ -788,84 +862,38 @@ function UI:FormatAttempts(mountID)
 	return L.ATTEMPTS:format(count)
 end
 
-local STATE_LABELS = {
-	available = "STATUS_AVAILABLE",
-	locked = "STATUS_LOCKED",
-	unknown = "STATUS_UNKNOWN",
-	unmapped = "STATUS_NO_SOURCE_SHORT",
-	ineligible = "STATUS_INELIGIBLE",
+--- Comparaison sur la colonne demandée, en trois états : -1, 0, 1.
+--
+--  Renvoyer un ORDRE plutôt qu'un booléen est ce qui rend l'inversion possible
+--  sans dupliquer six comparateurs. Le départage par le nom, lui, ne s'inverse
+--  jamais : sinon deux lignes égales sur la colonne triée échangeraient leur
+--  place d'un rafraîchissement à l'autre.
+local function CompareText(a, b)
+	if a == b then return 0 end
+	return a < b and -1 or 1
+end
+
+local function CompareNumber(a, b)
+	if a == b then return 0 end
+	return a < b and -1 or 1
+end
+
+local COMPARATORS = {
+	name = function(a, b) return CompareText(a.sortName, b.sortName) end,
+	source = function(a, b) return CompareText(a.sortSource, b.sortSource) end,
+	category = function(a, b) return CompareText(a.sortCategory, b.sortCategory) end,
+	-- Le type suit l'ordre de Data.MOVEMENT_ORDER, pas l'alphabet : terrestre,
+	-- volante, skyriding, aquatique, autre. C'est celui du graphe.
+	type = function(a, b) return CompareNumber(a.movementRank, b.movementRank) end,
+	tries = function(a, b) return CompareNumber(a.tries, b.tries) end,
 }
 
--- Ordre d'urgence, pour le tri par disponibilité : ce qui est jouable
--- maintenant en tête, ce dont on ne sait rien à la fin.
-local STATE_RANK = {
-	available = 1,
-	locked = 2,
-	unknown = 3,
-	unmapped = 4,
-	ineligible = 5,
-}
-
-UI.SORTS = {
-	{ value = "name", label = "SORT_NAME" },
-	{ value = "source", label = "SORT_SOURCE" },
-	{ value = "expansion", label = "SORT_EXPANSION" },
-	{ value = "status", label = "SORT_STATUS" },
-	{ value = "attempts", label = "SORT_ATTEMPTS" },
-	{ value = "owned", label = "SORT_OWNED" },
-}
-
---- Comparateurs de tri. Tous retombent sur le nom en cas d'égalité : sans ce
---  départage, l'ordre de deux lignes équivalentes change d'un rafraîchissement
---  à l'autre et la liste paraît instable.
-local SORT_FUNCTIONS = {
-	name = function(a, b) return a.name < b.name end,
-
-	source = function(a, b)
-		if a.kind ~= b.kind then return a.kind < b.kind end
-		return a.name < b.name
-	end,
-
-	expansion = function(a, b)
-		if a.tier ~= b.tier then return a.tier < b.tier end
-		return a.name < b.name
-	end,
-
-	status = function(a, b)
-		if a.rank ~= b.rank then return a.rank < b.rank end
-		return a.name < b.name
-	end,
-
-	attempts = function(a, b)
-		if a.tries ~= b.tries then return a.tries > b.tries end
-		return a.name < b.name
-	end,
-
-	-- Manquantes d'abord : c'est la question que pose l'addon. Les possédées
-	-- suivent, groupées, ce qui revient à trier sur une colonne « possédée
-	-- oui / non ».
-	owned = function(a, b)
-		if a.owned ~= b.owned then return not a.owned end
-		return a.name < b.name
-	end,
-}
-
---- Libellé et couleur de la pastille d'une ligne.
-function UI:StatusVisual(status)
-	local L = ns.L
-	local Theme = ns.Theme
-	local label = L[STATE_LABELS[status.state] or "STATUS_UNKNOWN"] or L.STATUS_UNKNOWN
-	local color = Theme.STATE_COLORS[status.state] or Theme.colors.faint
-
-	if status.state == ns.Eligibility.STATE.LOCKED and status.resetIn then
-		label = ns.Util.FormatDuration(status.resetIn)
-	end
-	-- Un personnage pas revu depuis longtemps rend son statut douteux : on
-	-- bascule en ambre plutôt que d'afficher un vert qui ment.
-	if status.stale and status.state ~= ns.Eligibility.STATE.UNMAPPED then
-		color = Theme.colors.amber
-	end
-	return label, color
+--- Ramène un critère de tri sauvegardé à une colonne qui existe encore. Les
+--  réglages « extension », « statut » et « possédée » viennent de versions où
+--  ces colonnes étaient là.
+function UI:ResolveSort(key)
+	if COMPARATORS[key] then return key end
+	return "name"
 end
 
 local function MatchesSearch(entry, needle)
@@ -873,13 +901,38 @@ local function MatchesSearch(entry, needle)
 	return entry.name:lower():find(needle, 1, true) ~= nil
 end
 
---- Type d'endroit d'une monture, pour la colonne et le filtre.
+--- Type d'endroit d'une monture, quand la cartographie le sait.
 --  @return "raid" | "dungeon" | "outdoor"
 function UI:GetInstanceType(source)
 	if type(source) ~= "table" then return "outdoor" end
 	if source.isRaid == true then return "raid" end
 	if source.isRaid == false then return "dungeon" end
 	return "outdoor"
+end
+
+--- Catégorie affichée d'une monture : libellé, couleur, clé de tri.
+--
+--  Elle part du `sourceType` du client — toujours fourni, donc jamais vide — et
+--  se précise en « Raid » ou « Donjon » quand la cartographie a rattaché la
+--  monture à une instance. L'ancienne colonne faisait l'inverse : elle partait
+--  de la cartographie et retombait sur un tiret, ce qui affichait « — » sur la
+--  majorité des lignes alors que le client, lui, savait répondre.
+function UI:GetCategoryVisual(entry, source)
+	local Theme = ns.Theme
+	local instanceType = self:GetInstanceType(source)
+
+	if instanceType == "raid" then
+		return ns.L.TYPE_RAID, Theme.colors.purple, "1" .. (ns.L.TYPE_RAID or "")
+	end
+	if instanceType == "dungeon" then
+		return ns.L.TYPE_DUNGEON, Theme.colors.accent, "2" .. (ns.L.TYPE_DUNGEON or "")
+	end
+
+	local label = entry.sourceTypeLabel or ns.L.SOURCE_UNKNOWN
+	-- Les catégories du client passent après raid et donjon dans le tri : ce
+	-- sont les deux seules qui portent un verrou, donc les deux qui commandent
+	-- une semaine de farm.
+	return label, Theme.colors.muted, "3" .. label
 end
 
 function UI:BuildDataProvider()
@@ -894,10 +947,9 @@ function UI:BuildDataProvider()
 	local L = ns.L
 	local rows = {}
 
-	-- Les possédées ne sont ajoutées que sur demande. Elles n'ont pas de
-	-- disponibilité — elles sont acquises — donc les filtres de statut ne
-	-- s'appliquent pas à elles ; seuls la recherche, l'extension, la source et
-	-- le type les concernent.
+	-- Les possédées ne sont ajoutées que sur demande. La liste répond d'abord à
+	-- « qu'est-ce qu'il me manque » ; les revoir reste à un clic, et elles
+	-- s'affichent alors avec leur nom en doré.
 	local candidates = ns.Collection:GetMissing()
 	if filters.showOwned then
 		candidates = {}
@@ -914,72 +966,58 @@ function UI:BuildDataProvider()
 
 		if filters.hideExcluded and entry.excluded then keep = false end
 		if keep and not MatchesSearch(entry, needle) then keep = false end
-		if keep and filters.expansionsHidden[ns.Eligibility:GetExpansion(entry.mountID)] then
-			keep = false
-		end
 		if keep and filters.kindsHidden[entry.kind] then keep = false end
 
-		local source, instanceType
 		if keep then
-			source = ns.Eligibility:GetSource(entry.mountID)
-			instanceType = self:GetInstanceType(source)
-			if filters.instanceType and filters.instanceType ~= "all"
-				and filters.instanceType ~= instanceType
-			then
-				keep = false
-			end
-		end
+			local source = ns.Eligibility:GetSource(entry.mountID)
+			local categoryLabel, categoryColor, categorySort =
+				self:GetCategoryVisual(entry, source)
+			local movement = ns.Collection:GetMovement(entry.mountID)
+			local sourceSummary = ns.Collection:GetSourceSummary(entry.mountID) or ""
 
-		local status
-		if keep and not entry.owned then
-			status = ns.Eligibility:GetStatus(entry.mountID)
-			if filters.availableOnly and status.state ~= ns.Eligibility.STATE.AVAILABLE then
-				keep = false
-			end
-			if keep and filters.hideUnmapped and status.state == ns.Eligibility.STATE.UNMAPPED then
-				keep = false
-			end
-		end
-
-		if keep then
-			local label, color
-			if entry.owned then
-				label, color = L.STATUS_OWNED, Theme.colors.green
-			else
-				label, color = self:StatusVisual(status)
-			end
 			rows[#rows + 1] = {
 				mountID = entry.mountID,
 				name = entry.name,
 				icon = entry.icon,
 				kind = entry.kind or "unknown",
 				excluded = entry.excluded,
-				sourceSummary = ns.Collection:GetSourceSummary(entry.mountID),
-				statusLabel = label,
-				statusColor = color,
 				owned = entry.owned,
-				-- Les possédées ferment la marche au tri par disponibilité :
-				-- elles ne demandent plus rien.
-				rank = entry.owned and 0 or (STATE_RANK[status.state] or 9),
+
+				sourceSummary = sourceSummary,
+				categoryLabel = categoryLabel,
+				categoryColor = categoryColor,
+				movementLabel = ns.Data.GetMovementLabel(movement),
+				movementRank = ns.Data.GetMovementRank(movement),
 				tries = ns.Attempts:GetCount(entry.mountID),
-				-- math.huge pour les extensions inconnues : elles ferment la
-				-- marche au tri, comme sur le tableau de bord.
-				tier = (source and tonumber(source.tier)) or math.huge,
-				typeKey = instanceType,
-				typeLabel = ns.L[TYPE_LABELS[instanceType]],
-				typeColor = instanceType == "raid" and Theme.colors.purple
-					or instanceType == "dungeon" and Theme.colors.accent
-					or Theme.colors.faint,
+
+				-- Clés de tri en minuscules : sinon « Ulduar » passe avant
+				-- « alliance » sur un octet de casse, ce qui n'a aucun sens à
+				-- l'écran.
+				sortName = entry.name:lower(),
+				sortSource = sourceSummary:lower(),
+				sortCategory = categorySort:lower(),
 			}
 		end
 	end
 
-	table.sort(rows, SORT_FUNCTIONS[filters.sort or "name"] or SORT_FUNCTIONS.name)
+	local sortKey = self:ResolveSort(filters.sort)
+	local comparator = COMPARATORS[sortKey]
+	local descending = filters.sortDesc and true or false
+	table.sort(rows, function(a, b)
+		local order = comparator(a, b)
+		if order ~= 0 then
+			if descending then return order > 0 end
+			return order < 0
+		end
+		return a.sortName < b.sortName
+	end)
 
 	local provider = CreateDataProvider()
 	for index, row in ipairs(rows) do
 		row.index = index
-		row.triesText = row.tries > 0 and tostring(row.tries) or "—"
+		-- Zéro s'écrit « 0 », pas « — ». Un tiret dans une colonne de nombres se
+		-- lit comme une donnée absente, alors que la donnée est là et vaut zéro.
+		row.triesText = tostring(row.tries)
 		provider:Insert(row)
 	end
 
@@ -1021,6 +1059,7 @@ function UI:Refresh()
 
 	page.ScrollBox:SetDataProvider(provider, ScrollBoxConstants.RetainScrollPosition)
 	page.EmptyLabel:SetShown(shown == 0)
+	self:UpdateListHeader()
 end
 
 --------------------------------------------------------------------------------
@@ -1083,8 +1122,6 @@ function UI:Show()
 	local page = frame.CollectionPage
 	page.SearchBox:SetText(filters.search or "")
 	page.ShowOwned:SetChecked(filters.showOwned)
-	page.AvailableOnly:SetChecked(filters.availableOnly)
-	page.HideUnmapped:SetChecked(filters.hideUnmapped)
 	page.HideExcluded:SetChecked(filters.hideExcluded)
 	self:SelectTab(ns.db.profile.ui.activeTab or self.TAB_DASHBOARD)
 end

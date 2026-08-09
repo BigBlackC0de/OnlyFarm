@@ -28,16 +28,18 @@ multi-personnage fonctionnent. Les routes arrivent en phase 3.
   (le détail est dans `docs/API-NOTES.md`).
 * Liste des montures qui te manquent **et que ce personnage peut obtenir** —
   les montures d'une autre faction ou d'une autre classe sont écartées, pas
-  comptées comme « manquantes ».
+  comptées comme « manquantes ». Cinq colonnes — monture, source, catégorie,
+  type, essais — **triables au clic sur leur titre**, comme dans un tableur.
+  Aucune n'est jamais vide : catégorie et type viennent du client, donc elles
+  répondent même sans cartographie.
 * **Compteur de tentatives** par monture : tuer un boss incrémente les montures
   qu'il peut lâcher. Maj+clic sur une ligne ajoute une tentative à la main,
   Ctrl+clic en retire une.
-* Pour chaque monture, sa source telle que le jeu la décrit, et son statut :
-  disponible, verrouillée avec le temps avant reset, ou honnêtement
-  « incertain » quand l'addon ne sait pas encore.
 * Vue multi-personnage en infobulle : sur quels persos la cible est encore
   ouverte cette semaine. Un perso pas connecté depuis plus de 7 jours est
-  marqué incertain plutôt que présenté comme fiable.
+  marqué incertain plutôt que présenté comme fiable. Le bloc n'apparaît que
+  lorsqu'au moins un personnage a un verrou mesuré : une colonne d'« incertain »
+  n'aide personne.
 * Suivi des entrées d'instance, avec le compteur du cap 10/heure — 30/jour.
 
 ## Installation
