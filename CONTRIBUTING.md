@@ -143,6 +143,14 @@ liste. `Modules/Mapping.lua` part maintenant du texte de source déjà exposé p
 construit sans toucher au butin. La passe de butin subsiste en `/of deepscan`,
 hors du chemin critique.
 
+**Les outils de `Build/` ne concernent JAMAIS le joueur.** Un addon WoW ne peut
+émettre aucune requête réseau : toute donnée extérieure est compilée en `.lua`
+au build, committée, et livrée dans le dossier de l'addon comme une texture.
+`fetch_blizzard.py` et son client OAuth sont l'équivalent d'un compilateur —
+indispensables pour produire la release, invisibles pour qui l'installe. Toute
+formulation qui laisserait croire qu'un joueur doit configurer quelque chose est
+un bug de documentation : la question a réellement été posée.
+
 **Le scan doit précéder le pipeline Python.** `Data/Mounts.lua` ne peut pas être
 produit hors du jeu : il faut d'abord une cartographie en jeu sur un client à
 jour, puis `Build/generate_data.py` lit `OnlyFarmScanDB` dans les

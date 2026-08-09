@@ -39,11 +39,17 @@ Ce script n'a JAMAIS été exécuté contre l'API réelle depuis ce dépôt : l'
 réseau y est bloqué. Il est écrit d'après la documentation ; le premier
 lancement demande donc un œil sur la sortie.
 
-PRÉREQUIS
----------
+PRÉREQUIS — POUR LE MAINTENEUR, PAS POUR LE JOUEUR
+--------------------------------------------------
 Un client OAuth gratuit à créer sur https://develop.battle.net/access/clients
 (identifiant + secret). Aucune bibliothèque tierce : uniquement la librairie
 standard.
+
+Ce script tourne UNE FOIS PAR PATCH, chez le mainteneur. Son résultat est
+compilé par generate_data.py en Data/Mounts.lua, qui est committé et livré dans
+le dossier de l'addon. Personne d'autre n'exécute ceci : l'addon lui-même est
+incapable d'appeler une API, et le joueur n'a ni identifiants, ni Python, ni
+quoi que ce soit à installer.
 """
 
 from __future__ import annotations

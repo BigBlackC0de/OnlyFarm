@@ -9,6 +9,11 @@ Un addon WoW ne peut faire AUCUNE requête réseau : c'est une contrainte du
 client, pas un choix. Toute donnée extérieure doit donc être compilée dans un
 fichier `.lua` au moment du build. C'est le rôle de ce script.
 
+Corollaire à ne pas perdre de vue : ce script est un outil de MAINTENEUR. Le
+fichier qu'il produit est committé dans le dépôt et livré avec l'addon, comme
+une texture. Un joueur n'installe rien, ne configure rien et n'a besoin
+d'aucun identifiant — il copie un dossier.
+
 La cartographie dérivée du client (Modules/Mapping.lua) rattache ce qu'elle
 peut — instances, hauts faits — et suit les patchs toute seule. Elle bute sur
 les vendeurs, métiers, événements, PvP et butins de zone, dont le client

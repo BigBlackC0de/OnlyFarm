@@ -50,7 +50,7 @@ l'addon.
 | `/of chars` | lister les personnages connus et leurs verrous |
 | `/of deepscan` | passe approfondie : butin boss par boss (lent, facultatif) |
 | `/of diag` | dire pourquoi la cartographie est revenue vide |
-| `/of export` | CSV des montures sans extension, pour la curation |
+| `/of export` | CSV des montures sans extension (outil de mainteneur) |
 | `/of debug` | activer les traces |
 | `/of reset` | effacer la base sauvegardée (confirmation requise) |
 
@@ -95,41 +95,12 @@ La cartographie dérivée du client suit les patchs toute seule, mais elle bute
 sur un mur : **le client n'expose pas l'extension d'une zone**. Les montures de
 vendeur, de métier, d'événement saisonnier, de PvP ou de butin de zone n'ont
 donc aucun rattachement possible par API — leur texte de source ne cite qu'un
-PNJ ou un lieu.
+PNJ ou un lieu. Elles restent dans le panier « inconnue », et l'addon le dit
+plutôt que de deviner.
 
-Ce trou-là se comble par une table curée, compilée au build :
-
-```bash
-# depuis l'API officielle Blizzard (identifiants gratuits)
-export BLIZZARD_CLIENT_ID=... BLIZZARD_CLIENT_SECRET=...
-Build/fetch_blizzard.py --region eu --locale fr_FR
-
-# ou depuis le jeu, pour ne travailler que sur ce qui manque
-/of export
-
-Build/generate_data.py Build/overlay/mounts.csv
-```
-
-La clé de jointure est le **mountID** — celui qu'utilisent à la fois
-`C_MountJournal` et `/data/wow/mount/{id}`. Jamais le nom : les noms de
-montures sont localisés, une liste extérieure est écrite dans une seule langue,
-et un rapprochement par nom marcherait chez celui qui le teste puis échouerait
-chez tous les autres.
-
-**Ce que l'API officielle donne, et ce qu'elle ne donne pas.** Elle donne la
-liste canonique des montures avec leur mountID, leur nom **dans toutes les
-locales**, la source déclarée par Blizzard et la faction. Elle ne donne **pas**
-l'extension : aucun champ, sur aucun endpoint des montures. Son apport réel est
-donc ailleurs — elle rend utilisable n'importe quelle liste communautaire
-écrite en anglais sur un client français, en passant par le mountID. La colonne
-`expansion` reste à remplir.
-
-La table curée ne prime jamais sur ce que le client sait : elle ne s'applique
-qu'aux montures pour lesquelles aucune source dérivée n'a répondu.
-
-Les valeurs communautaires (Wowhead, warcraftmounts.com et équivalents) sont
-des estimations maintenues par des joueurs. Si tu en importes, crédite-les dans
-ce README et présente les taux de drop comme des estimations.
+Ce trou se comble par une table livrée avec l'addon, préparée au moment du
+build (voir plus bas). **Rien à faire de ton côté** : elle est dans le dossier
+que tu as copié.
 
 ## Développement
 
@@ -146,3 +117,50 @@ Les tests tournent hors du jeu grâce à un client simulé
 (`Tests/wow_stub.lua`) : ils couvrent la logique, pas le rendu. Pour l'interface
 il n'y a pas de raccourci — charger l'addon en jeu avec **BugSack + BugGrabber**
 et lire les erreurs.
+
+### Préparation des données (mainteneurs uniquement)
+
+> **Un joueur n'a RIEN à installer ni à configurer.** Un addon WoW ne peut
+> émettre aucune requête réseau : c'est une contrainte du client. Toute donnée
+> extérieure est donc compilée en `.lua` au moment du build, committée dans le
+> dépôt, et livrée avec l'addon — au même titre que les textures. Les outils
+> ci-dessous sont l'équivalent d'un compilateur : indispensables pour produire
+> la release, invisibles pour qui l'utilise.
+
+```bash
+# 1. identité canonique des montures, depuis l'API officielle Blizzard
+#    (client OAuth gratuit : https://develop.battle.net/access/clients)
+export BLIZZARD_CLIENT_ID=... BLIZZARD_CLIENT_SECRET=...
+Build/fetch_blizzard.py --region eu --locale fr_FR --limit 5   # essai
+Build/fetch_blizzard.py --region eu --locale fr_FR
+
+# 2. compléter la colonne « expansion » du CSV (voir ci-dessous)
+
+# 3. compiler la table livrée avec l'addon
+Build/generate_data.py Build/overlay/mounts.csv
+```
+
+La clé de jointure est le **mountID** — celui qu'utilisent à la fois
+`C_MountJournal` et `/data/wow/mount/{id}`. Jamais le nom : les noms sont
+localisés, une liste extérieure est écrite dans une seule langue, et un
+rapprochement par nom marcherait chez celui qui le teste puis échouerait chez
+tous les autres.
+
+**Ce que l'API officielle donne, et ce qu'elle ne donne pas.** Elle donne la
+liste canonique des montures avec leur mountID, leur nom **dans toutes les
+locales**, la source déclarée par Blizzard et la faction. Elle ne donne **pas**
+l'extension : aucun champ, sur aucun endpoint des montures. Son apport réel est
+donc ailleurs — elle rend utilisable n'importe quelle liste communautaire
+écrite en anglais sur un client français, en passant par le mountID. La colonne
+`expansion` reste à remplir, à la main ou depuis une source communautaire.
+
+`/of export` produit le même CSV depuis le jeu, restreint aux montures encore
+sans extension : c'est le plus court chemin pour ne travailler que sur ce qui
+manque réellement.
+
+La table curée ne prime jamais sur ce que le client sait : elle ne s'applique
+qu'aux montures pour lesquelles aucune source dérivée n'a répondu.
+
+Les valeurs communautaires (Wowhead, warcraftmounts.com et équivalents) sont
+des estimations maintenues par des joueurs. Si tu en importes, crédite-les ici
+et présente les taux de drop comme des estimations.
