@@ -285,35 +285,49 @@ function Collection:GetSourceSummary(mountID)
 	return (clean:gsub("^%s+", ""):gsub("%s+$", ""))
 end
 
---- Natures de source réellement présentes dans les montures manquantes, avec
---  leur libellé localisé et leur effectif.
+--- Catégories de source présentes chez ce joueur, avec leur libellé localisé et
+--  leurs effectifs.
 --
---  On ne liste PAS les natures possibles mais celles qui existent chez ce
---  joueur : un menu où la moitié des entrées donne zéro résultat se lit comme
---  un menu cassé. Les effectifs sont affichés pour la même raison.
---  @return liste triée { kind, label, count }
-function Collection:GetSourceKinds()
+--  On ne liste PAS les catégories possibles mais celles qui existent chez lui :
+--  un menu où la moitié des entrées donne zéro résultat se lit comme un menu
+--  cassé. Les effectifs sont affichés pour la même raison.
+--
+--  Le découpage passe par `sourceType`, JAMAIS par `kind` — voir la mise en garde
+--  dans Data/Sources.lua. C'est la même fonction de seau que le graphe du
+--  tableau de bord, donc les deux écrans listent les mêmes catégories, dans le
+--  même ordre, avec les mêmes noms.
+--
+--  @return liste triée { sourceType, label, rank, total, missing, owned }
+function Collection:GetSourceTypes()
 	local buckets, order = {}, {}
 
-	for _, entry in ipairs(self.missing) do
-		local kind = entry.kind or "unknown"
-		local bucket = buckets[kind]
-		if not bucket then
-			bucket = {
-				kind = kind,
-				label = entry.sourceTypeLabel or kind,
-				count = 0,
-			}
-			buckets[kind] = bucket
-			order[#order + 1] = bucket
+	for _, mountID in ipairs(self.allIDs) do
+		local entry = self.byID[mountID]
+		if entry then
+			local key, label, rank = ns.Data.GetSourceBucket(entry)
+			local bucket = buckets[key]
+			if not bucket then
+				bucket = {
+					sourceType = key,
+					label = label,
+					rank = rank,
+					total = 0,
+					missing = 0,
+					owned = 0,
+				}
+				buckets[key] = bucket
+				order[#order + 1] = bucket
+			end
+			bucket.total = bucket.total + 1
+			if entry.owned then
+				bucket.owned = bucket.owned + 1
+			else
+				bucket.missing = bucket.missing + 1
+			end
 		end
-		bucket.count = bucket.count + 1
 	end
 
-	table.sort(order, function(a, b)
-		if a.count ~= b.count then return a.count > b.count end
-		return a.label < b.label
-	end)
+	table.sort(order, ns.Data.CompareSourceBuckets)
 	return order
 end
 

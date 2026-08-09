@@ -573,44 +573,55 @@ function UI:CreateDropdown(parent, name, anchor, label, width)
 	return dropdown
 end
 
---- Menu des natures de source : butin, haut fait, vendeur, métier, événement…
---  C'est le filtre qui permet « je ne veux voir que les montures de haut
---  fait », et il vient entièrement du client : `sourceType` est fourni par le
---  Journal des montures, son libellé aussi.
+--- Menu des catégories de source : butin, haut fait, vendeur, métier, comptoir…
+--
+--  Il liste EXACTEMENT les catégories du graphe du tableau de bord, dans le même
+--  ordre : les deux appellent Collection:GetSourceTypes / Data.GetSourceBucket.
+--
+--  Il ne passe surtout pas par `kind`, la taxonomie interne. C'était le cas
+--  avant, et ça donnait un menu de sept entrées là où le graphe en montrait
+--  douze — avec « Promotion (66) » pour un seau qui contenait aussi le JCC, la
+--  boutique, les découvertes et le comptoir.
+--
+--  L'effectif affiché est celui de ce que le filtre va montrer : les manquantes,
+--  ou tout si « Afficher les possédées » est coché. Un compteur qui ne prédit pas
+--  la liste ne sert à rien.
 function UI:CreateSourceDropdown(parent, anchor)
 	local L = ns.L
 	local dropdown = self:CreateDropdown(parent, "OnlyFarmSourceDropdown", anchor, L.FILTER_SOURCE)
 	if not dropdown then return nil end
 
-	local function IsShown(kind)
-		return not ns.db.profile.filters.kindsHidden[kind]
+	local function IsShown(sourceType)
+		return not ns.db.profile.filters.sourcesHidden[sourceType]
 	end
-	local function SetShown(kind, shown)
-		ns.db.profile.filters.kindsHidden[kind] = (not shown) or nil
+	local function SetShown(sourceType, shown)
+		ns.db.profile.filters.sourcesHidden[sourceType] = (not shown) or nil
 		self:Refresh()
 	end
 
 	dropdown:SetupMenu(function(_, rootDescription)
 		rootDescription:CreateTitle(L.FILTER_SOURCE)
 
-		local kinds = ns.Collection:GetSourceKinds()
+		local sources = ns.Collection:GetSourceTypes()
+		local showOwned = ns.db.profile.filters.showOwned
 
 		rootDescription:CreateButton(L.FILTER_ALL, function()
-			wipe(ns.db.profile.filters.kindsHidden)
+			wipe(ns.db.profile.filters.sourcesHidden)
 			self:Refresh()
 		end)
 		rootDescription:CreateButton(L.FILTER_NONE, function()
-			local hidden = ns.db.profile.filters.kindsHidden
-			for _, entry in ipairs(kinds) do hidden[entry.kind] = true end
+			local hidden = ns.db.profile.filters.sourcesHidden
+			for _, entry in ipairs(sources) do hidden[entry.sourceType] = true end
 			self:Refresh()
 		end)
 
-		for _, entry in ipairs(kinds) do
+		for _, entry in ipairs(sources) do
+			local count = showOwned and entry.total or entry.missing
 			rootDescription:CreateCheckbox(
-				string.format("%s (%d)", entry.label, entry.count),
-				function() return IsShown(entry.kind) end,
+				string.format("%s (%d)", entry.label, count),
+				function() return IsShown(entry.sourceType) end,
 				function()
-					SetShown(entry.kind, not IsShown(entry.kind))
+					SetShown(entry.sourceType, not IsShown(entry.sourceType))
 					return MenuResponse.Refresh
 				end)
 		end
@@ -1107,7 +1118,9 @@ function UI:BuildDataProvider()
 
 		if filters.hideExcluded and entry.excluded then keep = false end
 		if keep and not MatchesSearch(entry, needle) then keep = false end
-		if keep and filters.kindsHidden[entry.kind] then keep = false end
+		-- Filtré sur `sourceType`, comme le menu qui pose la case : passer par
+		-- `kind` ici masquait cinq catégories d'un coup.
+		if keep and filters.sourcesHidden[entry.sourceType] then keep = false end
 
 		if keep then
 			local source = ns.Eligibility:GetSource(entry.mountID)

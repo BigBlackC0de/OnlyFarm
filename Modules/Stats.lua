@@ -152,13 +152,9 @@ Stats.DEFAULT_AXIS = "source"
 --  Le rang sépare ce qui est nommé de ce qui ne l'est pas : un panier « autre »
 --  ferme toujours la marche, quel que soit son effectif.
 local AXIS_BUCKET = {
-	source = function(entry)
-		local label = ns.Data.GetSourceTypeLabel(entry.sourceType)
-		if label then return entry.sourceType or 0, label, 0 end
-		-- sourceType absent ou sans libellé côté client : ça arrive sur un
-		-- type ajouté par un patch plus récent que nos constantes.
-		return entry.sourceType or 0, ns.L.SOURCE_UNKNOWN, 1
-	end,
+	-- Le seau de source vient de Data : le menu de filtre de la collection
+	-- appelle la même fonction, donc les deux écrans ne peuvent pas diverger.
+	source = function(entry) return ns.Data.GetSourceBucket(entry) end,
 
 	movement = function(entry)
 		local kind = ns.Collection:GetMovement(entry.mountID)
@@ -211,11 +207,10 @@ function Stats:ComputeBreakdown(axis)
 	-- Tri par effectif décroissant, PAS par avancement. Un tri par avancement
 	-- réordonne les lignes à chaque monture obtenue, et l'œil perd ses repères ;
 	-- l'effectif d'une catégorie, lui, ne bouge qu'à un patch.
-	table.sort(list, function(a, b)
-		if a.rank ~= b.rank then return a.rank < b.rank end
-		if a.total ~= b.total then return a.total > b.total end
-		return tostring(a.label) < tostring(b.label)
-	end)
+	--
+	-- Le comparateur est celui de Data, partagé avec le menu de filtre de la
+	-- collection : deux tris écrits séparément finissent toujours par différer.
+	table.sort(list, ns.Data.CompareSourceBuckets)
 
 	local max = 0
 	for _, bucket in ipairs(list) do

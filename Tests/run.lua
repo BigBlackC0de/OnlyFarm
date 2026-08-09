@@ -131,7 +131,7 @@ end)
 test("Database — création et estampille de schéma", function()
 	stub.Reset()
 	local ns = harness.Load(stub)
-	eq(_G.OnlyFarmDB.schema, 2, "schéma estampillé à la version courante")
+	eq(_G.OnlyFarmDB.schema, 3, "schéma estampillé à la version courante")
 	eq(ns.db.charKey, "Krayne-Hyjal", "clé de personnage")
 	eq(type(ns.db.global.chars["Krayne-Hyjal"]), "table", "entrée de personnage créée")
 	eq(ns.db.char.faction, "Alliance", "instantané écrit à PLAYER_LOGIN")
@@ -222,25 +222,64 @@ test("Collection — séparateur |n et codes couleur retirés du résumé", func
 		"codes couleur retirés")
 end)
 
-test("Collection — natures de source présentes, avec leurs effectifs", function()
+test("Collection — catégories de source, celles du client et pas les nôtres", function()
 	stub.Reset()
 	stub.mounts = StandardMounts()
 	local ns = harness.Load(stub)
 
-	local kinds = ns.Collection:GetSourceKinds()
-	-- Deux butins manquants (201, 204) et un vendeur (202) ; la monture
-	-- possédée et celle masquée ne comptent pas.
-	eq(#kinds, 2, "deux natures présentes")
-	eq(kinds[1].kind, "boss", "la plus fournie en tête")
-	eq(kinds[1].count, 2, "deux butins")
-	eq(kinds[1].label, "Drop", "libellé fourni par le client")
-	eq(kinds[2].kind, "vendor", "puis le vendeur")
-	eq(kinds[2].count, 1, "un vendeur")
+	local sources = ns.Collection:GetSourceTypes()
+	-- Deux butins (201, 204) et deux vendeurs (100 possédée, 202) ; la monture
+	-- masquée sur ce personnage ne compte nulle part.
+	eq(#sources, 2, "deux catégories présentes")
+	eq(sources[1].label, "Drop", "libellé fourni par le client")
+	eq(sources[1].sourceType, 1, "indexé par le sourceType, pas par notre kind")
+	eq(sources[1].total, 2, "effectif complet")
+	eq(sources[1].missing, 2, "dont deux manquantes")
+	eq(sources[2].label, "Vendor", "puis les vendeurs")
+	eq(sources[2].total, 2, "effectif complet")
+	eq(sources[2].missing, 1, "dont une seule manquante")
+	eq(sources[2].owned, 1, "et une possédée")
 
 	-- On ne liste QUE ce qui existe : un menu plein d'entrées à zéro résultat
 	-- se lit comme un menu cassé.
-	for _, entry in ipairs(kinds) do
-		eq(entry.count > 0, true, "aucune nature vide dans la liste")
+	for _, entry in ipairs(sources) do
+		eq(entry.total > 0, true, "aucune catégorie vide dans la liste")
+	end
+end)
+
+test("Collection — promotion, JCC, boutique et comptoir ne fusionnent plus", function()
+	stub.Reset()
+	-- Ces cinq sourceType partagent le même `kind` interne (« unknown ») parce
+	-- qu'aucun ne porte de verrou. Les afficher par `kind` produisait UN seau de
+	-- cinq catégories, étiqueté du libellé de la première monture croisée : le
+	-- menu annonçait « Promotion (5) » pour cinq choses différentes.
+	stub.mounts = {
+		{ mountID = 301, name = "Promo", sourceType = 8 },
+		{ mountID = 302, name = "JCC", sourceType = 9 },
+		{ mountID = 303, name = "Boutique", sourceType = 10 },
+		{ mountID = 304, name = "Découverte", sourceType = 11 },
+		{ mountID = 305, name = "Comptoir", sourceType = 12 },
+	}
+	local ns = harness.Load(stub)
+
+	eq(ns.Data.GetSourceKind(8), ns.Data.GetSourceKind(9),
+		"les cinq partagent bien le même kind interne")
+
+	local sources = ns.Collection:GetSourceTypes()
+	eq(#sources, 5, "cinq catégories distinctes à l'affichage")
+	for _, entry in ipairs(sources) do
+		eq(entry.total, 1, "chacune avec son unique monture")
+	end
+	-- Et chacune porte SON libellé, pas celui de sa voisine.
+	eq(sources[1].label, "Discovery", "libellés distincts, ordonnés")
+	eq(sources[5].label, "Trading Post", "jusqu'au dernier")
+
+	-- Et le graphe du tableau de bord voit exactement la même chose : c'est la
+	-- même fonction de seau et le même comparateur.
+	local breakdown = ns.Stats:GetBreakdown("source")
+	eq(#breakdown, #sources, "le graphe liste autant de catégories que le filtre")
+	for index, bucket in ipairs(breakdown) do
+		eq(bucket.label, sources[index].label, "mêmes libellés, dans le même ordre")
 	end
 end)
 
@@ -703,7 +742,7 @@ test("Database — migration 1 -> 2 : les exclues redeviennent visibles", functi
 	}
 	local ns = harness.Load(stub)
 
-	eq(_G.OnlyFarmDB.schema, 2, "schéma migré")
+	eq(_G.OnlyFarmDB.schema, 3, "schéma migré jusqu'à la version courante")
 	eq(ns.db.profile.filters.hideExcluded, false, "profil courant corrigé")
 	eq(_G.OnlyFarmDB.profiles["Zaltus-Hyjal"].filters.hideExcluded, false,
 		"autre profil laissé cohérent")

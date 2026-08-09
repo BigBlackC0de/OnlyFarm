@@ -74,7 +74,14 @@ Data.SOURCE_TYPE_TO_KIND = {
 	[9] = K.UNKNOWN,      -- Trading Card Game
 	[10] = K.UNKNOWN,     -- In-Game Store
 	[11] = K.UNKNOWN,     -- Discovery
+	[12] = K.UNKNOWN,     -- Comptoir (Trading Post)
 }
+
+-- Note sur les `UNKNOWN` ci-dessus : ce n'est PAS un aveu d'ignorance, c'est le
+-- sens de `kind`. Promotion, JCC, boutique, découverte et comptoir n'ont aucun
+-- verrou et ne se farment pas : pour la logique de disponibilité, elles se
+-- comportent identiquement. À l'affichage, en revanche, ce sont cinq catégories
+-- distinctes — d'où la mise en garde qui suit.
 
 --- Libellé localisé d'un sourceType, tel que l'affiche l'interface Blizzard.
 function Data.GetSourceTypeLabel(sourceType)
@@ -84,6 +91,50 @@ end
 
 function Data.GetSourceKind(sourceType)
 	return Data.SOURCE_TYPE_TO_KIND[sourceType] or K.UNKNOWN
+end
+
+--------------------------------------------------------------------------------
+-- Deux axes, et il ne faut pas les confondre
+--
+-- `kind` (ci-dessus) est la taxonomie INTERNE : elle sert à la logique — cette
+-- monture tombe-t-elle d'un boss, donc y a-t-il un verrou ? Elle écrase exprès
+-- ce qui se comporte pareil : promotion, JCC, boutique, découverte et comptoir
+-- n'ont aucun verrou, donc tous `unknown`.
+--
+-- `sourceType` est l'axe D'AFFICHAGE. Il ne doit JAMAIS passer par `kind`, et
+-- c'est l'erreur qui a produit un menu de filtre affichant « Promotion (66) »
+-- pour un seau qui contenait cinq catégories : le libellé venait de la première
+-- monture croisée, et l'effectif de toutes les autres. Cinq réponses fausses
+-- sous une étiquette juste.
+--
+-- Règle : tout ce qui s'affiche ou se filtre par source part de `sourceType` et
+-- de son libellé client. Tout ce qui raisonne sur les verrous part de `kind`.
+--------------------------------------------------------------------------------
+
+--- Seau de source d'une entrée : clé, libellé, rang d'affichage.
+--  Un seul endroit décide, pour que le graphe du tableau de bord et le menu de
+--  filtre de la collection listent exactement les mêmes catégories.
+--  @return sourceType, libellé, rang (0 = nommé par le client, 1 = panier)
+function Data.GetSourceBucket(entry)
+	local sourceType = entry and entry.sourceType
+	local label = Data.GetSourceTypeLabel(sourceType)
+	if label then return sourceType or 0, label, 0 end
+	-- Pas de libellé côté client : un sourceType plus récent que nos constantes.
+	-- Il tombe dans « Autres », qui ferme la marche.
+	return sourceType or 0, ns.L.SOURCE_UNKNOWN, 1
+end
+
+--- Ordre d'affichage des seaux de source : les nommés d'abord, puis par
+--  effectif décroissant, puis par libellé.
+--
+--  L'effectif retenu est `total` (possédées comprises) et non le nombre de
+--  manquantes : il ne bouge qu'à un patch, donc l'ordre des lignes ne change pas
+--  quand une monture rentre — et les deux écrans qui l'utilisent restent dans le
+--  même ordre l'un que l'autre.
+function Data.CompareSourceBuckets(a, b)
+	if a.rank ~= b.rank then return a.rank < b.rank end
+	if a.total ~= b.total then return a.total > b.total end
+	return tostring(a.label) < tostring(b.label)
 end
 
 --------------------------------------------------------------------------------

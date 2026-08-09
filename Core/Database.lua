@@ -14,7 +14,7 @@ local _, ns = ...
 
 local Database = ns:NewModule("Database", 10)
 
-local CURRENT_SCHEMA = 2
+local CURRENT_SCHEMA = 3
 
 local GLOBAL_DEFAULTS = {
 	chars = {},              -- [charKey] = { …, lockouts = {}, dungeonEntries = {} }
@@ -65,10 +65,11 @@ local PROFILE_DEFAULTS = {
 		-- Une monture exclue reste visible, grisée. La faire disparaître d'un
 		-- clic droit donnait l'impression d'avoir cassé quelque chose.
 		hideExcluded = false,
-		-- Natures de source décochées dans le menu. Vide = tout est affiché : on
-		-- ne veut pas qu'une nature ajoutée par un patch soit masquée par défaut
-		-- parce qu'elle n'était pas dans la liste au moment du réglage.
-		kindsHidden = {},
+		-- Catégories de source décochées dans le menu, indexées par le
+		-- `sourceType` du client. Vide = tout est affiché : on ne veut pas qu'une
+		-- catégorie ajoutée par un patch soit masquée par défaut parce qu'elle
+		-- n'était pas dans la liste au moment du réglage.
+		sourcesHidden = {},
 		-- Colonne de tri et sens, pilotés par les titres de colonnes.
 		-- "name" | "source" | "category" | "type" | "tries"
 		sort = "name",
@@ -107,6 +108,25 @@ migrations[1] = function(sv)
 	for _, profile in pairs(sv.profiles) do
 		if type(profile.filters) == "table" and profile.filters.hideExcluded == true then
 			profile.filters.hideExcluded = false
+		end
+	end
+end
+
+--- 2 -> 3 : le filtre par source était indexé par la taxonomie INTERNE
+--  (`kind`), qui écrase cinq catégories du client en une. Le menu affichait donc
+--  sept entrées pour douze catégories réelles, et décocher « Promotion » masquait
+--  aussi le JCC, la boutique, les découvertes et le comptoir.
+--
+--  Il est maintenant indexé par `sourceType`. Les anciennes clés — des chaînes —
+--  ne correspondent à rien dans le nouveau schéma : les laisser reviendrait à
+--  traîner un réglage mort pour toujours. On repart d'un filtre ouvert, ce qui
+--  est le seul état dont on est sûr qu'il ne cache rien à personne.
+migrations[2] = function(sv)
+	if type(sv.profiles) ~= "table" then return end
+	for _, profile in pairs(sv.profiles) do
+		if type(profile.filters) == "table" then
+			profile.filters.kindsHidden = nil
+			profile.filters.sourcesHidden = {}
 		end
 	end
 end

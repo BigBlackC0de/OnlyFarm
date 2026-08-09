@@ -102,6 +102,13 @@ vérifient à chaque fois qu'on touche au tableau de bord.
 
 ### Recette de l'onglet Collection
 
+- [ ] **Le menu « Source » liste EXACTEMENT les catégories du graphe du tableau
+      de bord**, dans le même ordre et avec les mêmes noms. Une catégorie qui
+      manque d'un côté est le symptôme du bug corrigé en schéma 3 : un filtre
+      indexé sur `kind` au lieu de `sourceType`, qui écrasait promotion, JCC,
+      boutique, découverte et comptoir en une seule entrée. Les EFFECTIFS, eux,
+      diffèrent légitimement : le menu compte ce qu'il va montrer (les
+      manquantes), le graphe compte possédées et manquantes.
 - [ ] **Aucune cellule vide**, sur aucune ligne, filtres au maximum. « Catégorie »
       et « Type » viennent du client : elles répondent même sans cartographie.
       Une cellule vide est un bug, pas une donnée manquante.

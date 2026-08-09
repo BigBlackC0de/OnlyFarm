@@ -250,12 +250,25 @@ _G.C_MountJournal = {
 }
 
 -- Libellés de catégorie de source, tels que les expose le client.
+--
+-- La liste est COMPLÈTE exprès. Cinq de ces catégories (promotion, JCC,
+-- boutique, découverte, comptoir) partagent le même `kind` interne, parce
+-- qu'aucune ne porte de verrou — et c'est précisément là que l'affichage s'est
+-- déjà trompé en les fusionnant. Sans leurs libellés ici, le test ne vérifiait
+-- que la moitié du problème : les seaux se séparaient, mais tous sous
+-- l'étiquette « Autres ».
 _G.BATTLE_PET_SOURCE_1 = "Drop"
 _G.BATTLE_PET_SOURCE_2 = "Quest"
 _G.BATTLE_PET_SOURCE_3 = "Vendor"
 _G.BATTLE_PET_SOURCE_4 = "Profession"
+_G.BATTLE_PET_SOURCE_5 = "Pet Battle"
 _G.BATTLE_PET_SOURCE_6 = "Achievement"
 _G.BATTLE_PET_SOURCE_7 = "World Event"
+_G.BATTLE_PET_SOURCE_8 = "Promotion"
+_G.BATTLE_PET_SOURCE_9 = "Trading Card Game"
+_G.BATTLE_PET_SOURCE_10 = "In-Game Store"
+_G.BATTLE_PET_SOURCE_11 = "Discovery"
+_G.BATTLE_PET_SOURCE_12 = "Trading Post"
 
 --------------------------------------------------------------------------------
 -- Journal des rencontres — paliers et instances
