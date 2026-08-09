@@ -97,7 +97,9 @@ end
 --   5 — le lieu est souvent étiqueté (« Région : … ») : on sait enlever
 --       l'étiquette, et plus seulement le suffixe d'aile
 --   6 — extension des montures de haut fait, via l'arbre des catégories
-local MAPPING_VERSION = 6
+--   7 — extension EXACTE par l'objet (C_Item.GetItemInfo.expansionID), avec
+--       mémorisation de l'itemID pour ne pas refaire la passe approfondie
+local MAPPING_VERSION = 7
 
 -- Une cartographie qui ne rattache rien est ratée, pas fraîche : on la
 -- retente. Mais pas indéfiniment — sur un client où rien ne répondrait, on
@@ -420,6 +422,74 @@ local function BuildAchievementIndex()
 end
 
 --------------------------------------------------------------------------------
+-- Extension EXACTE, par l'objet
+--
+-- C_Item.GetItemInfo renvoie un `expansionID` en 15e position : l'extension de
+-- l'objet, donc celle de la monture qu'il enseigne. C'est la seule source
+-- exacte du lot — pas un rapprochement de noms, pas une inférence, une donnée
+-- du client. Elle prime donc sur toutes les heuristiques.
+--
+-- Le prix à payer : il faut connaître l'itemID, et le Journal des montures ne
+-- l'expose pas. Seul le butin du Journal des rencontres le donne, donc la passe
+-- approfondie. D'où le stockage de l'itemID dans le cache : une fois la passe
+-- approfondie faite UNE fois, chaque scan rapide ultérieur retrouve l'extension
+-- exacte sans y revenir.
+--------------------------------------------------------------------------------
+
+-- Retours de C_Item.GetItemInfo : itemName(1) … bindType(14) expansionID(15).
+local ITEM_EXPANSION_RETURN = 15
+
+local function ItemExpansion(itemID)
+	if type(itemID) ~= "number" then return nil end
+	if not C_Item or type(C_Item.GetItemInfo) ~= "function" then return nil end
+
+	local results = { pcall(C_Item.GetItemInfo, itemID) }
+	if not results[1] then return nil end
+
+	-- results[1] est le booléen de pcall : le n-ième retour est en n+1.
+	local expansion = results[ITEM_EXPANSION_RETURN + 1]
+	if type(expansion) ~= "number" then return nil end
+	return expansion
+end
+
+local function RequestItem(itemID)
+	if type(itemID) ~= "number" then return end
+	if C_Item and type(C_Item.RequestLoadItemDataByID) == "function" then
+		pcall(C_Item.RequestLoadItemDataByID, itemID)
+	end
+end
+
+--- Applique l'extension de l'objet à toutes les entrées qui en ont un.
+--  @return nombre d'entrées renseignées
+local function ApplyItemExpansions(results)
+	local pending = {}
+	for _, entry in pairs(results) do
+		if entry.itemID then
+			RequestItem(entry.itemID)
+			pending[#pending + 1] = entry
+		end
+	end
+	if #pending == 0 then return 0 end
+
+	-- Le client répond de façon asynchrone : quelques frames de battement
+	-- valent mieux qu'une lecture immédiate qui rendrait nil partout.
+	for _ = 1, 5 do coroutine.yield() end
+
+	local applied = 0
+	for index, entry in ipairs(pending) do
+		local level = ItemExpansion(entry.itemID)
+		if level then
+			entry.tier = level
+			entry.tierName = ns.Data.ExpansionName(level)
+			entry.matchedBy = "item"
+			applied = applied + 1
+		end
+		if index % 100 == 0 then coroutine.yield() end
+	end
+	return applied
+end
+
+--------------------------------------------------------------------------------
 -- Passe B — texte de source
 --------------------------------------------------------------------------------
 
@@ -533,7 +603,7 @@ Mapping.MatchPlace = MatchPlace
 
 --- Cartographie toutes les montures à partir de leur texte de source.
 --  @return table [mountID] = source, statistiques du passage
-local function MapFromSourceText(index, achievements)
+local function MapFromSourceText(index, achievements, previous)
 	local results = {}
 	-- Compteurs par étape. Sans eux, « 0 rattachées » ne dit pas SI le texte a
 	-- été lu, SI un lieu en a été extrait, ou SI le rapprochement a échoué —
@@ -575,6 +645,12 @@ local function MapFromSourceText(index, achievements)
 				encounterName = subject,
 				origin = "sourceText",
 			}
+
+			-- L'itemID découvert par une passe approfondie passée est conservé :
+			-- c'est lui qui donne l'extension exacte, et le reperdre à chaque
+			-- scan obligerait à refaire la passe lente.
+			local known = previous and previous[mountID]
+			if known and known.itemID then entry.itemID = known.itemID end
 
 			-- Le lieu n'est retenu comme instance que s'il correspond à une
 			-- instance réelle. Sinon c'est une zone, un vendeur, un événement —
@@ -818,12 +894,17 @@ local function ScanRoutine(self, deep)
 	local achievements, achievementStats = BuildAchievementIndex()
 	self.achievementIndex = achievements
 
-	local results, stats = MapFromSourceText(index, achievements)
+	local previous = ns.db and ns.db.global.sourceCache or nil
+	local results, stats = MapFromSourceText(index, achievements, previous)
 
 	local refined = 0
 	if deep then
 		refined = DeepScan(index, results)
 	end
+
+	-- L'extension par l'objet passe en DERNIER et écrase les heuristiques :
+	-- elle est exacte, elles sont approchées.
+	local byItem = ApplyItemExpansions(results)
 
 	local nodes, nodeCount = CollectEntrances()
 
@@ -851,6 +932,7 @@ local function ScanRoutine(self, deep)
 		mapped = mapped,
 		textStats = stats,
 		refined = refined,
+		byItem = byItem,
 		nodes = nodes,
 		nodeCount = nodeCount,
 		deep = deep,
@@ -950,6 +1032,7 @@ function Mapping:Finish(payload)
 			achievementStats = payload.achievementStats,
 			textStats = payload.textStats,
 			refined = payload.refined,
+			byItem = payload.byItem,
 			nodes = payload.nodeCount,
 			deep = payload.deep or false,
 			mountsSeen = type(mountIDs) == "table" and #mountIDs or 0,

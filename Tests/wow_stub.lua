@@ -503,6 +503,29 @@ end
 _G.InCombatLockdown = function() return stub.inCombat == true end
 
 --------------------------------------------------------------------------------
+-- Objets
+--
+-- Fixture : stub.items[itemID] = { name, expansionID }. Seul expansionID nous
+-- intéresse : c'est le 15e retour de C_Item.GetItemInfo, et la seule source
+-- EXACTE d'extension pour une monture.
+--------------------------------------------------------------------------------
+
+stub.items = {}
+
+_G.C_Item = {
+	GetItemInfo = function(itemID)
+		local item = stub.items[itemID]
+		if not item then return nil end
+		return item.name or "Objet", "|Hitem:" .. itemID .. "|h", 4, 0, 0,
+			"Divers", "Monture", 1, "", 0, 0, 15, 5, 1,
+			item.expansionID, nil, false, ""
+	end,
+
+	RequestLoadItemDataByID = function() end,
+	GetItemCount = function() return 0 end,
+}
+
+--------------------------------------------------------------------------------
 -- Horloges de reset
 --------------------------------------------------------------------------------
 
@@ -566,6 +589,7 @@ function stub.Reset()
 	stub.selectedInstance = nil
 	stub.selectedEncounter = nil
 	stub.lfgDungeons = {}
+	stub.items = {}
 	stub.profileClock = 0
 	stub.dailyResetAt = stub.now + 3600
 	stub.weeklyResetAt = stub.now + 3 * 86400

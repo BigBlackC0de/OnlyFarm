@@ -133,6 +133,54 @@ encore d'`instanceID` connu. Son statut est alors « incertain » et le dit
 
 ---
 
+---
+
+## L'extension d'une monture : ce que le client donne vraiment
+
+Question ouverte pendant plusieurs itérations, tranchée sur le dump officiel du
+build 12.0.7 et sur l'API web réelle.
+
+**Aucune API ne donne l'extension d'une MONTURE.** Ni `C_MountJournal`
+(vérifié : `MountInfo` et `MountInfoExtra` ne contiennent aucun champ
+d'extension), ni l'API web `/data/wow/mount/{id}` (vérifié en jeu le
+2026-08-09 : `id`, `name`, `creature_displays`, `description`, `source`,
+`faction`, `requirements`, `should_exclude_if_uncollected`). Le Journal des
+montures de Blizzard lui-même n'a pas de filtre par extension — son code ne
+mentionne le mot nulle part.
+
+**En revanche `C_Item.GetItemInfo(itemID)` donne un `expansionID`**, en 15e
+position (`ItemDocumentation.lua`, structure `ItemInfoResult`). C'est
+l'extension de l'OBJET, donc celle de la monture qu'il enseigne : exacte, non
+localisée, fournie par le client.
+
+Le chaînon manquant est l'itemID : `C_MountJournal.GetMountFromItem` va de
+l'objet vers la monture, jamais l'inverse. La seule source d'itemID est le
+butin du Journal des rencontres (`GetLootInfoByIndex`, champ `itemID`), donc la
+passe approfondie.
+
+D'où le montage retenu dans `Modules/Mapping.lua` : la passe approfondie
+récolte les itemID, ils sont **mémorisés dans le cache**, et chaque scan rapide
+ultérieur en tire l'extension exacte sans avoir à la refaire. L'objet écrase
+toutes les heuristiques ; l'instance, elle, reste celle du rapprochement de
+lieu, puisque c'est elle qui sert aux verrous et que l'objet ne la donne pas.
+
+Restent hors d'atteinte les montures qui ne viennent d'aucune table de butin
+d'instance : vendeurs, métiers, événements, PvP. Pour celles-là, seule une
+table curée peut répondre (`Data/Mounts.lua`).
+
+### `C_MountJournal.SetSourceFilter` : à ne pas utiliser
+
+`SetSourceFilter(filterIndex, isChecked)` pilote les cases « source » du
+Journal des montures et change ce que renvoient `GetNumDisplayedMounts` et
+`GetDisplayedMountInfo`. Deux raisons de s'en passer :
+
+* elle modifie les **réglages du joueur**. Un addon qui les change en douce
+  laisse le Journal filtré autrement qu'il ne l'avait laissé ;
+* elle n'apporte rien : `sourceType` est déjà le 6e retour de
+  `GetMountInfoByID`, monture par monture, sans effet de bord.
+
+Elle ne donne pas non plus accès à l'extension, qui est le seul manque réel.
+
 ## Points à vérifier au prochain patch
 
 * `GetSavedInstanceEncounterInfo` existe-t-elle encore ?

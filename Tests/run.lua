@@ -1042,6 +1042,36 @@ end)
 -- La table curée est le seul moyen de rattacher les montures que le client ne
 -- sait pas situer : vendeurs, métiers, événements, PvP. Elle ne doit JAMAIS
 -- primer sur une donnée dérivée du client, qui suit les patchs.
+-- L'extension par l'objet est la seule source EXACTE : elle vient du client,
+-- sans rapprochement de noms ni inférence. Elle doit donc écraser les
+-- heuristiques, y compris un rapprochement de lieu réussi.
+test("Mapping — l'extension de l'objet prime sur les heuristiques", function()
+	stub.Reset()
+	stub.lfgDungeons = {
+		-- Volontairement faux : le lieu rattacherait la monture à Legion.
+		[100] = { name = "Ulduar", subtypeID = 3, expansionLevel = 6 },
+	}
+	stub.items = { [45693] = { name = "Rênes", expansionID = 2 } }
+	stub.mounts = {
+		{ mountID = 201, spellID = 1001, name = "Fumeronde", sourceType = 1,
+		  source = "Butin : Yogg-Saron\nUlduar" },
+	}
+	local ns = harness.Load(stub)
+	-- itemID connu d'une passe approfondie précédente, conservé dans le cache.
+	ns.db.global.sourceCache = { [201] = { itemID = 45693 } }
+
+	ns.Mapping:Run(false)
+	stub.RunFrames(120)
+
+	local entry = ns.db.global.sourceCache[201]
+	eq(entry.itemID, 45693, "l'itemID connu est repris du cache")
+	eq(entry.matchedBy, "item", "c'est l'objet qui a tranché")
+	eq(entry.tierName, "Wrath of the Lich King", "extension exacte de l'objet")
+	-- L'instance reste celle du rapprochement de lieu : c'est elle qui sert
+	-- aux verrous, et l'objet ne la donne pas.
+	eq(entry.instanceName, "Ulduar", "l'instance du lieu est conservée")
+end)
+
 test("Mapping — la table curée comble, mais ne prime pas", function()
 	stub.Reset()
 	stub.lfgDungeons = {
