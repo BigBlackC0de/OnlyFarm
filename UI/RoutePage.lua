@@ -15,10 +15,10 @@
 	Rien n'est calculé ici : Modules/Route.lua choisit la mission et pose le
 	point de passage. Cette page pose des frames et affiche ce qu'on lui donne.
 
-	Ce qu'elle ne fait PAS encore : enchaîner plusieurs étapes (téléport, vol,
-	entrée). TravelGraph sait calculer ce chemin, mais un itinéraire à sauts
-	multiples qu'on n'a pas vérifié en jeu ne vaut pas mieux qu'une flèche qui
-	pointe juste — et la flèche, elle, marche partout.
+	Le chemin est découpé en ÉTAPES (téléport, vol, entrée) par Dijkstra, dans
+	Modules/Route.lua. La liste les montre toutes, la flèche d'UI/ArrowHUD.lua
+	pointe celle en cours. C'est ce qui fait la différence entre « Ulduar est par
+	là, à quatre kilomètres » et « prends le portail de Dalaran, devant toi ».
 -----------------------------------------------------------------------------]]
 
 local _, ns = ...
@@ -30,6 +30,17 @@ local LINE_HEIGHT = 20
 
 function RoutePage:OnEnable()
 	self:RegisterMessage("OF_ROUTE_UPDATED", "Refresh")
+	self:RegisterMessage("OF_ROUTE_STARTED", "Refresh")
+	self:RegisterMessage("OF_ROUTE_STOPPED", "Refresh")
+	self:RegisterMessage("OF_ROUTE_STEP", "Refresh")
+	self:RegisterMessage("OF_ROUTE_ARRIVED", "OnArrived")
+end
+
+--- Arrivée : on le dit dans le chat, parce que la flèche disparaît et qu'une
+--  disparition sans un mot se lit comme une panne.
+function RoutePage:OnArrived()
+	ns:Print(ns.L.ROUTE_ARRIVED)
+	self:Refresh()
 end
 
 --------------------------------------------------------------------------------
@@ -131,6 +142,58 @@ function RoutePage:CreateMission(page)
 	card.Empty:SetPoint("LEFT", 20, 0)
 	card.Empty:SetPoint("RIGHT", -20, 0)
 	card.Empty:Hide()
+
+	self:CreateSteps(card)
+end
+
+--- Le chemin, étape par étape. C'est la réponse à « une flèche vers le prochain
+--  téléport » : la flèche montre l'étape courante, cette liste montre la suite.
+function RoutePage:CreateSteps(card)
+	local Theme = ns.Theme
+	local L = ns.L
+
+	local title = Theme.Text(card, "GameFontNormal", Theme.colors.text)
+	title:SetPoint("TOPLEFT", card.Lines[#card.Lines], "BOTTOMLEFT", 0, -14)
+	title:SetText(L.ROUTE_STEPS)
+	card.StepsTitle = title
+
+	card.Steps = {}
+	for index = 1, 6 do
+		local row = CreateFrame("Frame", nil, card)
+		row:SetHeight(LINE_HEIGHT)
+		row:SetPoint("LEFT", 10, 0)
+		row:SetPoint("RIGHT", -10, 0)
+		if index == 1 then
+			row:SetPoint("TOP", title, "BOTTOM", 0, -4)
+		else
+			row:SetPoint("TOP", card.Steps[index - 1], "BOTTOM", 0, 0)
+		end
+
+		-- Pastille de rang : elle dit d'un coup d'œil où on en est, et laquelle
+		-- est l'étape courante.
+		row.Index = Theme.Text(row, "GameFontHighlightSmall", Theme.colors.faint, "CENTER")
+		row.Index:SetPoint("LEFT")
+		row.Index:SetWidth(18)
+
+		row.Text = Theme.Text(row, "GameFontHighlightSmall", Theme.colors.muted)
+		row.Text:SetPoint("LEFT", row.Index, "RIGHT", 6, 0)
+		row.Text:SetPoint("RIGHT", -44, 0)
+		row.Text:SetWordWrap(false)
+
+		row.Cost = Theme.Text(row, "GameFontHighlightSmall", Theme.colors.faint, "RIGHT")
+		row.Cost:SetPoint("RIGHT")
+		row.Cost:SetWidth(40)
+
+		row:Hide()
+		card.Steps[index] = row
+	end
+
+	card.StepsEmpty = Theme.Text(card, "GameFontHighlightSmall", Theme.colors.faint)
+	card.StepsEmpty:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
+	card.StepsEmpty:SetPoint("RIGHT", -10, 0)
+	card.StepsEmpty:SetHeight(34)
+	card.StepsEmpty:SetJustifyV("TOP")
+	card.StepsEmpty:Hide()
 end
 
 function RoutePage:CreateMap(page)
@@ -157,17 +220,28 @@ end
 --------------------------------------------------------------------------------
 
 function RoutePage:OnStart()
+	local L = ns.L
+
+	-- Le bouton fait aussi l'arrêt : un trajet en cours et un bouton « Start »
+	-- qui le relance, c'est un bouton qui ne dit pas ce qu'il fait.
+	local plan = ns.Route:GetPlan()
+	if plan and not plan.arrived then
+		ns.Route:Stop()
+		self:Refresh()
+		return
+	end
+
 	local mission = ns.Route:GetMission()
 	if not mission then return end
 
-	local backend, reason = ns.Route:Start(mission)
-	local L = ns.L
-
-	if backend then
-		ns:Print(L.ROUTE_STARTED:format(mission.instanceName or mission.name))
+	local ok, reason = ns.Route:Start(mission)
+	if ok then
+		local step = ns.Route:GetCurrentStep()
+		ns:Print(L.ROUTE_STARTED:format(step and step.name or mission.name))
 		-- Épingler la cible au démarrage : le joueur vient de dire qu'il y va,
 		-- l'addon n'a plus à en proposer une autre au prochain rafraîchissement.
 		ns.Route:SetTarget(mission.mountID)
+		ns.ArrowHUD:Show()
 	else
 		ns:Print(L.ROUTE_FAILED:format(tostring(reason)))
 	end
@@ -214,6 +288,9 @@ function RoutePage:Refresh()
 		card.StartButton:SetEnabled(false)
 		card.ClearButton:Hide()
 		card.Backend:SetText("")
+		card.StepsTitle:Hide()
+		card.StepsEmpty:Hide()
+		for _, row in ipairs(card.Steps) do row:Hide() end
 		-- Deux causes possibles, deux messages : la cartographie n'a pas encore
 		-- tourné, ou elle a tourné et rien n'est routable.
 		local meta = ns.db and ns.db.global.scanMeta
@@ -225,6 +302,7 @@ function RoutePage:Refresh()
 	end
 
 	card.Empty:Hide()
+	card.StepsTitle:Show()
 	card.Icon:SetTexture(mission.icon)
 	card.Icon:Show()
 	card.MountName:SetText(mission.name)
@@ -266,8 +344,77 @@ function RoutePage:Refresh()
 	for index = used + 1, #lines do lines[index]:Hide() end
 
 	card.StartButton:SetEnabled(true)
+	local running = plan ~= nil and not plan.arrived
+	card.StartButton.Text:SetText(running and L.ROUTE_STOP or L.ROUTE_START)
 	card.Backend:SetText(ns.Route:HasTomTom() and L.ROUTE_VIA_TOMTOM or L.ROUTE_VIA_CLIENT)
 
-	page.MapCard.Preview:SetTarget(mission.node.uiMapID, mission.node.x, mission.node.y,
-		mission.zoneName or mission.node.name)
+	self:RefreshSteps(card, mission)
+
+	-- La carte montre l'étape courante quand un trajet tourne, la destination
+	-- sinon : pendant le trajet, ce qu'on veut voir c'est où on va MAINTENANT.
+	local plan = ns.Route:GetPlan()
+	local step = ns.Route:GetCurrentStep()
+	local shown = (plan and step and step.node) and step.node or mission.node
+	local label = (plan and step) and step.name or (mission.zoneName or mission.node.name)
+	page.MapCard.Preview:SetTarget(shown.uiMapID, shown.x, shown.y, label)
+end
+
+--- Liste des étapes. Sans trajet lancé, on affiche déjà le chemin prévu : le
+--  joueur doit pouvoir juger de la route AVANT de cliquer.
+function RoutePage:RefreshSteps(card, mission)
+	local L = ns.L
+	local Theme = ns.Theme
+
+	local plan = ns.Route:GetPlan()
+	local steps = plan and plan.steps or ns.Route:BuildSteps(mission)
+	local current = plan and plan.current or 0
+
+	if not steps or #steps == 0 then
+		for _, row in ipairs(card.Steps) do row:Hide() end
+		card.StepsEmpty:SetText(L.ROUTE_UNREACHABLE)
+		card.StepsEmpty:Show()
+		return
+	end
+	card.StepsEmpty:Hide()
+
+	for index, row in ipairs(card.Steps) do
+		local step = steps[index]
+		if step then
+			local done = current > index
+			local active = current == index
+
+			row.Index:SetText(done and "•" or tostring(index))
+			row.Text:SetText(self:StepText(step))
+			row.Cost:SetText(step.cost and ns.Util.FormatDuration(step.cost) or "")
+
+			-- Trois états, trois couleurs : franchie, en cours, à venir.
+			local color = Theme.colors.muted
+			if done then
+				color = Theme.colors.faint
+			elseif active then
+				color = Theme.colors.accent
+			end
+			row.Index:SetTextColor(color[1], color[2], color[3])
+			row.Text:SetTextColor(color[1], color[2], color[3])
+			row:Show()
+		else
+			row:Hide()
+		end
+	end
+end
+
+--- Consigne d'une étape, en clair.
+function RoutePage:StepText(step)
+	local L = ns.L
+	local kinds = ns.Data.EDGE_KINDS
+	if step.kind == kinds.TELEPORT and step.spellName then
+		return L.ROUTE_STEP_TELEPORT:format(step.spellName)
+	end
+	if step.kind == kinds.PORTAL then
+		return L.ROUTE_STEP_PORTAL:format(step.name or "?")
+	end
+	if step.kind == kinds.WALK then
+		return L.ROUTE_STEP_WALK:format(step.name or "?")
+	end
+	return L.ROUTE_STEP_FLY:format(step.name or "?")
 end

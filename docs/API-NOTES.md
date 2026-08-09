@@ -307,12 +307,41 @@ l'interface**, pas une API documentée dans le dump. `Modules/Route.lua` s'en se
 s'il est là et construit sinon la table à la main (`{ uiMapID, position }`) — ce
 que `SetUserWaypoint` accepte, puisque c'est sa structure d'entrée.
 
-**TomTom n'est pas une dépendance.** S'il est chargé, `Route:Start` lui confie le
-point (`TomTom:AddWaypoint(uiMapID, x, y, opts)`, coordonnées normalisées comme
-celles du client) parce que sa flèche est meilleure et que le joueur l'a installée
-pour ça. Sinon le point du client fait le travail. L'addon ne réclame jamais son
-installation : renvoyer quelqu'un vers un autre addon pour une fonction que le
-client assure depuis Shadowlands serait un aveu, pas un conseil.
+**TomTom n'est pas une dépendance, et il ne peut pas en être une.** Sa fonction
+d'ajout a changé de signature au fil des versions :
+
+* ancienne : `AddWaypoint(x, y, description, …)` — coordonnées en **centièmes**,
+  sur la carte **courante**, pas de uiMapID ;
+* moderne : `AddWaypoint(uiMapID, x, y, opts)` — **fractions**, carte explicite ;
+* stable depuis le passage aux uiMapID : `AddMFWaypoint(uiMapID, floor, x, y, opts)`.
+
+Appeler l'une avec les arguments de l'autre **ne lève aucune erreur**. Le point
+part n'importe où, ou nulle part, et l'addon croit avoir réussi. C'est exactement
+le bug rencontré : « TomTom détecté », et aucune flèche à l'écran.
+
+`Modules/Route.lua` préfère donc `AddMFWaypoint`, réclame la flèche
+explicitement (`SetCrazyArrow`, parce que l'option `crazy` dépend du réglage
+`arrow.autoqueue` du joueur), et — surtout — **pose le point du client EN PLUS**.
+Si la flèche de TomTom ne vient pas, il reste un guidage.
+
+**La flèche d'OnlyFarm ne dépend de personne** (`UI/ArrowHUD.lua`). Le client n'a
+pas de flèche flottante : son point de passage donne une épingle et une distance
+dans le suivi de quêtes, ce qui n'est pas ce qu'on demande quand on demande une
+flèche. Et elle seule peut pointer l'ÉTAPE en cours plutôt que la destination.
+
+Trois conventions à ne pas mélanger pour qu'elle pointe juste — un signe inversé
+donne une flèche exactement à l'opposé :
+
+| Quoi | Convention |
+|---|---|
+| coordonnées de carte | `x` croît vers l'**est**, `y` vers le **sud** |
+| `GetPlayerFacing()` | radians, 0 = **nord**, croissant **antihoraire** |
+| `Texture:SetRotation()` | positif = **antihoraire** |
+
+D'où `rotation = cap − orientation`, les deux mesurés antihoraire depuis le nord.
+Le cap se calcule en coordonnées de carte quand joueur et cible sont sur la même
+(convention certaine), et en coordonnées monde sinon — dont l'axe `x` pointe au
+nord et l'axe `y` à l'ouest, hypothèse à confirmer en jeu.
 
 ### 3. À quoi ça ressemble — l'art de carte
 

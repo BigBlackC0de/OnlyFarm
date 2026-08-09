@@ -1517,46 +1517,149 @@ test("Route — la cible épinglée gagne, jusqu'à ce qu'elle tombe", function(
 	eq(ns.Route:GetMission().mountID, 201, "retour au choix automatique")
 end)
 
-test("Route — Start pose le point de passage du client et le suit", function()
+test("Route — Start construit un plan et pointe sur la première étape", function()
 	local ns = LoadWithRoute()
-	local mission = ns.Route:GetMissionFor(201)
+	stub.playerMap = { uiMapID = 492, x = 0.10, y = 0.10 }
+	ns.Route:SetTarget(201)
 
-	local backend, reason = ns.Route:Start(mission)
-	eq(backend, "native", "point de passage natif, sans TomTom")
-	eq(reason, nil, "aucune raison d'échec")
-	eq(stub.waypoint ~= nil, true, "le point est posé")
+	eq(ns.Route:Start(), true, "le trajet démarre")
+	local plan = ns.Route:GetPlan()
+	eq(plan ~= nil, true, "un plan est retenu")
+	eq(plan.current, 1, "on est à la première étape")
+	eq(#plan.steps >= 1, true, "au moins une étape")
+
+	-- Le point de passage va sur l'ÉTAPE, pas sur la destination finale. Ici les
+	-- deux coïncident (un seul vol), mais c'est le nœud de l'étape qui est lu.
+	local step = ns.Route:GetCurrentStep()
+	eq(step.nodeID, "ej:187", "l'étape mène à l'entrée d'Ulduar")
+	eq(stub.waypoint ~= nil, true, "le point du client est posé")
 	eq(stub.waypoint.uiMapID, 492, "sur la bonne carte")
 	eq(stub.superTracked, true, "et suivi à l'écran")
 end)
 
-test("Route — une carte qui refuse le point de passage est signalée", function()
+test("Route — le plan passe par un téléport quand il en existe un", function()
 	local ns = LoadWithRoute()
-	local mission = ns.Route:GetMissionFor(201)
-	-- Les cartes d'intérieur d'instance refusent le point de passage. On le
-	-- rapporte au lieu de laisser croire que la flèche est posée.
-	stub.maps[492] = nil
+	-- Le joueur est sur un autre continent : sans téléport, Ulduar est
+	-- inatteignable ; avec, le plan doit compter deux étapes.
+	stub.maps[84] = { name = "Hurlevent", continentID = 13,
+		originX = 0, originY = 0, spanX = 1000, spanY = 1000 }
+	stub.playerMap = { uiMapID = 84, x = 0.5, y = 0.5 }
+	ns.Nodes:Invalidate()
 
-	local backend, reason = ns.Route:Start(mission)
-	eq(backend, nil, "rien n'est posé")
-	eq(reason, "map_refuses", "et la raison est nommée")
+	eq(ns.Route:BuildSteps(ns.Route:GetMissionFor(201)), nil,
+		"aucun chemin entre deux continents sans téléport")
+
+	-- Un sort de téléportation qui porte le nom du nœud : c'est ainsi que
+	-- Teleports rapproche un sort d'une destination.
+	stub.spells = { { spellID = 3565, name = "Ulduar", castTime = 10000 } }
+	ns.Teleports:Invalidate()
+	ns.TravelGraph:Invalidate()
+
+	local steps = ns.Route:BuildSteps(ns.Route:GetMissionFor(201))
+	eq(steps ~= nil, true, "un chemin existe maintenant")
+	eq(#steps, 1, "un seul saut : le téléport mène droit au nœud")
+	eq(steps[1].kind, ns.Data.EDGE_KINDS.TELEPORT, "et c'est bien un téléport")
+	eq(steps[1].spellName, "Ulduar", "avec le sort à lancer")
 end)
 
-test("Route — TomTom est utilisé quand il est là", function()
+test("Route — l'étape avance quand le joueur arrive", function()
 	local ns = LoadWithRoute()
+	stub.playerMap = { uiMapID = 492, x = 0.10, y = 0.10 }
+	ns.Route:SetTarget(201)
+	ns.Route:Start()
+
+	eq(ns.Route:Advance(), false, "loin de l'étape : rien ne bouge")
+
+	-- Le nœud est en (0.41, 0.18) sur une carte de 1000 yards de côté : on se
+	-- pose juste à côté.
+	stub.playerMap = { uiMapID = 492, x = 0.412, y = 0.181 }
+	eq(ns.Route:Advance(), true, "arrivé : l'étape est franchie")
+	eq(ns.Route:GetPlan().arrived, true, "et c'était la dernière")
+	eq(ns.Route:GetCurrentStep(), nil, "plus d'étape courante")
+end)
+
+test("Route — cap et distance vers l'étape", function()
+	local ns = LoadWithRoute()
+	-- Joueur au sud-est du nœud, orienté au nord.
+	stub.playerMap = { uiMapID = 492, x = 0.50, y = 0.50 }
+	_G.GetPlayerFacing = function() return 0 end
+
+	local node = ns.Nodes:Get("ej:187")
+	local rotation, distance = ns.Route:GetBearing(node)
+	eq(distance ~= nil, true, "une distance est calculée")
+
+	-- Le nœud est au nord-ouest : cap entre nord (0) et ouest (pi/2), donc
+	-- strictement dans le premier quadrant antihoraire.
+	eq(rotation > 0 and rotation < math.pi / 2, true,
+		"le cap pointe au nord-ouest, orientation nord")
+
+	-- Même position, joueur tourné vers l'ouest : la cible est maintenant
+	-- davantage sur sa droite, donc la rotation diminue.
+	local before = rotation
+	_G.GetPlayerFacing = function() return math.pi / 2 end
+	local after = ns.Route:GetBearing(node)
+	eq(after < before, true, "tourner change le cap relatif")
+	_G.GetPlayerFacing = nil
+end)
+
+test("Route — une carte qui refuse le point de passage n'empêche pas la flèche", function()
+	local ns = LoadWithRoute()
+	stub.playerMap = { uiMapID = 492, x = 0.10, y = 0.10 }
+	ns.Route:SetTarget(201)
+	ns.Route:Start()
+
+	-- Les cartes d'intérieur d'instance refusent le point de passage. Le trajet
+	-- reste guidé : c'est notre flèche qui prend le relais, pas rien du tout.
+	stub.waypoint = nil
+	stub.maps[492] = nil
+	local backend = ns.Route:PointAtCurrentStep()
+	eq(backend, "arrow", "on retombe sur la flèche de l'addon")
+	eq(stub.waypoint, nil, "et aucun point client n'est posé")
+end)
+
+test("Route — TomTom prend le point, et le client aussi", function()
+	local ns = LoadWithRoute()
+	stub.playerMap = { uiMapID = 492, x = 0.10, y = 0.10 }
 	local received
+	-- Forme moderne, celle qui ne change pas de sens d'une version à l'autre.
 	_G.TomTom = {
-		AddWaypoint = function(_, uiMapID, x, y, options)
+		AddMFWaypoint = function(_, uiMapID, _, x, y, options)
 			received = { uiMapID = uiMapID, x = x, y = y, options = options }
+			return { uid = true }
 		end,
 	}
 
 	eq(ns.Route:HasTomTom(), true, "TomTom détecté")
-	local backend = ns.Route:Start(ns.Route:GetMissionFor(201))
+	ns.Route:SetTarget(201)
+	ns.Route:Start()
+	local backend = ns.Route:PointAtCurrentStep()
 	_G.TomTom = nil
 
-	eq(backend, "tomtom", "c'est TomTom qui prend le point")
+	eq(backend, "tomtom", "TomTom est annoncé comme le meilleur guidage")
 	eq(received.uiMapID, 492, "avec la bonne carte")
-	eq(stub.waypoint, nil, "et le point natif n'est pas posé en double")
+	-- Les deux, volontairement : quand la flèche de TomTom ne vient pas — ce qui
+	-- est exactement le bug d'origine — le point du client reste là pour donner
+	-- la distance dans le suivi de quêtes.
+	eq(stub.waypoint ~= nil, true, "le point du client est posé aussi")
+end)
+
+test("Route — TomTom d'une vieille version n'est pas appelé à l'aveugle", function()
+	local ns = LoadWithRoute()
+	stub.playerMap = { uiMapID = 492, x = 0.10, y = 0.10 }
+	local args
+	-- Vieille signature : AddWaypoint(x, y, description…) en centièmes, sur la
+	-- carte courante. On l'appelle en dernier recours seulement, et jamais à la
+	-- place du point client.
+	_G.TomTom = {
+		AddWaypoint = function(_, a, b, c) args = { a, b, c } end,
+	}
+	ns.Route:SetTarget(201)
+	ns.Route:Start()
+	_G.TomTom = nil
+
+	eq(args ~= nil, true, "l'ancienne forme est tout de même tentée")
+	eq(stub.waypoint ~= nil, true,
+		"mais le point du client est posé, donc le joueur a un guidage")
 end)
 
 --------------------------------------------------------------------------------

@@ -30,6 +30,24 @@ done < <(grep -E '\.lua$' OnlyFarm.toc || true)
 [ "$missing" -eq 0 ] && echo "  ok"
 
 echo
+echo "== Fichiers non déclarés dans le .toc =="
+# Le contrôle inverse du précédent. Sans lui, un module peut exister, compiler,
+# passer la revue — et n'être chargé nulle part. C'est arrivé à TravelGraph.lua,
+# resté mort pendant plusieurs versions.
+#
+# Le .toc écrit ses chemins avec des antislashs : on les normalise avant de
+# comparer, sinon le contrôle ne trouve jamais rien et rassure à tort.
+orphan=0
+grep -E '\.lua$' OnlyFarm.toc | tr -d '\r' | tr '\\' '/' | sort > /tmp/of-declared.txt
+find Core Data Modules UI -name '*.lua' | sed 's|^\./||' | sort > /tmp/of-present.txt
+while IFS= read -r file; do
+	echo "  NON CHARGÉ : $file"
+	orphan=1
+done < <(comm -13 /tmp/of-declared.txt /tmp/of-present.txt)
+rm -f /tmp/of-declared.txt /tmp/of-present.txt
+[ "$orphan" -eq 0 ] && echo "  ok"
+
+echo
 echo "== Générateur de données =="
 if [ -f Build/overlay/mounts.csv ]; then
 	python3 Build/generate_data.py Build/overlay/mounts.csv --check
@@ -41,4 +59,4 @@ echo
 echo "== Tests =="
 lua5.1 Tests/run.lua
 
-exit $(( fail || missing ))
+exit $(( fail || missing || orphan ))

@@ -25,6 +25,7 @@ Modules\Collection.lua
 Modules\Lockouts.lua
 Modules\Nodes.lua
 Modules\Teleports.lua
+Modules\TravelGraph.lua
 Modules\Attempts.lua
 Modules\Eligibility.lua
 Modules\Stats.lua
@@ -35,6 +36,7 @@ UI\Theme.lua
 UI\MapPreview.lua
 UI\Dashboard.lua
 UI\RoutePage.lua
+UI\ArrowHUD.lua
 UI\MainFrame.lua
 UI\CopyFrame.lua
 UI\MinimapButton.lua

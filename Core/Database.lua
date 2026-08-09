@@ -51,6 +51,12 @@ local PROFILE_DEFAULTS = {
 		angle = 205,       -- degrés, position sur l'anneau de la minicarte
 		hide = false,
 	},
+	arrow = {
+		-- Position de la flèche de trajet, déplaçable à la souris.
+		point = "CENTER",
+		x = 240,
+		y = 0,
+	},
 	dashboard = {
 		-- Axe du graphe de répartition : "source" | "movement". La nature de la
 		-- source d'abord, parce que c'est celle sur laquelle on agit — c'est

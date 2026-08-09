@@ -7,10 +7,10 @@
 Addon World of Warcraft (Retail) qui répond à une question : **qu'est-ce que je
 fais cette semaine pour choper des montures, et dans quel ordre ?**
 
-État : **phase 1 (socle)**, plus le premier étage de la route. Diff de
-collection, verrous et disponibilité multi-personnage fonctionnent ; l'onglet
-Route propose une cible et pose son point de passage. L'enchaînement à plusieurs
-étapes (téléport puis vol) reste à faire.
+État : **phase 1 (socle)**, plus la route à une cible. Diff de collection,
+verrous et disponibilité multi-personnage fonctionnent ; l'onglet Route propose
+une cible, découpe le chemin en étapes sur tes propres téléports, et guide à la
+flèche. Reste à faire : enchaîner plusieurs cibles dans une même sortie.
 
 ## Ce que ça fait aujourd'hui
 
@@ -44,13 +44,17 @@ Route propose une cible et pose son point de passage. L'enchaînement à plusieu
   lorsqu'au moins un personnage a un verrou mesuré : une colonne d'« incertain »
   n'aide personne.
 * **Onglet Route** : une cible à la fois — raid en priorité — avec son instance,
-  son boss, sa zone, et la carte de la zone avec une épingle sur l'entrée. Le
-  bouton `Start` pose le point de passage : celui du jeu, avec sa flèche et sa
-  distance dans le suivi de quêtes. **TomTom n'est pas requis** ; s'il est
-  installé, l'addon lui confie le point plutôt que de doubler sa flèche.
-  Les coordonnées viennent de `C_EncounterJournal.GetDungeonEntrancesForMap`,
+  son boss, sa zone, et la carte de la zone avec une épingle sur l'entrée. Les
+  coordonnées viennent de `C_EncounterJournal.GetDungeonEntrancesForMap`,
   c'est-à-dire de la source qu'utilise la carte du monde du jeu — aucune
   coordonnée n'est écrite à la main.
+* **Le chemin, étape par étape**, calculé par Dijkstra sur TES téléports (le
+  graphe ne contient que les sorts et jouets que ce personnage possède
+  vraiment) : « Utilise la Pierre de foyer de Dalaran », puis « Vole jusqu'à
+  Ulduar ». `Start` allume une **flèche déplaçable qui pointe l'étape en cours**,
+  pas la destination finale, et passe à la suivante quand tu arrives. Elle ne
+  dépend d'aucun autre addon. Le point de passage du jeu est posé en plus, et
+  TomTom reçoit le sien s'il est installé — mais rien n'est jamais réclamé.
 * Clic droit sur une ligne : copier le nom, tracer la route, exclure. Et un
   bouton d'exclusion sur chaque ligne, pour que l'action se voie.
 * Suivi des entrées d'instance, avec le compteur du cap 10/heure — 30/jour.

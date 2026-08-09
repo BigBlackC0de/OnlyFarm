@@ -143,10 +143,25 @@ vérifient à chaque fois qu'on touche au tableau de bord.
       carte du monde du jeu, l'icône d'entrée de donjon doit être au même point.
 - [ ] **Pavé de bord** : la carte n'est ni compressée ni étirée sur son bord
       droit ou bas. C'est le symptôme d'un `SetTexCoord` manquant.
-- [ ] **Bouton Start sans TomTom** : le point de passage du jeu apparaît sur la
-      carte, la flèche et la distance s'affichent dans le suivi de quêtes.
-- [ ] **Bouton Start avec TomTom** : c'est la flèche de TomTom qui apparaît, et le
-      pied de carte l'annonçait avant le clic.
+- [ ] **Bouton Start** : la flèche d'OnlyFarm apparaît, déplaçable à la souris,
+      et son point suit le cap quand on tourne sur soi-même. C'est le point le
+      plus important : elle ne dépend d'aucun autre addon, donc elle doit venir
+      dans TOUS les cas.
+- [ ] **Cap juste** : se placer au sud de la cible, regarder au nord — le point
+      doit être en HAUT de l'anneau. Si la flèche pointe à l'opposé ou en miroir,
+      c'est une convention d'axe inversée dans Route:GetBearing ; les trois
+      conventions en jeu y sont écrites en commentaire.
+- [ ] **Le point de passage du jeu est posé aussi** (épingle sur la carte,
+      distance dans le suivi de quêtes), même quand TomTom est là. C'est
+      volontaire : si la flèche de TomTom ne vient pas, il reste un guidage.
+- [ ] **Étapes** : la liste montre le chemin AVANT de cliquer Start. Avec un
+      téléport dont le nom correspond à la destination, il doit apparaître comme
+      première étape (« Utilise … »).
+- [ ] **Avancement** : arriver près d'une étape la passe en grisé, la suivante
+      passe en bleu, et la flèche change de cible. À la dernière, la flèche
+      disparaît et le chat dit « Tu y es ».
+- [ ] **Bouton Arrêter** : pendant un trajet, le bouton Start devient Arrêter et
+      retire la flèche et le point de passage.
 - [ ] **Épinglage** : après Start, la mission est marquée « épinglée par toi » et
       ne change plus. « Laisser choisir » rend la main à l'addon.
 - [ ] **Monture obtenue** : la cible épinglée obtenue laisse la place à une autre

@@ -212,62 +212,271 @@ function Route.CompareKeys(a, b)
 end
 
 --------------------------------------------------------------------------------
+-- Trajet : les étapes jusqu'à la cible
+--
+-- C'est ici que « une flèche vers le prochain téléport » se fabrique. Dijkstra
+-- vit déjà dans TravelGraph, et les arêtes dans Teleports (grimoire et boîte à
+-- jouets du personnage) : il ne manquait que de s'en servir et de retenir le
+-- plan.
+--
+-- Le plan est calculé UNE FOIS, au démarrage. Le recalculer à chaque pas
+-- ferait danser la flèche : à mi-chemin d'un vol, un autre téléport peut
+-- devenir marginalement moins cher, et la consigne changerait sous les pieds du
+-- joueur. On mesure donc l'avancement le long du plan retenu, et on ne
+-- replanifie que si le joueur le demande.
+--------------------------------------------------------------------------------
+
+-- Distance en yards sous laquelle une étape est considérée atteinte. Large
+-- exprès : une entrée d'instance est un volume, pas un point, et le nœud est
+-- posé sur l'icône de la carte.
+Route.ARRIVAL_YARDS = 60
+
+--- Construit les étapes de la position courante jusqu'à la cible.
+--  @return liste de { kind, nodeID, node, name, spellName, cost }, ou nil
+function Route:BuildSteps(mission)
+	if not mission or not mission.node or not mission.node.nodeID then return nil end
+	local targetID = mission.node.nodeID
+
+	local universe = ns.TravelGraph:BuildUniverse({ targetID })
+	local playerID = ns.TravelGraph.PLAYER_NODE
+	if not universe[playerID] then return nil end
+	if not universe[targetID] then return nil end
+
+	local _, previous = ns.TravelGraph:ShortestPaths(playerID, universe)
+	local path = ns.TravelGraph:Path(previous, playerID, targetID)
+	-- Inatteignable : continents différents et aucun téléport pour les relier.
+	-- On renvoie nil et l'interface le dit, plutôt que d'inventer un trajet.
+	if not path then return nil end
+
+	local steps = {}
+	for index, hop in ipairs(path) do
+		local node = universe[hop.to]
+		steps[index] = {
+			index = index,
+			kind = hop.edge and hop.edge.kind or ns.Data.EDGE_KINDS.FLY,
+			nodeID = hop.to,
+			node = node,
+			name = node and node.name or hop.to,
+			spellName = hop.edge and hop.edge.name,
+			spellID = hop.edge and hop.edge.spellID,
+			itemID = hop.edge and hop.edge.itemID,
+			cost = hop.cost,
+		}
+	end
+	return steps
+end
+
+--- Plan en cours, ou nil si aucun trajet n'a été lancé.
+function Route:GetPlan()
+	return self.plan
+end
+
+--- Étape courante du plan.
+function Route:GetCurrentStep()
+	local plan = self.plan
+	if not plan or not plan.steps then return nil end
+	return plan.steps[plan.current]
+end
+
+--- Fait avancer le plan si le joueur a atteint l'étape courante.
+--
+--  La mesure est la même pour toutes les natures d'étape : la distance au nœud
+--  d'arrivée. Un téléport est « fait » quand on est arrivé à destination, un vol
+--  aussi. Pas besoin d'écouter le lancement du sort, ce qui éviterait de toute
+--  façon mal le cas du joueur qui y va autrement.
+--  @return true si l'étape a changé
+function Route:Advance()
+	local plan = self.plan
+	if not plan or not plan.steps then return false end
+
+	local step = plan.steps[plan.current]
+	if not step then return false end
+
+	local playerNode = ns.Nodes:GetPlayerNode()
+	local distance = playerNode and ns.Nodes:Distance(playerNode, step.node)
+	if not distance or distance > self.ARRIVAL_YARDS then return false end
+
+	plan.current = plan.current + 1
+	if plan.current > #plan.steps then
+		plan.arrived = true
+		self:SendMessage("OF_ROUTE_ARRIVED")
+	end
+	self:SendMessage("OF_ROUTE_STEP")
+	return true
+end
+
+--- Cap et distance vers un nœud, depuis la position courante.
+--
+--  CONVENTIONS, parce qu'elles ne se devinent pas et qu'un signe inversé donne
+--  une flèche qui pointe pile à l'opposé :
+--
+--    * coordonnées de carte : x croît vers l'EST, y croît vers le SUD ;
+--    * GetPlayerFacing() : radians, 0 = nord, croissant dans le sens
+--      ANTIHORAIRE (donc pi/2 = ouest) ;
+--    * Texture:SetRotation() : positif = antihoraire.
+--
+--  On veut une rotation nulle quand la cible est droit devant, d'où
+--  `rotation = cap - orientation`, les deux mesurés antihoraire depuis le nord.
+--
+--  Le cap se calcule en coordonnées de CARTE quand le joueur et la cible sont
+--  sur la même, parce que cette convention-là est certaine. Sinon on retombe
+--  sur les coordonnées monde, dont l'axe x pointe au nord et l'axe y à l'ouest
+--  — c'est l'hypothèse à vérifier en jeu si la flèche part de travers.
+--  @return rotation en radians, distance en yards — ou nil si incomparable
+function Route:GetBearing(node)
+	if type(node) ~= "table" then return nil end
+	local playerNode = ns.Nodes:GetPlayerNode()
+	if not playerNode then return nil end
+
+	local distance = ns.Nodes:Distance(playerNode, node)
+	if not distance then return nil end
+	if type(GetPlayerFacing) ~= "function" then return nil, distance end
+	local facing = GetPlayerFacing()
+	if type(facing) ~= "number" then return nil, distance end
+
+	local north, west
+	if playerNode.uiMapID and playerNode.uiMapID == node.uiMapID then
+		north = playerNode.y - node.y     -- y croît au sud
+		west = playerNode.x - node.x      -- x croît à l'est
+	else
+		north = node.wx - playerNode.wx
+		west = node.wy - playerNode.wy
+	end
+
+	if north == 0 and west == 0 then return 0, distance end
+	return math.atan2(west, north) - facing, distance
+end
+
+--------------------------------------------------------------------------------
 -- Pose du point de passage
 --------------------------------------------------------------------------------
 
+--- TomTom, s'il est là ET si on reconnaît sa signature.
+--
+--  Prudence obligatoire : `AddWaypoint` a changé de forme au fil des versions.
+--  L'ancienne prenait `(x, y, description…)` en centièmes sur la carte
+--  COURANTE ; la moderne prend `(uiMapID, x, y, opts)` en fractions. Appeler
+--  l'une avec les arguments de l'autre ne lève aucune erreur : le point est
+--  simplement posé n'importe où, ou nulle part. C'est exactement ce qui s'est
+--  produit — « TomTom détecté », et aucune flèche.
+--
+--  `AddMFWaypoint(uiMapID, floor, x, y, opts)` est la forme stable depuis le
+--  passage aux uiMapID. On la préfère, et TomTom n'est de toute façon plus
+--  qu'un bonus : la flèche d'OnlyFarm ne dépend de personne.
 function Route:HasTomTom()
-	return TomTom ~= nil and type(TomTom.AddWaypoint) == "function"
+	if TomTom == nil then return false end
+	return type(TomTom.AddMFWaypoint) == "function"
+		or type(TomTom.AddWaypoint) == "function"
 end
 
---- Pose le point de passage de la mission et l'allume.
---  @return "tomtom" | "native" | nil, plus un message d'échec le cas échéant
+function Route:SendToTomTom(node, title)
+	if TomTom == nil then return false end
+	local opts = {
+		title = title,
+		from = "OnlyFarm",
+		persistent = false,
+		minimap = true,
+		world = true,
+		crazy = true,
+	}
+
+	if type(TomTom.AddMFWaypoint) == "function" then
+		local ok, uid = pcall(TomTom.AddMFWaypoint, TomTom, node.uiMapID, nil,
+			node.x, node.y, opts)
+		if ok then
+			-- `crazy = true` ne suffit pas toujours : selon le réglage
+			-- `arrow.autoqueue` du joueur, le point entre dans une file au lieu
+			-- de prendre la flèche. On la réclame explicitement.
+			if uid and type(TomTom.SetCrazyArrow) == "function" then
+				pcall(TomTom.SetCrazyArrow, TomTom, uid, 15, title)
+			end
+			return true
+		end
+	end
+
+	if type(TomTom.AddWaypoint) == "function" then
+		local ok = pcall(TomTom.AddWaypoint, TomTom, node.uiMapID, node.x, node.y, opts)
+		if ok then return true end
+	end
+
+	return false
+end
+
+--- Lance le trajet : calcule le plan, pose le point de passage sur la PREMIÈRE
+--  étape, et allume la flèche.
+--
+--  Le point ne va pas sur la destination finale mais sur l'étape courante. C'est
+--  toute la différence entre « Ulduar est par là, à 4000 mètres » et « prends le
+--  portail de Dalaran, il est à 60 mètres devant toi ».
+--
+--  @return true si le trajet est lancé, sinon nil + une raison
 function Route:Start(mission)
 	mission = mission or self:GetMission()
 	if not mission then return nil, "no_mission" end
 
-	local node = mission.node
-	local title = mission.instanceName or mission.name
+	local steps = self:BuildSteps(mission)
+	if not steps or #steps == 0 then
+		-- Déjà sur place, ou aucun chemin. Le point de passage sur la cible
+		-- reste utile dans les deux cas.
+		steps = { {
+			index = 1,
+			kind = ns.Data.EDGE_KINDS.FLY,
+			nodeID = mission.node.nodeID,
+			node = mission.node,
+			name = mission.instanceName or mission.node.name,
+		} }
+	end
 
-	if self:HasTomTom() then
-		-- TomTom attend des coordonnées normalisées, comme celles du client.
-		-- `persistent = false` : ce point est une proposition de l'addon, il n'a
-		-- pas à survivre à la session dans la base de TomTom.
-		local ok = pcall(TomTom.AddWaypoint, TomTom, node.uiMapID, node.x, node.y, {
-			title = title,
-			from = ns.ADDON_NAME or "OnlyFarm",
-			persistent = false,
-			crazy = true,
-		})
-		if ok then
-			self.started = mission.mountID
-			return "tomtom"
+	self.plan = {
+		mountID = mission.mountID,
+		mission = mission,
+		steps = steps,
+		current = 1,
+		arrived = false,
+		startedAt = time(),
+	}
+
+	self:PointAtCurrentStep()
+	self:SendMessage("OF_ROUTE_STARTED")
+	return true
+end
+
+--- (Re)pose le point de passage sur l'étape courante.
+--  @return "tomtom" | "native" | "arrow" — le meilleur guidage obtenu
+function Route:PointAtCurrentStep()
+	local step = self:GetCurrentStep()
+	if not step or not step.node then return nil, "no_step" end
+
+	local node = step.node
+	local title = step.name or (self.plan.mission and self.plan.mission.name)
+	local best = "arrow"
+
+	-- TomTom d'abord s'il est là : sa flèche est meilleure que la nôtre. Mais on
+	-- ne s'arrête PAS là, contrairement à avant — le point du client coûte deux
+	-- appels et il donne la distance dans le suivi de quêtes.
+	if self:SendToTomTom(node, title) then best = "tomtom" end
+
+	-- Point de passage du client. Vérifier la carte d'abord : les cartes
+	-- d'intérieur d'instance et les cartes cosmiques le refusent, et poser sans
+	-- demander lève une erreur au lieu de ne rien faire.
+	if C_Map and type(C_Map.SetUserWaypoint) == "function" then
+		local allowed = true
+		if type(C_Map.CanSetUserWaypointOnMap) == "function" then
+			allowed = C_Map.CanSetUserWaypointOnMap(node.uiMapID) and true or false
+		end
+		if allowed then
+			local point = self.MakePoint(node.uiMapID, node.x, node.y)
+			if point and pcall(C_Map.SetUserWaypoint, point) then
+				if C_SuperTrack and type(C_SuperTrack.SetSuperTrackedUserWaypoint) == "function" then
+					pcall(C_SuperTrack.SetSuperTrackedUserWaypoint, true)
+				end
+				if best == "arrow" then best = "native" end
+			end
 		end
 	end
 
-	-- Point de passage du client. Il faut vérifier la carte d'abord : les cartes
-	-- d'intérieur d'instance et les cartes cosmiques le refusent, et poser sans
-	-- demander lève une erreur au lieu de ne rien faire.
-	if not C_Map or type(C_Map.SetUserWaypoint) ~= "function" then
-		return nil, "no_api"
-	end
-	if type(C_Map.CanSetUserWaypointOnMap) == "function"
-		and not C_Map.CanSetUserWaypointOnMap(node.uiMapID)
-	then
-		return nil, "map_refuses"
-	end
-
-	local point = self.MakePoint(node.uiMapID, node.x, node.y)
-	if not point then return nil, "no_api" end
-
-	local ok = pcall(C_Map.SetUserWaypoint, point)
-	if not ok then return nil, "set_failed" end
-
-	if C_SuperTrack and type(C_SuperTrack.SetSuperTrackedUserWaypoint) == "function" then
-		pcall(C_SuperTrack.SetSuperTrackedUserWaypoint, true)
-	end
-
-	self.started = mission.mountID
-	return "native"
+	self:SendMessage("OF_ROUTE_STEP")
+	return best
 end
 
 --- Fabrique un UiMapPoint. `UiMapPoint.CreateFromCoordinates` est un utilitaire
@@ -289,15 +498,13 @@ function Route.MakePoint(uiMapID, x, y)
 	return { uiMapID = uiMapID, position = position }
 end
 
---- Retire le point de passage posé par l'addon.
+--- Arrête le trajet et retire le point de passage.
 function Route:Stop()
-	self.started = nil
-	if self:HasTomTom() then
-		-- TomTom n'offre pas de retrait par coordonnées sans garder la référence
-		-- du point ; le joueur nettoie depuis TomTom, qui a son propre menu.
-		return
-	end
+	self.plan = nil
 	if C_Map and type(C_Map.ClearUserWaypoint) == "function" then
 		pcall(C_Map.ClearUserWaypoint)
 	end
+	-- TomTom garde son point : il a son propre menu pour l'effacer, et le retirer
+	-- dans son dos supprimerait peut-être un point que le joueur avait posé.
+	self:SendMessage("OF_ROUTE_STOPPED")
 end

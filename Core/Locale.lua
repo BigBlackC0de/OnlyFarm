@@ -173,6 +173,18 @@ local L = {
 	ROUTE_NONE = "No routable mount: none of the missing ones has a mapped entrance.",
 	ROUTE_NEEDS_SCAN = "The mapping has not run yet — it is what ties a mount to an instance entrance.",
 	ROUTE_NO_MAP = "No map art for this place.",
+	ROUTE_STEPS = "The way there",
+	ROUTE_STEP_FLY = "Fly to %s",
+	ROUTE_STEP_WALK = "Head to %s",
+	ROUTE_STEP_TELEPORT = "Use %s",
+	ROUTE_STEP_PORTAL = "Portal: %s",
+	ROUTE_UNREACHABLE = "No way there from here: another continent, and no teleport of yours reaches it.",
+	ROUTE_ARRIVED = "You are there.",
+	ROUTE_STOP = "Stop",
+	ARROW_YARDS = "%.0f yd",
+	ARROW_PROGRESS = "step %d of %d",
+	ARROW_USE = "Use %s",
+	ARROW_PORTAL = "Portal: %s",
 	TYPE_OUTDOOR_LABEL = "Out in the world",
 	COL_STATUS_SHORT = "Status",
 
@@ -327,6 +339,18 @@ if GetLocale and GetLocale() == "frFR" then
 	L.ROUTE_NONE = "Aucune monture routable : aucune des manquantes n'a d'entrée cartographiée."
 	L.ROUTE_NEEDS_SCAN = "La cartographie n'a pas encore tourné — c'est elle qui relie une monture à une entrée d'instance."
 	L.ROUTE_NO_MAP = "Pas d'art de carte pour ce lieu."
+	L.ROUTE_STEPS = "Le chemin"
+	L.ROUTE_STEP_FLY = "Vole jusqu'à %s"
+	L.ROUTE_STEP_WALK = "Rejoins %s"
+	L.ROUTE_STEP_TELEPORT = "Utilise %s"
+	L.ROUTE_STEP_PORTAL = "Portail : %s"
+	L.ROUTE_UNREACHABLE = "Pas de chemin d'ici : autre continent, et aucun de tes téléports n'y va."
+	L.ROUTE_ARRIVED = "Tu y es."
+	L.ROUTE_STOP = "Arrêter"
+	L.ARROW_YARDS = "%.0f m"
+	L.ARROW_PROGRESS = "étape %d sur %d"
+	L.ARROW_USE = "Utilise %s"
+	L.ARROW_PORTAL = "Portail : %s"
 	L.TYPE_OUTDOOR_LABEL = "En extérieur"
 	L.COL_STATUS_SHORT = "Statut"
 
