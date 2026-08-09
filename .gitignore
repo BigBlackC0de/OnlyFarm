@@ -18,3 +18,11 @@ Scratch/
 
 # Consignes locales pour un assistant, non versionnées
 CLAUDE.md
+
+# Identifiants de l'API Blizzard. Le secret ne doit JAMAIS être committé :
+# il donne accès à l'API au nom de son propriétaire, et un dépôt public est
+# indexé en quelques minutes. Il se passe par variable d'environnement.
+.env
+.env.*
+*.secret
+Build/blizzard-credentials*

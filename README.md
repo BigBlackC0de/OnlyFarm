@@ -127,9 +127,29 @@ et lire les erreurs.
 > ci-dessous sont l'équivalent d'un compilateur : indispensables pour produire
 > la release, invisibles pour qui l'utilise.
 
+Créer le client OAuth sur <https://develop.battle.net/access/clients> :
+
+| Champ | Quoi mettre |
+|---|---|
+| **Client Name** | un nom **globalement unique** sur tout Battle.net — `OnlyFarm` seul sera probablement refusé, préférer `OnlyFarm-<pseudo>` |
+| **Redirect URLs** | **vide**. Ce champ ne sert qu'au flux « authorization code », où un joueur se connecte avec son compte. On utilise `client_credentials`, qui n'en a pas besoin |
+| **Service URL** | cocher **« I do not have a service URL for this client »** : il n'y a pas de service, seulement un script local |
+| **Intended Use** | décrire l'usage réel (voir ci-dessous) |
+
+Texte proposé pour *Intended Use* :
+
+> Local build script for OnlyFarm, an open-source World of Warcraft addon.
+> It runs on my own machine a few times per patch and reads static game data
+> only (/data/wow/mount/index and /data/wow/mount/{id}) to compile a mount
+> reference table that ships inside the addon. No player or account data is
+> accessed, nothing is hosted, and no end user interacts with this client.
+
+Le **secret** ne se committe jamais et ne se partage pas : il donne accès à
+l'API au nom de son propriétaire. Il se passe par variable d'environnement, et
+`.gitignore` couvre les fichiers d'identifiants usuels.
+
 ```bash
 # 1. identité canonique des montures, depuis l'API officielle Blizzard
-#    (client OAuth gratuit : https://develop.battle.net/access/clients)
 export BLIZZARD_CLIENT_ID=... BLIZZARD_CLIENT_SECRET=...
 Build/fetch_blizzard.py --region eu --locale fr_FR --raw 3     # réponses brutes
 Build/fetch_blizzard.py --region eu --locale fr_FR
