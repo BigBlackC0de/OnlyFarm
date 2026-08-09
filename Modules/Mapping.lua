@@ -120,7 +120,7 @@ end
 --   8 — le pilote rend enfin la main au client entre deux lectures de butin :
 --       les yields étaient consommés dans la même frame, donc la passe de
 --       butin lisait avant que le client ait chargé quoi que ce soit
-local MAPPING_VERSION = 8
+local MAPPING_VERSION = 9
 
 -- Une cartographie qui ne rattache rien est ratée, pas fraîche : on la
 -- retente. Mais pas indéfiniment — sur un client où rien ne répondrait, on
@@ -554,10 +554,23 @@ local function ParseSourceText(text)
 	local subject = first:match("^[^:]*:%s*(.+)$") or first
 	subject = Trim(subject)
 
-	-- Dernière ligne : le lieu, quand il y en a un.
-	local place = #segments >= 2 and segments[#segments] or nil
+	-- Le lieu N'EST PAS forcément la dernière ligne.
+	--
+	-- Les données réelles le montrent : « Vendeur : Unger Statforth |n Zone :
+	-- Wetlands |n Coût : 1 or ». La dernière ligne est le prix, pas le lieu.
+	-- Prendre `segments[#segments]` marchait sur les montures à deux lignes et
+	-- ratait toutes celles à trois.
+	--
+	-- On renvoie donc TOUTES les lignes candidates, et c'est le rapprochement
+	-- qui tranche : un vrai nom d'instance correspondra, un prix ne
+	-- correspondra à rien. Aucune étiquette localisée à reconnaître, donc rien
+	-- à maintenir par langue.
+	local places = {}
+	for index = 2, #segments do
+		places[#places + 1] = segments[index]
+	end
 
-	return subject ~= "" and subject or nil, place
+	return subject ~= "" and subject or nil, places[1], places
 end
 
 Mapping.ParseSourceText = ParseSourceText
@@ -590,14 +603,17 @@ local function MatchPlace(index, place)
 	if index[key] then return index[key], "exact" end
 
 	-- 2. Après le deux-points : « région : libération de terremine ».
+	--    Recherche EXACTE dans l'index : pas de borne de longueur ici, sans
+	--    quoi une zone au nom court (« Wetlands », 8 signes) serait écartée
+	--    alors que son entrée existe. La borne ne protège que le partiel.
 	local after = key:match("^[^:]+:%s*(.+)$")
-	if after and #after >= MIN_PARTIAL_LENGTH and index[after] then
+	if after and index[after] then
 		return index[after], "labelled"
 	end
 
 	-- 3. Avant le deux-points : « citadelle … : le bastion inférieur ».
 	local before = key:match("^(.-)%s*:%s*.+$")
-	if before and #before >= MIN_PARTIAL_LENGTH and index[before] then
+	if before and index[before] then
 		return index[before], "prefix"
 	end
 
@@ -652,7 +668,7 @@ local function MapFromSourceText(index, achievements, previous)
 			stats.withText = stats.withText + 1
 		end
 
-		local subject, place = ParseSourceText(sourceText)
+		local subject, place, places = ParseSourceText(sourceText)
 		if place then stats.withPlace = stats.withPlace + 1 end
 
 		local spellID, sourceType = select(2, C_MountJournal.GetMountInfoByID(mountID)),
@@ -676,8 +692,13 @@ local function MapFromSourceText(index, achievements, previous)
 			-- Le lieu n'est retenu comme instance que s'il correspond à une
 			-- instance réelle. Sinon c'est une zone, un vendeur, un événement —
 			-- on garde le texte sans prétendre que c'est un raid.
+			-- Chaque ligne candidate est essayée, la première qui correspond
+			-- gagne. Une ligne de coût ou de faction ne correspondra à rien.
 			local match, strategy = nil, nil
-			if place then match, strategy = MatchPlace(index, place) end
+			for _, candidate in ipairs(places or {}) do
+				match, strategy = MatchPlace(index, candidate)
+				if match then break end
+			end
 
 			if match then
 				entry.instanceName = match.name

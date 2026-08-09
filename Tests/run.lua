@@ -765,6 +765,35 @@ test("Mapping — les deux séparateurs de ligne sont acceptés", function()
 
 	boss, place = Parse("Butin : Le roi-liche\r\nCitadelle de la Couronne de glace")
 	eq(place, "Citadelle de la Couronne de glace", "retour chariot Windows")
+
+	-- Régression, vue sur les données DB2 réelles : le lieu n'est pas toujours
+	-- la DERNIÈRE ligne. « Vendeur … |n Zone … |n Coût … » en a trois, et la
+	-- dernière est le prix.
+	local _, first, all = Parse("Vendeur : Unger Statforth|nZone : Wetlands|nCoût : 1 or")
+	eq(#all, 2, "deux lignes candidates après le sujet")
+	eq(all[1], "Zone : Wetlands", "le lieu est la deuxième ligne")
+	eq(all[2], "Coût : 1 or", "le prix reste candidat, il ne correspondra à rien")
+	eq(first, all[1], "la première candidate est renvoyée par commodité")
+end)
+
+-- Et le rapprochement doit trouver le lieu même quand il est suivi d'un prix.
+test("Mapping — le lieu est trouvé au milieu des lignes", function()
+	stub.Reset()
+	stub.lfgDungeons = {
+		[100] = { name = "Wetlands", subtypeID = 1, expansionLevel = 0 },
+	}
+	stub.mounts = {
+		{ mountID = 6, spellID = 458, name = "Cheval bai", sourceType = 3,
+		  source = "Vendeur : Unger Statforth|nZone : Wetlands|nCoût : 1 or" },
+	}
+	local ns = harness.Load(stub)
+
+	ns.Mapping:Run(false)
+	stub.RunFrames(80)
+
+	local entry = ns.db.global.sourceCache[6]
+	eq(entry.tierName, "Vanilla", "extension trouvée malgré la ligne de coût")
+	eq(entry.instanceName, "Wetlands", "lieu rapproché sur la bonne ligne")
 end)
 
 test("Mapping — replis de rapprochement des noms d'instance", function()
