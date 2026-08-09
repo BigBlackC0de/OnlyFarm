@@ -26,20 +26,26 @@ Elle donne, de façon canonique et versionnée :
     client ;
   * la faction et les prérequis.
 
-Elle NE donne PAS l'extension d'une monture. Aucun champ, sur aucun endpoint
-de l'API des montures. Le chemin officiel n'existe que pour les instances
-(/data/wow/journal-expansion -> journal-instance -> journal-encounter), et
-c'est justement le seul cas que l'addon sait déjà résoudre tout seul, côté
-client, sans réseau.
+Elle NE donne PAS l'extension d'une monture. VÉRIFIÉ contre l'API réelle le
+2026-08-09, build 12.0.7_67808, région eu : la réponse de /data/wow/mount/{id}
+contient id, name, creature_displays, description, source, faction,
+requirements et should_exclude_if_uncollected. Aucun champ d'extension, ni
+direct ni indirect.
+
+Le chemin officiel vers une extension n'existe que pour les instances
+(/data/wow/journal-expansion -> journal-instance -> journal-encounter), et il
+ne rejoint jamais les montures : aucun endpoint ne relie un objet de butin à
+une monture. C'est de toute façon le seul cas que l'addon résout déjà tout
+seul, côté client, sans réseau.
 
 Autrement dit : l'API règle le problème de l'IDENTITÉ et de la LANGUE, pas
 celui de l'extension des montures hors instance. Pour celles-là, la colonne
 `expansion` du CSV reste à remplir — par une source communautaire, ou à la
 main. Le script la laisse vide plutôt que d'inventer.
 
-Ce script n'a JAMAIS été exécuté contre l'API réelle depuis ce dépôt : l'accès
-réseau y est bloqué. Il est écrit d'après la documentation ; le premier
-lancement demande donc un œil sur la sortie.
+Exécuté contre l'API réelle le 2026-08-09 (1627 montures dans l'index). Le
+dépôt lui-même n'a pas d'accès réseau : les corrections viennent de sorties
+collées à la main.
 
 PRÉREQUIS — POUR LE MAINTENEUR, PAS POUR LE JOUEUR
 --------------------------------------------------
@@ -248,9 +254,22 @@ def fetch_mounts(api: BlizzardAPI, limit: int | None) -> list[dict]:
         source = detail.get("source") or {}
         source_type = source.get("type")
 
+        # Champ absent de la documentation mais bien présent dans les réponses :
+        # Blizzard s'en sert pour ne PAS afficher une monture non possédée dans
+        # l'armurerie. Il désigne en pratique les montures hors d'atteinte
+        # (retirées, doublons, réservées à l'autre faction). On le conserve : il
+        # vaut mieux que l'addon sache les écarter plutôt que de les compter
+        # comme « manquantes ».
+        excluded = bool(detail.get("should_exclude_if_uncollected"))
+
+        faction = (detail.get("faction") or {}).get("type") or ""
+
         rows.append(
             {
                 "mountID": mount_id,
+                "apiType": source_type or "",
+                "faction": faction,
+                "excludeIfUncollected": "1" if excluded else "",
                 # Le nom localisé sert à VÉRIFIER la jointure avec le client,
                 # pas à la faire : c'est le mountID qui joint.
                 "name": detail.get("name") or item.get("name") or "",
@@ -322,6 +341,9 @@ def main() -> int:
                 "spellID",
                 "name",
                 "apiSource",
+                "apiType",
+                "faction",
+                "excludeIfUncollected",
                 "kind",
                 "expansion",
                 "instance",
