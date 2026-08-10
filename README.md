@@ -139,6 +139,9 @@ que tu as copié.
 
 * [`CONTRIBUTING.md`](CONTRIBUTING.md) — conventions, règles du domaine, décisions prises.
 * [`docs/SPEC.md`](docs/SPEC.md) — spécification fonctionnelle complète.
+* [`docs/PHASE3.md`](docs/PHASE3.md) — ce qui reste de la phase 3 : passer de
+  la cible unique à la tournée. Inventaire de l'existant, modules à écrire,
+  algorithmes, tests, pièges.
 * [`docs/API-NOTES.md`](docs/API-NOTES.md) — signatures d'API vérifiées contre
   le client 12.0.7, et les endroits où la spécification est fausse.
 

@@ -481,7 +481,7 @@ Aucun `OnUpdate` permanent hors calcul actif. Zéro requête réseau (impossible
 |---|---|---|
 | **1 — Socle** | TOC, Ace3, scan collection, scan lockouts, liste des montures manquantes avec disponibilité. Aucune route. | ~1 semaine |
 | **2 — Données** | Pipeline `generate_data.py`, scan Encounter Journal, drop rates, coordonnées d'entrée. | ~1 semaine |
-| **3 — Route auto** | NodeDB, TravelDB, graphe, Dijkstra, TSP, onglet Route. | ~2 semaines |
+| **3 — Route auto** | NodeDB, TravelDB, graphe, Dijkstra, TSP, onglet Route. Plan détaillé : [`docs/PHASE3.md`](PHASE3.md). | ~2 semaines |
 | **4 — En jeu** | HUD, auto-avance, waypoints, bouton de téléport sécurisé, compteur d'instances. | ~1 semaine |
 | **5 — Routes maison** | Éditeur drag & drop, épinglage, conditions, import/export, templates. | ~1 semaine |
 | **6 — Élargissement** | Rares, world bosses, réputations, métiers, événements, PvP. Vue multi-perso complète. | ~1–2 semaines |
