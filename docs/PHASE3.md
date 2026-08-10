@@ -18,7 +18,8 @@ L'addon sait déjà :
 * quelles montures manquent, et lesquelles sont ouvertes cette semaine sur ce
   personnage ;
 * **où se trouve une cible** — `Modules/Route.lua` choisit une monture (raid en
-  priorité), résout son entrée d'instance, pose un point de passage ;
+  priorité), résout sa destination — entrée d'instance, ou à défaut la carte du
+  lieu cité par le texte de source — et pose un point de passage ;
 * **comment y aller** — `Route:BuildSteps` lance Dijkstra sur le graphe des
   téléports que ce personnage possède réellement, et découpe le trajet en
   étapes ;
@@ -39,8 +40,8 @@ plein de pièges).
 
 | Fichier | Ce qu'il fait déjà |
 |---|---|
-| `Modules/Route.lua` (prio 50) | `GetMission()` / `GetMissionFor(mountID)` / `PickAuto()` — **une** cible ; `BuildSteps(mission)` → étapes via Dijkstra ; `Start` / `Advance` / `Stop` ; `GetBearing(node)` ; point de passage natif + TomTom |
-| `Modules/Nodes.lua` (32) | registre fusionné (statique + `nodeCache` + `customNodes`), `GetPlayerNode()`, `GetForSource(source)`, `Distance()`, `FlightCost()` |
+| `Modules/Route.lua` (prio 50) | `GetMission()` / `GetMissionFor(mountID)` / `PickAuto()` — **une** cible ; `BuildSteps(mission)` → étapes via Dijkstra ; `Start` / `Advance` / `Stop` ; `HasReached(step[, playerNode])` ; `GetBearing(node[, playerNode])` ; `GetGuidance()` — ce que la flèche doit afficher, cap ou consigne de repli ; point de passage natif + TomTom |
+| `Modules/Nodes.lua` (32) | registre fusionné (statique + `nodeCache` + `customNodes` + nœuds de carte créés à la demande), `GetPlayerNode()`, `GetForSource(source)`, `MatchPlace(texte)` / `MapNode(uiMapID)`, `Vector()` — direction et distance séparées —, `Distance()`, `IsNear()`, `IsOnMap()`, `MapRect()` / `MapPosFromWorld()` — la projection dans les deux sens —, `EnsureWorldPos()`, `WaypointFor()`, `FlightCost()` |
 | `Modules/Teleports.lua` (33) | découverte des téléports dans le grimoire et le coffre à jouets, `GetEdges()`, `IsReady(edge)`, `GetCooldownRemaining(edge)`, apprentissage des durées (`NoteTravel`) |
 | `Modules/TravelGraph.lua` (34) | `BuildUniverse()`, `EdgesFrom()`, `ShortestPaths()`, `Path()`, `BuildMatrix()`, `IsReachable()` |
 | `UI/RoutePage.lua`, `UI/MapPreview.lua`, `UI/ArrowHUD.lua` | onglet Route, carte avec épingle, flèche déplaçable |
@@ -152,10 +153,13 @@ Règles de filtrage, dans cet ordre :
    L'interface doit le dire. On n'écarte pas une cible parce qu'on ignore son
    horloge : ce serait masquer une monture farmable derrière une lacune de
    l'addon ;
-7. `GetMissionFor` renvoie `nil` (pas de nœud exploitable) → écartée, comptée
-   dans `stats.noNode`. **Ce compteur doit être affiché** : c'est lui qui mesure
-   le trou de géographie, et le seul moyen de savoir si le moissonnage des
-   entrées d'instance a marché.
+7. `GetMissionFor` renvoie `nil` (aucune destination du tout) → écartée, comptée
+   dans `stats.noNode`. **Ce compteur doit être affiché**, mais il ne mesure plus
+   le trou de géographie : depuis qu'une carte de zone est une destination
+   acceptable, il ne reste dedans que les montures qui n'ont réellement aucun
+   lieu — boutique, JCC, promotion. Le vrai indicateur de qualité est ailleurs :
+   c'est la part de cibles `zoneWide`, précision « quelque part dans cette
+   zone ». `/of diag` section [9] donne les deux.
 
 ### 4.2 Regroupement
 
@@ -195,9 +199,15 @@ le piège n°1 de cette phase, détaillé au §6.2.
 
 `TravelGraph:IsReachable(cost)` distingue un coût réel d'un `math.huge`. Un
 nœud inatteignable **ne se retire pas silencieusement de la tournée** : il sort
-dans une section « inatteignable depuis ici », avec sa raison. `Route:BuildSteps`
-applique déjà cette règle pour la cible unique (`path == nil` → `nil`, et
-l'interface le dit) ; la tournée ne doit pas être moins honnête.
+dans une section « inatteignable depuis ici », avec sa raison.
+
+`Route:BuildSteps` applique déjà cette règle pour la cible unique, mais **plus
+en rendant `nil`** : ça revenait à confondre « je ne sais pas t'y conduire » et
+« je ne sais pas où c'est », et le joueur se retrouvait avec un plan vide et
+aucune consigne. Il rend maintenant une étape unique portant `far = true`, qui
+DÉSIGNE la cible en nommant sa zone et son continent. La tournée doit reprendre
+cette distinction plutôt que l'aplatir : un nœud sans chemin connu reste une
+cible affichable, un nœud sans destination du tout n'en est pas une.
 
 ---
 
