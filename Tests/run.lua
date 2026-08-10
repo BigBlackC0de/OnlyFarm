@@ -1507,11 +1507,15 @@ end)
 
 --- Charge l'addon avec une géographie : une entrée d'instance cartographiée,
 --  sur une carte projetable.
+--
+--  `wx`/`wy` du nœud suivent la convention du client — monde x = axe nord-sud,
+--  donc issu de la coordonnée de carte `y`. Une fixture incohérente avec la
+--  projection donnerait des distances justes par accident.
 local function LoadWithRoute()
 	stub.Reset()
 	stub.mounts = StandardMounts()
 	stub.maps[492] = {
-		name = "Désolation des Dragons",
+		name = "Désolation des Dragons", mapType = 3, parentMapID = 113,
 		continentID = 113, originX = 0, originY = 0, spanX = 1000, spanY = 1000,
 	}
 
@@ -1533,7 +1537,7 @@ local function LoadWithRoute()
 		["ej:187"] = {
 			nodeID = "ej:187", name = "Ulduar", kind = "instance",
 			uiMapID = 492, x = 0.41, y = 0.18, journalInstanceID = 187,
-			continentID = 113, wx = 410, wy = 180,
+			continentID = 113, wx = 180, wy = 410,
 		},
 	}
 	ns.Eligibility:Invalidate()
@@ -1622,13 +1626,16 @@ test("Route — le plan passe par un téléport quand il en existe un", function
 	local ns = LoadWithRoute()
 	-- Le joueur est sur un autre continent : sans téléport, Ulduar est
 	-- inatteignable ; avec, le plan doit compter deux étapes.
-	stub.maps[84] = { name = "Hurlevent", continentID = 13,
+	stub.maps[84] = { name = "Hurlevent", mapType = 3, continentID = 13,
 		originX = 0, originY = 0, spanX = 1000, spanY = 1000 }
 	stub.playerMap = { uiMapID = 84, x = 0.5, y = 0.5 }
 	ns.Nodes:Invalidate()
 
-	eq(ns.Route:BuildSteps(ns.Route:GetMissionFor(201)), nil,
-		"aucun chemin entre deux continents sans téléport")
+	-- Aucun chemin ne veut pas dire aucune consigne : on désigne la cible, et on
+	-- l'annonce comme lointaine. Un plan vide laissait le joueur sans rien.
+	local far = ns.Route:BuildSteps(ns.Route:GetMissionFor(201))
+	eq(#far, 1, "une étape de désignation malgré tout")
+	eq(far[1].far, true, "annoncée comme lointaine")
 
 	-- Un sort de téléportation qui porte le nom du nœud : c'est ainsi que
 	-- Teleports rapproche un sort d'une destination.
@@ -1741,6 +1748,232 @@ test("Route — TomTom d'une vieille version n'est pas appelé à l'aveugle", fu
 	eq(args ~= nil, true, "l'ancienne forme est tout de même tentée")
 	eq(stub.waypoint ~= nil, true,
 		"mais le point du client est posé, donc le joueur a un guidage")
+end)
+
+--------------------------------------------------------------------------------
+-- Géographie : projection, replis, zones
+--------------------------------------------------------------------------------
+
+test("Nodes — la projection inverse retrouve la position d'origine", function()
+	local ns = LoadWithRoute()
+	local rect = ns.Nodes:MapRect(492)
+	eq(rect ~= nil, true, "la carte se projette")
+
+	local continentID, wx, wy = ns.Nodes:ResolveWorldPos(492, 0.31, 0.72)
+	local x, y = ns.Nodes:MapPosFromWorld(492, continentID, wx, wy)
+	eq(math.abs(x - 0.31) < 1e-9, true, "x retrouvé")
+	eq(math.abs(y - 0.72) < 1e-9, true, "y retrouvé")
+
+	-- Une carte d'un autre continent ne peut pas accueillir cette position.
+	stub.maps[84] = { name = "Hurlevent", mapType = 3, continentID = 13,
+		originX = 0, originY = 0, spanX = 1000, spanY = 1000 }
+	ns.Nodes:Invalidate()
+	eq(ns.Nodes:MapPosFromWorld(84, continentID, wx, wy), nil,
+		"pas de projection d'un continent sur un autre")
+end)
+
+test("Nodes — une carte non projetable retombe sur sa parente", function()
+	local ns = LoadWithRoute()
+	-- L'intérieur d'un donjon : la carte existe, elle porte un nom, mais aucune
+	-- coordonnée monde n'en sort. C'est le cas de toutes les entrées de raid
+	-- moissonnées à l'intérieur d'une tour ou d'une grotte.
+	stub.maps[1912] = { name = "Tour de Torghast", mapType = 4, parentMapID = 492,
+		projects = false }
+	ns.Nodes:Invalidate()
+
+	local node = { nodeID = "ej:999", name = "Sanctum", kind = "instance",
+		uiMapID = 1912, x = 0.5, y = 0.5 }
+	ns.Nodes:EnsureWorldPos(node)
+
+	eq(node.continentID, 113, "le continent vient de la carte parente")
+	eq(node.approxMapID, 492, "et le repli est déclaré, pas caché")
+	eq(node.wx ~= nil and node.wy ~= nil, true, "des coordonnées monde existent enfin")
+end)
+
+test("Nodes — une zone nommée par la source devient une destination", function()
+	local ns = LoadWithRoute()
+	stub.maps[1355] = { name = "Nazjatar", mapType = 3, continentID = 113,
+		originX = 2000, originY = 2000, spanX = 500, spanY = 500 }
+	ns.Nodes:Invalidate()
+
+	-- Le texte du client est ÉTIQUETÉ : « Zone : Nazjatar ». C'est la forme
+	-- réelle, et c'est elle qui ne trouvait rien avant.
+	local node = ns.Nodes:GetForSource({ kind = "vendor", placeName = "Zone : Nazjatar" })
+	eq(node ~= nil, true, "une destination est trouvée")
+	eq(node.uiMapID, 1355, "c'est bien la carte de la zone")
+	eq(node.zoneWide, true, "et elle s'annonce comme une zone entière")
+	eq(node.kind, ns.Data.NODE_KINDS.ZONE, "de nature « zone »")
+
+	-- Un lieu qui ne désigne aucune carte ne doit rien inventer.
+	eq(ns.Nodes:GetForSource({ placeName = "Coût : 1 pièce d'or" }), nil,
+		"un prix n'est pas un lieu")
+end)
+
+--------------------------------------------------------------------------------
+-- Route : le guidage quand la géographie est incomplète
+--------------------------------------------------------------------------------
+
+test("Route — le cap survit à l'absence de distance", function()
+	local ns = LoadWithRoute()
+	-- Joueur ET cible dans le même intérieur d'instance : pas de coordonnées
+	-- monde, donc pas de distance. La direction, elle, se lit sur la carte —
+	-- et c'est tout le bug : la flèche s'éteignait aussi.
+	stub.maps[1912] = { name = "Tour de Torghast", mapType = 4, projects = false }
+	ns.Nodes:Invalidate()
+	stub.playerMap = { uiMapID = 1912, x = 0.50, y = 0.50 }
+	_G.GetPlayerFacing = function() return 0 end
+
+	local node = { nodeID = "ej:999", name = "Sanctum", uiMapID = 1912, x = 0.40, y = 0.20 }
+	local rotation, distance = ns.Route:GetBearing(node)
+	_G.GetPlayerFacing = nil
+
+	eq(distance, nil, "aucune distance vraie, et on ne l'invente pas")
+	eq(rotation ~= nil, true, "mais le cap existe")
+	eq(rotation > 0 and rotation < math.pi / 2, true, "et il pointe au nord-ouest")
+end)
+
+test("Route — le point de passage remonte à la carte qui l'accepte", function()
+	local ns = LoadWithRoute()
+	-- La carte du nœud refuse le point de passage ; sa parente l'accepte. Le
+	-- point doit y être posé, à la position reprojetée — pas abandonné.
+	stub.maps[1912] = { name = "Tour de Torghast", mapType = 4, parentMapID = 492,
+		continentID = 113, originX = 100, originY = 400, spanX = 50, spanY = 50,
+		noWaypoint = true }
+	ns.Nodes:Invalidate()
+
+	local node = { nodeID = "ej:999", name = "Sanctum", uiMapID = 1912, x = 0.5, y = 0.5 }
+	ns.Nodes:EnsureWorldPos(node)
+	local uiMapID, x, y = ns.Nodes:WaypointFor(node)
+
+	eq(uiMapID, 492, "le point atterrit sur la carte de zone")
+	-- Le nœud est au monde (125 nord-sud, 425 est-ouest) ; sur une carte de
+	-- 1000 yards de côté ancrée à l'origine, cela fait x = 425/1000 (est-ouest)
+	-- et y = 125/1000 (nord-sud). L'inversion des deux axes est exactement ce
+	-- que ce test surveille.
+	eq(math.abs(x - 0.425) < 1e-9, true, "x reprojeté")
+	eq(math.abs(y - 0.125) < 1e-9, true, "y reprojeté")
+end)
+
+test("Route — une cible lointaine reste une consigne, pas un silence", function()
+	local ns = LoadWithRoute()
+	stub.maps[84] = { name = "Hurlevent", mapType = 3, parentMapID = 13,
+		continentID = 13, originX = 0, originY = 0, spanX = 1000, spanY = 1000 }
+	stub.maps[13] = { name = "Roc-Noir", mapType = 2, continentID = 13,
+		originX = 0, originY = 0, spanX = 9000, spanY = 9000 }
+	stub.maps[113] = { name = "Norfendre", mapType = 2, continentID = 113,
+		originX = 0, originY = 0, spanX = 9000, spanY = 9000 }
+	stub.playerMap = { uiMapID = 84, x = 0.5, y = 0.5 }
+	ns.Nodes:Invalidate()
+
+	ns.Route:SetTarget(201)
+	eq(ns.Route:Start(), true, "le trajet démarre malgré tout")
+
+	local guidance = ns.Route:GetGuidance()
+	eq(guidance ~= nil, true, "il y a quelque chose à afficher")
+	eq(guidance.rotation, nil, "aucun cap, les continents diffèrent")
+	eq(guidance.hint ~= nil and guidance.hint ~= "", true,
+		"mais une consigne, et c'est ce qui manquait")
+	eq(guidance.hint:find("Norfendre", 1, true) ~= nil, true,
+		"elle nomme le continent de la cible")
+end)
+
+test("Route — entrer dans l'instance vaut arrivée", function()
+	local ns = LoadWithRoute()
+	stub.playerMap = { uiMapID = 492, x = 0.10, y = 0.10 }
+	ns.Route:SetTarget(201)
+	ns.Route:Start()
+
+	eq(ns.Route:Advance(), false, "dehors et loin : rien ne bouge")
+
+	-- Le joueur franchit la porte. La distance, elle, ne dit plus rien d'utile :
+	-- la carte d'intérieur n'est pas celle de l'entrée.
+	stub.currentInstance = { name = "Ulduar", instanceType = "raid", instanceID = 603 }
+	eq(ns.Route:Advance(), true, "être dedans est une preuve d'arrivée")
+	eq(ns.Route:GetPlan().arrived, true, "et le trajet est terminé")
+end)
+
+test("Route — une monture de vendeur est routable, à l'échelle de la zone", function()
+	local ns = LoadWithRoute()
+	stub.maps[1355] = { name = "Nazjatar", mapType = 3, parentMapID = 113,
+		continentID = 113, originX = 2000, originY = 2000, spanX = 500, spanY = 500 }
+	ns.db.global.sourceCache[202] = {
+		kind = "vendor", encounterName = "Talutu", placeName = "Zone : Nazjatar",
+	}
+	ns.Eligibility:Invalidate()
+	ns.Nodes:Invalidate()
+	ns.Route:Invalidate()
+
+	local mission = ns.Route:GetMissionFor(202)
+	eq(mission ~= nil, true, "la monture de vendeur a enfin une mission")
+	eq(mission.zoneWide, true, "annoncée comme une zone entière")
+	eq(mission.node.uiMapID, 1355, "sur la bonne carte")
+
+	-- Et le choix automatique préfère quand même l'entrée précise du raid.
+	eq(ns.Route:GetMission().mountID, 201, "la destination précise passe devant")
+end)
+
+test("Route — un donjon sans entrée moissonnée reste routable", function()
+	local ns = LoadWithRoute()
+	-- Le cas « butin » que rien ne rattrapait : la source nomme bien l'instance,
+	-- mais aucune entrée n'a été moissonnée pour elle. La carte du donjon, elle,
+	-- existe — sans coordonnées monde, d'où le repli sur la zone qui la contient.
+	stub.maps[1001] = { name = "Le Bastion du Crépuscule", mapType = 4,
+		parentMapID = 492, projects = false }
+	ns.db.global.nodeCache = {}
+	ns.db.global.sourceCache[201] = {
+		kind = "boss", instanceName = "Le Bastion du Crépuscule",
+		journalInstanceID = 73, isRaid = true, encounterName = "Halfus",
+	}
+	ns.Eligibility:Invalidate()
+	ns.Nodes:Invalidate()
+	ns.Route:Invalidate()
+
+	local mission = ns.Route:GetMissionFor(201)
+	eq(mission ~= nil, true, "une mission existe malgré l'entrée manquante")
+	eq(mission.node.uiMapID, 1001, "la cible est la carte du donjon")
+	eq(mission.node.approxMapID, 492, "positionnée par sa zone parente")
+end)
+
+test("Route — une cible de zone est atteinte en entrant dans la zone", function()
+	local ns = LoadWithRoute()
+	stub.maps[1355] = { name = "Nazjatar", mapType = 3, parentMapID = 113,
+		continentID = 113, originX = 2000, originY = 2000, spanX = 500, spanY = 500 }
+	stub.maps[1356] = { name = "Grotte de Nazjatar", mapType = 5, parentMapID = 1355,
+		projects = false }
+	ns.db.global.sourceCache[202] = {
+		kind = "vendor", encounterName = "Talutu", placeName = "Zone : Nazjatar",
+	}
+	ns.Eligibility:Invalidate()
+	ns.Nodes:Invalidate()
+	ns.Route:Invalidate()
+
+	stub.playerMap = { uiMapID = 492, x = 0.5, y = 0.5 }
+	ns.Route:SetTarget(202)
+	ns.Route:Start()
+	eq(ns.Route:Advance(), false, "ailleurs : rien ne bouge")
+
+	-- Le joueur entre dans une grotte de la zone visée. Le centre de zone est à
+	-- des milliers de yards, mais il EST arrivé.
+	stub.playerMap = { uiMapID = 1356, x = 0.5, y = 0.5 }
+	eq(ns.Route:Advance(), true, "être dans la zone suffit")
+end)
+
+test("Teleports — un sort qui cite une zone entre dans le graphe", function()
+	local ns = LoadWithRoute()
+	stub.maps[84] = { name = "Hurlevent", mapType = 3, continentID = 13,
+		originX = 0, originY = 0, spanX = 1000, spanY = 1000 }
+	-- Aucune instance ne s'appelle Hurlevent : avant, ce portail n'existait pas
+	-- pour le routeur. C'est le cas de tous les portails de mage.
+	stub.spells = { { spellID = 10059, name = "Portail : Hurlevent", castTime = 10000 } }
+	ns.Nodes:Invalidate()
+	ns.Teleports:Invalidate()
+
+	local found
+	for _, edge in ipairs(ns.Teleports:GetEdges()) do
+		if edge.spellID == 10059 then found = edge end
+	end
+	eq(found ~= nil, true, "l'arête existe")
+	eq(found.to, "map:84", "et elle mène à la carte de la zone")
 end)
 
 --------------------------------------------------------------------------------

@@ -393,10 +393,27 @@ end
 -- La projection carte -> monde est affine et volontairement triviale : ce qui
 -- se teste ici, c'est que le routeur refuse de comparer deux continents, pas
 -- la géométrie d'Azeroth.
+--
+-- Trois champs facultatifs modélisent ce que le vrai client fait de travers, et
+-- que le routeur doit encaisser :
+--
+--   * `projects = false`  — carte d'intérieur d'instance : elle existe, elle a
+--     un nom et un parent, mais aucune coordonnée monde ;
+--   * `noWaypoint = true` — carte qui refuse le point de passage ;
+--   * `mapType` / `parentMapID` — l'arbre des cartes, que le repli remonte.
 --------------------------------------------------------------------------------
 
 stub.maps = {}
 stub.playerMap = nil        -- { uiMapID, x, y }
+
+local function MapInfo(uiMapID, map)
+	return {
+		mapID = uiMapID,
+		name = map.name or ("Carte " .. tostring(uiMapID)),
+		mapType = map.mapType,
+		parentMapID = map.parentMapID,
+	}
+end
 
 _G.C_Map = {
 	GetBestMapForUnit = function() return stub.playerMap and stub.playerMap.uiMapID or nil end,
@@ -408,17 +425,23 @@ _G.C_Map = {
 
 	GetWorldPosFromMapPos = function(uiMapID, position)
 		local map = stub.maps[uiMapID]
-		if not map then return nil end
+		if not map or map.projects == false then return nil end
+		-- CROISEMENT VOULU, et c'est la convention du client : la coordonnée
+		-- monde `x` est l'axe NORD-SUD, donc elle dépend de la coordonnée de
+		-- carte `y` ; la coordonnée monde `y` est l'axe EST-OUEST et dépend de
+		-- `x`. Une fixture qui ne croise pas laisserait passer une inversion de
+		-- signe dans le calcul de cap — précisément le genre de bug qui fait
+		-- pointer la flèche à l'opposé sans qu'aucun test ne bronche.
 		return map.continentID, {
-			x = map.originX + position.x * map.spanX,
-			y = map.originY + position.y * map.spanY,
+			x = map.originX + position.y * map.spanX,
+			y = map.originY + position.x * map.spanY,
 		}
 	end,
 
 	GetMapChildrenInfo = function()
 		local list = {}
-		for uiMapID in pairs(stub.maps) do
-			table.insert(list, { mapID = uiMapID })
+		for uiMapID, map in pairs(stub.maps) do
+			table.insert(list, MapInfo(uiMapID, map))
 		end
 		table.sort(list, function(a, b) return a.mapID < b.mapID end)
 		return list
@@ -427,10 +450,13 @@ _G.C_Map = {
 	GetMapInfo = function(uiMapID)
 		local map = stub.maps[uiMapID]
 		if not map then return nil end
-		return { mapID = uiMapID, name = map.name or ("Carte " .. tostring(uiMapID)) }
+		return MapInfo(uiMapID, map)
 	end,
 
-	CanSetUserWaypointOnMap = function(uiMapID) return stub.maps[uiMapID] ~= nil end,
+	CanSetUserWaypointOnMap = function(uiMapID)
+		local map = stub.maps[uiMapID]
+		return map ~= nil and map.noWaypoint ~= true
+	end,
 	SetUserWaypoint = function(point) stub.waypoint = point end,
 	ClearUserWaypoint = function() stub.waypoint = nil end,
 }

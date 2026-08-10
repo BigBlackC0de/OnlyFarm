@@ -83,7 +83,7 @@ function ArrowHUD:Create()
 	local Theme = ns.Theme
 
 	local frame = CreateFrame("Frame", "OnlyFarmArrow", UIParent)
-	frame:SetSize(SIZE, SIZE + 34)
+	frame:SetSize(SIZE, SIZE + 54)
 	frame:SetFrameStrata("MEDIUM")
 	frame:SetClampedToScreen(true)
 	frame:EnableMouse(true)
@@ -137,6 +137,15 @@ function ArrowHUD:Create()
 	frame.Progress:SetPoint("TOP", frame.Step, "BOTTOM", 0, -2)
 	frame.Progress:SetPoint("LEFT")
 	frame.Progress:SetPoint("RIGHT")
+
+	-- La ligne qui empêche le cadre d'être muet. Quand il n'y a pas de cap —
+	-- autre continent, cible à l'échelle d'une zone — c'est elle qui porte la
+	-- réponse, et une réponse vaut toujours mieux qu'un tiret.
+	frame.Hint = Theme.Text(frame, "GameFontHighlightSmall", Theme.colors.gold, "CENTER")
+	frame.Hint:SetPoint("TOP", frame.Progress, "BOTTOM", 0, -2)
+	frame.Hint:SetPoint("LEFT")
+	frame.Hint:SetPoint("RIGHT")
+	frame.Hint:SetWordWrap(false)
 
 	-- Un seul OnUpdate, bridé : la flèche doit suivre la souris du joueur qui
 	-- tourne, pas recalculer une distance monde soixante fois par seconde.
@@ -207,29 +216,34 @@ function ArrowHUD:Update()
 	local frame = self.frame
 	if not frame or not frame:IsShown() then return end
 
-	local step = ns.Route:GetCurrentStep()
-	if not step then
+	local guidance = ns.Route:GetGuidance()
+	if not guidance then
 		self:Hide()
 		return
 	end
 
+	local L = ns.L
+	local step = guidance.step
+	local distance, rotation = guidance.distance, guidance.rotation
+
 	local plan = ns.Route:GetPlan()
 	frame.Step:SetText(self:StepLabel(step))
-	frame.Progress:SetText(plan and ns.L.ARROW_PROGRESS:format(plan.current, #plan.steps) or "")
-
-	local rotation, distance = ns.Route:GetBearing(step.node)
+	frame.Progress:SetText(plan and L.ARROW_PROGRESS:format(plan.current, #plan.steps) or "")
+	frame.Hint:SetText(guidance.hint or "")
 
 	if distance then
-		frame.Distance:SetText(ns.L.ARROW_YARDS:format(distance))
+		frame.Distance:SetText(L.ARROW_YARDS:format(distance))
+	elseif guidance.arrived then
+		frame.Distance:SetText(L.ARROW_ARRIVED)
 	else
-		-- Pas de distance comparable : l'étape est sur un autre continent, donc
-		-- elle se franchit par un sort, pas à pied.
+		-- Pas de distance comparable : c'est la ligne de consigne qui parle, et
+		-- elle dit où se trouve la cible. Le tiret seul se lisait comme un bug.
 		frame.Distance:SetText("—")
 	end
 
 	local Theme = ns.Theme
 	local color = Theme.colors.accent
-	if distance and distance <= ns.Route.ARRIVAL_YARDS then
+	if guidance.arrived then
 		color = Theme.colors.green
 	end
 

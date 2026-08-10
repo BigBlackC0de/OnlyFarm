@@ -337,11 +337,18 @@ function RoutePage:Refresh()
 		SetLine(Next(), L.TOOLTIP_BOSS, mission.encounterName, Theme.colors.gold)
 	end
 	SetLine(Next(), L.ROUTE_ZONE, mission.zoneName or mission.node.name, Theme.colors.text)
+	-- Des coordonnées au dixième pour une cible qui est une zone entière
+	-- feraient croire à une précision qu'on n'a pas : on écrit ce qu'on sait.
 	SetLine(Next(), L.ROUTE_COORDS,
-		string.format("%.1f, %.1f", mission.node.x * 100, mission.node.y * 100),
+		mission.zoneWide and L.ROUTE_ZONE_WIDE
+			or string.format("%.1f, %.1f", mission.node.x * 100, mission.node.y * 100),
 		Theme.colors.muted)
 	SetLine(Next(), L.COL_STATUS_SHORT, statusText, Theme.colors.text)
 	for index = used + 1, #lines do lines[index]:Hide() end
+
+	-- `plan` doit être lu AVANT de s'en servir : déclaré plus bas, il valait le
+	-- global nil, et le bouton affichait « Start » même trajet en cours.
+	local plan = ns.Route:GetPlan()
 
 	card.StartButton:SetEnabled(true)
 	local running = plan ~= nil and not plan.arrived
@@ -352,7 +359,6 @@ function RoutePage:Refresh()
 
 	-- La carte montre l'étape courante quand un trajet tourne, la destination
 	-- sinon : pendant le trajet, ce qu'on veut voir c'est où on va MAINTENANT.
-	local plan = ns.Route:GetPlan()
 	local step = ns.Route:GetCurrentStep()
 	local shown = (plan and step and step.node) and step.node or mission.node
 	local label = (plan and step) and step.name or (mission.zoneName or mission.node.name)
@@ -371,12 +377,11 @@ function RoutePage:RefreshSteps(card, mission)
 
 	if not steps or #steps == 0 then
 		for _, row in ipairs(card.Steps) do row:Hide() end
-		card.StepsEmpty:SetText(L.ROUTE_UNREACHABLE)
-		card.StepsEmpty:Show()
+		self:SetStepsNote(card, card.StepsTitle, L.ROUTE_UNREACHABLE)
 		return
 	end
-	card.StepsEmpty:Hide()
 
+	local lastShown = card.StepsTitle
 	for index, row in ipairs(card.Steps) do
 		local step = steps[index]
 		if step then
@@ -397,16 +402,42 @@ function RoutePage:RefreshSteps(card, mission)
 			row.Index:SetTextColor(color[1], color[2], color[3])
 			row.Text:SetTextColor(color[1], color[2], color[3])
 			row:Show()
+			lastShown = row
 		else
 			row:Hide()
 		end
 	end
+
+	-- Une étape « lointaine » n'est pas un itinéraire, c'est une désignation :
+	-- on garde la ligne ET l'explication, au lieu de choisir entre les deux.
+	-- La note se pose sous la dernière ligne visible, jamais par-dessus.
+	self:SetStepsNote(card, lastShown, steps[1].far and L.ROUTE_UNREACHABLE or nil)
+end
+
+--- Note sous la liste des étapes, ancrée sous `anchor`, masquée si vide.
+function RoutePage:SetStepsNote(card, anchor, text)
+	if not text then
+		card.StepsEmpty:Hide()
+		return
+	end
+	card.StepsEmpty:ClearAllPoints()
+	card.StepsEmpty:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -6)
+	card.StepsEmpty:SetPoint("RIGHT", card, "RIGHT", -10, 0)
+	card.StepsEmpty:SetText(text)
+	card.StepsEmpty:Show()
 end
 
 --- Consigne d'une étape, en clair.
 function RoutePage:StepText(step)
 	local L = ns.L
 	local kinds = ns.Data.EDGE_KINDS
+	if step.far then
+		local text = L.ROUTE_STEP_FAR:format(step.name or "?")
+		-- Le continent est ce qui manque le plus quand la cible est loin : il
+		-- dit quel portail prendre, ce qu'aucun nom de zone ne dit tout seul.
+		if step.continentName then text = text .. " (" .. step.continentName .. ")" end
+		return text
+	end
 	if step.kind == kinds.TELEPORT and step.spellName then
 		return L.ROUTE_STEP_TELEPORT:format(step.spellName)
 	end

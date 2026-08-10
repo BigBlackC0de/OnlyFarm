@@ -74,9 +74,12 @@ end
 
 --- Mission pour une monture donnée, ou nil si on ne sait pas où l'envoyer.
 --
---  Renvoyer nil est une réponse légitime et fréquente : sans entrée
---  cartographiée, il n'y a pas de coordonnées, donc pas de point de passage à
---  poser. Mieux vaut le dire que planter une épingle au hasard.
+--  Renvoyer nil reste une réponse légitime — une monture de boutique ou de JCC
+--  n'a aucun endroit où l'on puisse aller — mais c'est devenu RARE. Le nœud est
+--  cherché du plus précis au plus grossier (entrée d'instance, puis carte du
+--  lieu cité par le texte de source), et une zone entière est une destination
+--  acceptable : elle met le joueur sur le bon continent, ce qui est l'essentiel
+--  du trajet. Le manque de précision est porté par `zoneWide`, pas caché.
 function Route:GetMissionFor(mountID)
 	if type(mountID) ~= "number" then return nil end
 
@@ -103,6 +106,10 @@ function Route:GetMissionFor(mountID)
 		attempts = ns.Attempts:GetCount(mountID),
 		status = ns.Eligibility:GetStatus(mountID),
 		zoneName = self:GetZoneName(node.uiMapID),
+		-- « Quelque part dans cette zone » : à dire, sinon des coordonnées au
+		-- dixième laissent croire à un point précis.
+		zoneWide = node.zoneWide == true,
+		continentName = ns.Nodes:ContinentName(node),
 	}
 
 	-- Le boss, mais seulement si c'en est un. `encounterName` porte le sujet du
@@ -185,6 +192,10 @@ function Route:PickAuto()
 			if mission then
 				local key = {
 					mission.isRaid == true and 0 or 1,
+					-- Une destination précise avant une zone entière : à égalité
+					-- par ailleurs, mieux vaut envoyer le joueur sur une porte
+					-- que dans une province.
+					mission.zoneWide and 1 or 0,
 					STATE_PRIORITY[mission.status and mission.status.state] or 9,
 					-mission.attempts,
 					mission.name or "",
@@ -199,16 +210,18 @@ function Route:PickAuto()
 	return best
 end
 
---- Compare deux clés de tri composites. Trois nombres puis un nom : écrire la
---  comparaison une fois évite quatre `if` imbriqués recopiés à chaque critère.
+--- Compare deux clés de tri composites : des nombres, puis un nom en dernier
+--  pour départager. Écrire la comparaison une fois évite autant de `if`
+--  imbriqués que de critères — et permet d'en ajouter un sans y revenir.
 function Route.CompareKeys(a, b)
-	for index = 1, 3 do
+	local last = #a
+	for index = 1, last - 1 do
 		if a[index] ~= b[index] then
 			return a[index] < b[index] and -1 or 1
 		end
 	end
-	if a[4] == b[4] then return 0 end
-	return a[4] < b[4] and -1 or 1
+	if a[last] == b[last] then return 0 end
+	return a[last] < b[last] and -1 or 1
 end
 
 --------------------------------------------------------------------------------
@@ -232,38 +245,70 @@ end
 Route.ARRIVAL_YARDS = 60
 
 --- Construit les étapes de la position courante jusqu'à la cible.
---  @return liste de { kind, nodeID, node, name, spellName, cost }, ou nil
+--
+--  ON REND TOUJOURS AU MOINS UNE ÉTAPE quand la cible est connue. L'ancienne
+--  version rendait nil dès que Dijkstra ne trouvait rien — c'est-à-dire dès que
+--  la cible était sur un autre continent sans téléport, soit le cas le plus
+--  courant — et le joueur se retrouvait avec un plan vide et aucune consigne.
+--  « Je ne sais pas t'y conduire » et « je ne sais pas où c'est » sont deux
+--  réponses différentes, et seule la seconde justifie de ne rien dire.
+--
+--  L'étape de repli porte `far = true` : l'interface annonce alors le voyage
+--  comme long au lieu de le présenter comme un simple vol.
+--
+--  @return liste de { kind, nodeID, node, name, spellName, cost, far }, ou nil
 function Route:BuildSteps(mission)
 	if not mission or not mission.node or not mission.node.nodeID then return nil end
 	local targetID = mission.node.nodeID
 
 	local universe = ns.TravelGraph:BuildUniverse({ targetID })
 	local playerID = ns.TravelGraph.PLAYER_NODE
-	if not universe[playerID] then return nil end
-	if not universe[targetID] then return nil end
 
-	local _, previous = ns.TravelGraph:ShortestPaths(playerID, universe)
-	local path = ns.TravelGraph:Path(previous, playerID, targetID)
-	-- Inatteignable : continents différents et aucun téléport pour les relier.
-	-- On renvoie nil et l'interface le dit, plutôt que d'inventer un trajet.
-	if not path then return nil end
-
-	local steps = {}
-	for index, hop in ipairs(path) do
-		local node = universe[hop.to]
-		steps[index] = {
-			index = index,
-			kind = hop.edge and hop.edge.kind or ns.Data.EDGE_KINDS.FLY,
-			nodeID = hop.to,
-			node = node,
-			name = node and node.name or hop.to,
-			spellName = hop.edge and hop.edge.name,
-			spellID = hop.edge and hop.edge.spellID,
-			itemID = hop.edge and hop.edge.itemID,
-			cost = hop.cost,
-		}
+	if universe[playerID] and universe[targetID] then
+		local _, previous = ns.TravelGraph:ShortestPaths(playerID, universe)
+		local path = ns.TravelGraph:Path(previous, playerID, targetID)
+		if path and #path > 0 then
+			local steps = {}
+			for index, hop in ipairs(path) do
+				local node = universe[hop.to]
+				steps[index] = {
+					index = index,
+					kind = hop.edge and hop.edge.kind or ns.Data.EDGE_KINDS.FLY,
+					nodeID = hop.to,
+					node = node,
+					name = node and node.name or hop.to,
+					spellName = hop.edge and hop.edge.name,
+					spellID = hop.edge and hop.edge.spellID,
+					itemID = hop.edge and hop.edge.itemID,
+					cost = hop.cost,
+				}
+			end
+			return steps
+		end
 	end
-	return steps
+
+	return { self:FarStep(mission) }
+end
+
+--- Étape unique vers une cible qu'aucun trajet connu ne relie à ici.
+--
+--  Elle ne prétend pas conduire : elle DÉSIGNE. La flèche pointera dessus dès
+--  que le joueur sera sur le bon continent, et d'ici là la consigne nomme la
+--  zone et le continent — ce qui suffit à savoir quel portail prendre.
+function Route:FarStep(mission)
+	local node = mission.node
+	local playerNode = ns.Nodes:GetPlayerNode()
+	local far = not playerNode or ns.Nodes:Vector(playerNode, node) == nil
+
+	return {
+		index = 1,
+		kind = far and ns.Data.EDGE_KINDS.WALK or ns.Data.EDGE_KINDS.FLY,
+		nodeID = node.nodeID,
+		node = node,
+		name = mission.zoneName or mission.instanceName or node.name,
+		far = far,
+		continentName = mission.continentName,
+	}
 end
 
 --- Plan en cours, ou nil si aucun trajet n'a été lancé.
@@ -280,10 +325,11 @@ end
 
 --- Fait avancer le plan si le joueur a atteint l'étape courante.
 --
---  La mesure est la même pour toutes les natures d'étape : la distance au nœud
---  d'arrivée. Un téléport est « fait » quand on est arrivé à destination, un vol
---  aussi. Pas besoin d'écouter le lancement du sort, ce qui éviterait de toute
---  façon mal le cas du joueur qui y va autrement.
+--  La preuve d'arrivée ne dépend pas de la nature de l'étape : un téléport est
+--  « fait » quand on est à destination, un vol aussi. Pas besoin d'écouter le
+--  lancement du sort, ce qui traiterait de toute façon mal le joueur qui y va
+--  autrement. C'est `HasReached` qui décide, et il sait répondre même quand la
+--  distance n'existe pas.
 --  @return true si l'étape a changé
 function Route:Advance()
 	local plan = self.plan
@@ -291,18 +337,63 @@ function Route:Advance()
 
 	local step = plan.steps[plan.current]
 	if not step then return false end
-
-	local playerNode = ns.Nodes:GetPlayerNode()
-	local distance = playerNode and ns.Nodes:Distance(playerNode, step.node)
-	if not distance or distance > self.ARRIVAL_YARDS then return false end
+	if not self:HasReached(step) then return false end
 
 	plan.current = plan.current + 1
 	if plan.current > #plan.steps then
 		plan.arrived = true
 		self:SendMessage("OF_ROUTE_ARRIVED")
+	else
+		-- Le point de passage suit le plan. Sans ça il restait planté sur
+		-- l'étape franchie : le suivi de quêtes continuait d'annoncer une
+		-- distance vers un endroit où le joueur se tenait déjà.
+		self:PointAtCurrentStep()
 	end
 	self:SendMessage("OF_ROUTE_STEP")
 	return true
+end
+
+--- L'étape est-elle franchie ?
+--
+--  Deux preuves, et la seconde vaut mieux que la première : être DANS
+--  l'instance visée est un fait que le client affirme, là où la distance n'est
+--  qu'une mesure — et une mesure qui n'existe pas toujours. Sans elle, la
+--  flèche restait affichée alors que le joueur était déjà devant le boss.
+--  `playerNode` est facultatif : la flèche mesure et redessine dix fois par
+--  seconde, et recalculer trois fois la même position à chaque battement est du
+--  travail pur pour rien.
+function Route:HasReached(step, playerNode)
+	if type(step) ~= "table" or not step.node then return false end
+
+	playerNode = playerNode or ns.Nodes:GetPlayerNode()
+	if playerNode and ns.Nodes:IsNear(playerNode, step.node, self.ARRIVAL_YARDS) then
+		return true
+	end
+
+	-- Une cible à l'échelle de la zone est atteinte quand on EST dans la zone.
+	-- Exiger soixante yards autour d'un centre géométrique reviendrait à ne
+	-- jamais arriver : le centre d'une zone n'est pas un endroit où l'on va.
+	if step.node.zoneWide and playerNode
+		and ns.Nodes:IsOnMap(playerNode, step.node.uiMapID)
+	then
+		return true
+	end
+
+	return self:IsInsideTarget(step)
+end
+
+--- Le joueur est-il à l'intérieur de l'instance visée par cette étape ?
+function Route:IsInsideTarget(step)
+	local node = step and step.node
+	if not node or node.kind ~= ns.Data.NODE_KINDS.INSTANCE then return false end
+	if type(GetInstanceInfo) ~= "function" then return false end
+
+	local ok, name, instanceType = pcall(GetInstanceInfo)
+	if not ok or type(name) ~= "string" or instanceType == "none" then return false end
+
+	local current = ns.Util.NormalizeName(name)
+	local target = ns.Util.NormalizeName(node.name)
+	return current ~= nil and current == target
 end
 
 --- Cap et distance vers un nœud, depuis la position courante.
@@ -311,6 +402,7 @@ end
 --  une flèche qui pointe pile à l'opposé :
 --
 --    * coordonnées de carte : x croît vers l'EST, y croît vers le SUD ;
+--    * coordonnées monde : x croît vers le NORD, y croît vers l'OUEST ;
 --    * GetPlayerFacing() : radians, 0 = nord, croissant dans le sens
 --      ANTIHORAIRE (donc pi/2 = ouest) ;
 --    * Texture:SetRotation() : positif = antihoraire.
@@ -318,33 +410,65 @@ end
 --  On veut une rotation nulle quand la cible est droit devant, d'où
 --  `rotation = cap - orientation`, les deux mesurés antihoraire depuis le nord.
 --
---  Le cap se calcule en coordonnées de CARTE quand le joueur et la cible sont
---  sur la même, parce que cette convention-là est certaine. Sinon on retombe
---  sur les coordonnées monde, dont l'axe x pointe au nord et l'axe y à l'ouest
---  — c'est l'hypothèse à vérifier en jeu si la flèche part de travers.
---  @return rotation en radians, distance en yards — ou nil si incomparable
-function Route:GetBearing(node)
+--  Le choix de la mesure appartient à `Nodes:Vector` : carte commune d'abord,
+--  monde ensuite. Ce qui compte ici, c'est qu'un cap SANS distance reste un cap
+--  — l'ancienne version renonçait aux deux dès que l'une manquait.
+--  @return rotation en radians|nil, distance en yards|nil
+function Route:GetBearing(node, playerNode)
 	if type(node) ~= "table" then return nil end
-	local playerNode = ns.Nodes:GetPlayerNode()
+	playerNode = playerNode or ns.Nodes:GetPlayerNode()
 	if not playerNode then return nil end
 
-	local distance = ns.Nodes:Distance(playerNode, node)
-	if not distance then return nil end
+	local north, west, distance = ns.Nodes:Vector(playerNode, node)
+	if not north then return nil end
 	if type(GetPlayerFacing) ~= "function" then return nil, distance end
 	local facing = GetPlayerFacing()
 	if type(facing) ~= "number" then return nil, distance end
 
-	local north, west
-	if playerNode.uiMapID and playerNode.uiMapID == node.uiMapID then
-		north = playerNode.y - node.y     -- y croît au sud
-		west = playerNode.x - node.x      -- x croît à l'est
-	else
-		north = node.wx - playerNode.wx
-		west = node.wy - playerNode.wy
-	end
-
 	if north == 0 and west == 0 then return 0, distance end
 	return math.atan2(west, north) - facing, distance
+end
+
+--------------------------------------------------------------------------------
+-- Ce que la flèche doit montrer
+--
+-- Rassemblé ici plutôt que dans l'affichage : décider quoi dire quand il n'y a
+-- pas de cap est une question de routage, pas de mise en page. Et il faut
+-- TOUJOURS dire quelque chose — un cadre qui n'affiche ni distance ni direction
+-- se lit comme une panne, alors que « c'est sur un autre continent » est une
+-- réponse complète.
+--------------------------------------------------------------------------------
+
+--- @return { step, node, rotation, distance, arrived, label, hint } ou nil
+function Route:GetGuidance()
+	local step = self:GetCurrentStep()
+	if not step or not step.node then return nil end
+
+	local playerNode = ns.Nodes:GetPlayerNode()
+	local rotation, distance = self:GetBearing(step.node, playerNode)
+	local guidance = {
+		step = step,
+		node = step.node,
+		rotation = rotation,
+		distance = distance,
+		arrived = self:HasReached(step, playerNode),
+	}
+
+	if not rotation then
+		-- Pas de cap : la cible n'est pas sur cette portion du monde. On nomme
+		-- l'endroit, ce qui est exactement ce qu'il faut pour choisir un portail.
+		local L = ns.L
+		local continent = step.continentName or ns.Nodes:ContinentName(step.node)
+		if continent then
+			guidance.hint = L.ARROW_OTHER_CONTINENT:format(continent)
+		else
+			guidance.hint = L.ARROW_ELSEWHERE:format(step.name or step.node.name or "?")
+		end
+	elseif step.node.zoneWide then
+		guidance.hint = ns.L.ARROW_ZONE_WIDE
+	end
+
+	return guidance
 end
 
 --------------------------------------------------------------------------------
@@ -369,8 +493,11 @@ function Route:HasTomTom()
 		or type(TomTom.AddWaypoint) == "function"
 end
 
-function Route:SendToTomTom(node, title)
+function Route:SendToTomTom(uiMapID, x, y, title)
 	if TomTom == nil then return false end
+	if type(uiMapID) ~= "number" or type(x) ~= "number" or type(y) ~= "number" then
+		return false
+	end
 	local opts = {
 		title = title,
 		from = "OnlyFarm",
@@ -381,8 +508,7 @@ function Route:SendToTomTom(node, title)
 	}
 
 	if type(TomTom.AddMFWaypoint) == "function" then
-		local ok, uid = pcall(TomTom.AddMFWaypoint, TomTom, node.uiMapID, nil,
-			node.x, node.y, opts)
+		local ok, uid = pcall(TomTom.AddMFWaypoint, TomTom, uiMapID, nil, x, y, opts)
 		if ok then
 			-- `crazy = true` ne suffit pas toujours : selon le réglage
 			-- `arrow.autoqueue` du joueur, le point entre dans une file au lieu
@@ -395,7 +521,7 @@ function Route:SendToTomTom(node, title)
 	end
 
 	if type(TomTom.AddWaypoint) == "function" then
-		local ok = pcall(TomTom.AddWaypoint, TomTom, node.uiMapID, node.x, node.y, opts)
+		local ok = pcall(TomTom.AddWaypoint, TomTom, uiMapID, x, y, opts)
 		if ok then return true end
 	end
 
@@ -416,15 +542,9 @@ function Route:Start(mission)
 
 	local steps = self:BuildSteps(mission)
 	if not steps or #steps == 0 then
-		-- Déjà sur place, ou aucun chemin. Le point de passage sur la cible
-		-- reste utile dans les deux cas.
-		steps = { {
-			index = 1,
-			kind = ns.Data.EDGE_KINDS.FLY,
-			nodeID = mission.node.nodeID,
-			node = mission.node,
-			name = mission.instanceName or mission.node.name,
-		} }
+		-- Déjà sur place : Dijkstra rend un chemin vide quand départ et arrivée
+		-- se confondent. Le point de passage sur la cible reste utile.
+		steps = { self:FarStep(mission) }
 	end
 
 	self.plan = {
@@ -451,27 +571,23 @@ function Route:PointAtCurrentStep()
 	local title = step.name or (self.plan.mission and self.plan.mission.name)
 	local best = "arrow"
 
+	-- La carte visée n'est pas forcément celle du nœud : un intérieur d'instance
+	-- refuse le point de passage, et c'est la carte de zone au-dessus qui le
+	-- prend. `Nodes:WaypointFor` remonte cette chaîne et reprojette la position.
+	local uiMapID, x, y = ns.Nodes:WaypointFor(node)
+
 	-- TomTom d'abord s'il est là : sa flèche est meilleure que la nôtre. Mais on
 	-- ne s'arrête PAS là, contrairement à avant — le point du client coûte deux
 	-- appels et il donne la distance dans le suivi de quêtes.
-	if self:SendToTomTom(node, title) then best = "tomtom" end
+	if uiMapID and self:SendToTomTom(uiMapID, x, y, title) then best = "tomtom" end
 
-	-- Point de passage du client. Vérifier la carte d'abord : les cartes
-	-- d'intérieur d'instance et les cartes cosmiques le refusent, et poser sans
-	-- demander lève une erreur au lieu de ne rien faire.
-	if C_Map and type(C_Map.SetUserWaypoint) == "function" then
-		local allowed = true
-		if type(C_Map.CanSetUserWaypointOnMap) == "function" then
-			allowed = C_Map.CanSetUserWaypointOnMap(node.uiMapID) and true or false
-		end
-		if allowed then
-			local point = self.MakePoint(node.uiMapID, node.x, node.y)
-			if point and pcall(C_Map.SetUserWaypoint, point) then
-				if C_SuperTrack and type(C_SuperTrack.SetSuperTrackedUserWaypoint) == "function" then
-					pcall(C_SuperTrack.SetSuperTrackedUserWaypoint, true)
-				end
-				if best == "arrow" then best = "native" end
+	if uiMapID and C_Map and type(C_Map.SetUserWaypoint) == "function" then
+		local point = self.MakePoint(uiMapID, x, y)
+		if point and pcall(C_Map.SetUserWaypoint, point) then
+			if C_SuperTrack and type(C_SuperTrack.SetSuperTrackedUserWaypoint) == "function" then
+				pcall(C_SuperTrack.SetSuperTrackedUserWaypoint, true)
 			end
+			if best == "arrow" then best = "native" end
 		end
 	end
 

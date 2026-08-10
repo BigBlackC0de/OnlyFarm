@@ -48,13 +48,28 @@ flèche. Reste à faire : enchaîner plusieurs cibles dans une même sortie.
   coordonnées viennent de `C_EncounterJournal.GetDungeonEntrancesForMap`,
   c'est-à-dire de la source qu'utilise la carte du monde du jeu — aucune
   coordonnée n'est écrite à la main.
+* **Une destination pour presque tout**, et pas seulement pour les raids. Quand
+  aucune entrée d'instance ne correspond, l'addon retient la CARTE du lieu que
+  cite le texte de source du client (« Zone : Nazjatar ») et vise son centre.
+  C'est grossier, c'est annoncé comme tel — « quelque part dans cette zone » —
+  et ça met le joueur sur le bon continent, ce qui est l'essentiel du trajet.
+  Vendeurs, rares, événements et métiers deviennent routables ; seules les
+  montures qui n'ont aucun lieu (boutique, JCC, promotion) restent sans route.
+  `/of diag` donne le compte exact, par moyen.
 * **Le chemin, étape par étape**, calculé par Dijkstra sur TES téléports (le
   graphe ne contient que les sorts et jouets que ce personnage possède
-  vraiment) : « Utilise la Pierre de foyer de Dalaran », puis « Vole jusqu'à
-  Ulduar ». `Start` allume une **flèche déplaçable qui pointe l'étape en cours**,
-  pas la destination finale, et passe à la suivante quand tu arrives. Elle ne
-  dépend d'aucun autre addon. Le point de passage du jeu est posé en plus, et
-  TomTom reçoit le sien s'il est installé — mais rien n'est jamais réclamé.
+  vraiment, portails de mage compris) : « Utilise la Pierre de foyer de
+  Dalaran », puis « Vole jusqu'à Ulduar ». `Start` allume une **flèche
+  déplaçable qui pointe l'étape en cours**, pas la destination finale, et passe
+  à la suivante quand tu arrives. Elle ne dépend d'aucun autre addon. Le point
+  de passage du jeu est posé en plus, et TomTom reçoit le sien s'il est
+  installé — mais rien n'est jamais réclamé.
+* **La flèche ne reste jamais muette.** Une entrée moissonnée à l'intérieur
+  d'une tour n'a pas de coordonnées monde : la distance est alors inconnue, mais
+  la direction se lit quand même sur la carte, et elle s'affiche. Quand la cible
+  est sur un autre continent, le cadre nomme ce continent au lieu d'afficher un
+  tiret. Et quand la carte de la cible refuse le point de passage, il est posé
+  sur la carte de zone au-dessus, à la position reprojetée.
 * Clic droit sur une ligne : copier le nom, tracer la route, exclure. Et un
   bouton d'exclusion sur chaque ligne, pour que l'action se voie.
 * Suivi des entrées d'instance, avec le compteur du cap 10/heure — 30/jour.

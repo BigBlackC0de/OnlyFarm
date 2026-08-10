@@ -78,6 +78,17 @@ function Teleports:BuildNameIndex()
 end
 
 --- Premier nœud dont le nom apparaît dans `text`, ou nil.
+--
+--  Deux registres consultés, dans cet ordre : les entrées d'instance d'abord,
+--  parce qu'un téléport de donjon vise une porte précise ; les CARTES du client
+--  ensuite.
+--
+--  Ce second registre est ce qui met enfin les portails de mage et les pierres
+--  de foyer dans le graphe. « Téléportation : Orgrimmar » ne cite aucune
+--  instance — l'ancien rapprochement ne trouvait donc rien et l'arête n'existait
+--  pas — mais il cite une zone, et une zone est un nœud depuis que le routeur
+--  sait en fabriquer. Sur un mage, c'est tout le réseau des capitales qui entre
+--  d'un coup dans le calcul.
 function Teleports:MatchNode(text, index)
 	local needle = ns.Util.NormalizeName(text)
 	if not needle then return nil end
@@ -86,7 +97,18 @@ function Teleports:MatchNode(text, index)
 			return index[i].nodeID
 		end
 	end
-	return nil
+
+	-- Le rapprochement PARTIEL est refusé ici, à la différence des textes de
+	-- source. Une arête inventée est bien pire qu'une arête manquante : elle
+	-- fait calculer tout un trajet autour d'un sort qui ne mène pas là. Or les
+	-- vrais sorts de voyage citent leur destination après un deux-points —
+	-- « Portail : Hurlevent », « Teleport: Stormwind » — donc les formes sûres
+	-- suffisent à tous les attraper.
+	local uiMapID, strategy = ns.Nodes:MatchPlace(text)
+	if not uiMapID or strategy == "partial" then return nil end
+
+	local node = ns.Nodes:MapNode(uiMapID)
+	return node and node.nodeID or nil
 end
 
 --------------------------------------------------------------------------------

@@ -687,6 +687,7 @@ local function MapFromSourceText(index, achievements, previous)
 		partial = 0,
 		byAchievement = 0,
 		byCurated = 0,
+		byMap = 0,
 	}
 
 	local mountIDs = C_MountJournal and C_MountJournal.GetMountIDs()
@@ -760,6 +761,28 @@ local function MapFromSourceText(index, achievements, previous)
 				stats[strategy] = (stats[strategy] or 0) + 1
 			else
 				if place then entry.placeName = place end
+
+				-- Le lieu n'est pas une instance : c'est peut-être une CARTE.
+				--
+				-- C'est ce rapprochement-là qui donne une destination aux
+				-- montures de vendeur, de rare, d'événement et de métier —
+				-- l'écrasante majorité de la collection. Sans lui, l'addon
+				-- LISAIT « Zone : Nazjatar » et répondait quand même « aucune
+				-- entrée cartographiée » : il savait où c'était et refusait de
+				-- le dire.
+				--
+				-- Le figer ici plutôt que de le refaire à chaque calcul de route
+				-- n'est pas qu'une économie : le rapprochement est le même pour
+				-- tout le monde, il n'a aucune raison d'être recommencé.
+				for _, candidate in ipairs(places or {}) do
+					local uiMapID = ns.Nodes:MatchPlace(candidate)
+					if uiMapID then
+						entry.uiMapID = uiMapID
+						entry.placeName = candidate
+						stats.byMap = (stats.byMap or 0) + 1
+						break
+					end
+				end
 
 				-- Aucun lieu exploitable : le sujet est peut-être un haut
 				-- fait, auquel cas l'arbre des catégories donne l'extension.
@@ -979,19 +1002,22 @@ local function CollectEntrances()
 				if type(x) == "number" and type(y) == "number" and entrance.journalInstanceID then
 					local nodeID = ns.Data.InstanceNodeID(entrance.journalInstanceID)
 					if not nodes[nodeID] then
-						local continentID, wx, wy = ns.Nodes:ResolveWorldPos(uiMapID, x, y)
-						nodes[nodeID] = {
+						local node = {
 							nodeID = nodeID,
 							name = entrance.name,
 							kind = ns.Data.NODE_KINDS.INSTANCE,
 							uiMapID = uiMapID,
 							x = x,
 							y = y,
-							continentID = continentID,
-							wx = wx,
-							wy = wy,
 							journalInstanceID = entrance.journalInstanceID,
 						}
+						-- Les coordonnées monde passent par le repli de Nodes :
+						-- une entrée moissonnée sur la carte d'un intérieur
+						-- d'instance ne se projette pas, et sans repli elle
+						-- entrait dans le cache muette — pas de distance, pas de
+						-- cap, une flèche vide devant le portail.
+						ns.Nodes:EnsureWorldPos(node)
+						nodes[nodeID] = node
 						count = count + 1
 					end
 				end
@@ -1405,6 +1431,38 @@ function Mapping:BuildReport()
 	Line("    %s possédées / %s obtenables / %s masquées · journal prêt : %s",
 		tostring(counts.owned), tostring(counts.total), tostring(counts.hidden),
 		tostring(ns.Collection.ready))
+
+	-- 9. Routage. « La plupart des montures n'ont pas de route » est un constat
+	--    juste et inutilisable : il ne dit pas si c'est le lieu qui manque, le
+	--    rapprochement qui échoue, ou la géographie qui n'a pas été moissonnée.
+	--    Cette section répond, monture par monture agrégée par moyen.
+	Line("")
+	Line("[9] Routage — où l'addon sait envoyer le joueur")
+	local byMeans, meansOrder = {}, {}
+	local routable, missingTotal = 0, 0
+	for _, entry in ipairs(ns.Collection:GetMissing()) do
+		missingTotal = missingTotal + 1
+		local node = ns.Nodes:GetForSource(ns.Eligibility:GetSource(entry.mountID))
+		local means = "AUCUNE destination"
+		if node then
+			routable = routable + 1
+			means = tostring(node.kind)
+			if node.approxMapID then means = means .. " (carte parente)" end
+		end
+		if not byMeans[means] then
+			byMeans[means] = 0
+			meansOrder[#meansOrder + 1] = means
+		end
+		byMeans[means] = byMeans[means] + 1
+	end
+	table.sort(meansOrder, function(a, b) return byMeans[a] > byMeans[b] end)
+	Line("    %d/%d montures manquantes ont une destination", routable, missingTotal)
+	for _, means in ipairs(meansOrder) do
+		Line("    %-28s %d", means, byMeans[means])
+	end
+	Line("    nœuds en mémoire : %d · cartes indexées : %d",
+		ns.Nodes:Count(), ns.Util.Count(ns.Nodes:BuildPlaceIndex()))
+	Line("    arêtes de voyage disponibles : %d", #ns.Teleports:GetEdges())
 
 	return lines
 end

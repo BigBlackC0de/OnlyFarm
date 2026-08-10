@@ -27,6 +27,7 @@ Data.NODE_KINDS = {
 	INSTANCE = "instance",  -- entrée d'instance, moissonnée depuis le client
 	HUB = "hub",            -- ancre de voyage (capitale, camp de portails)
 	OUTDOOR = "outdoor",    -- point de spawn d'un rare, vendeur, nœud de métier
+	ZONE = "zone",          -- une carte entière, visée en son centre
 	CUSTOM = "custom",      -- posé par le joueur depuis l'éditeur de route
 }
 
@@ -34,6 +35,13 @@ Data.NODE_KINDS = {
 --  patchs, contrairement au nom localisé : c'est lui qui sert de clé.
 function Data.InstanceNodeID(journalInstanceID)
 	return "ej:" .. tostring(journalInstanceID)
+end
+
+--- Identifiant de nœud d'une carte. Le uiMapID est stable entre patchs, et
+--  c'est ce qui permet à une monture de vendeur — dont on ne connaît que la
+--  zone — d'avoir malgré tout une destination.
+function Data.MapNodeID(uiMapID)
+	return "map:" .. tostring(uiMapID)
 end
 
 --------------------------------------------------------------------------------
